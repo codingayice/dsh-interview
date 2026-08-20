@@ -1,5 +1,5 @@
 function sessionIdOf(exec) {
-  return exec?.agent?.session?.id || 'global'
+  return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || 'global'
 }
 
 function modelText(value) {

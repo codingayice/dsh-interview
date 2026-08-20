@@ -31,7 +31,7 @@ function Explanation({ explanation }) {
 }
 
 export function LiveInterviewCard({ sessionId }) {
-  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId])
+  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
   const command = useCommand(sessionId)
   if (query.loading && !query.data) return h('div', { className: 'di-card' }, h(Loading))
   if (query.error) return h('div', { className: 'di-card' }, h(ErrorNotice, null, query.error))

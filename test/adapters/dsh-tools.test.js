@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createToolDefinitions, modelText } from '../../src/adapters/dsh/tool-definitions.js'
+import { createToolDefinitions, modelText, sessionIdOf } from '../../src/adapters/dsh/tool-definitions.js'
 import { instructionFor } from '../../src/adapters/dsh/agent-event-bridge.js'
 import { dispatchCommand } from '../../src/adapters/http/command-dispatcher.js'
 import { errorResponse } from '../../src/adapters/http/api-routes.js'
@@ -10,6 +10,11 @@ import { applicationFixture } from '../support/application-fixture.js'
 function exec(sessionId = 'session-1') {
   return { agent: { session: { id: sessionId } } }
 }
+
+test('工具优先使用 DSH 会话头中的稳定会话 ID', () => {
+  assert.equal(sessionIdOf({ agent: { session: { id: 'runtime-id', header: { id: 'stable-id' } } } }), 'stable-id')
+  assert.equal(sessionIdOf(exec('legacy-id')), 'legacy-id')
+})
 
 test('DSH 只暴露四个职责明确的面试工具', () => {
   const fixture = applicationFixture()

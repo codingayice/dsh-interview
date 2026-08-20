@@ -9,6 +9,7 @@ export const name = 'dsh-interview'
 export const inject = ['slots']
 
 function ToolResourceView({ toolName, sessionId, block }) {
+  if (!block || !('kind' in block)) return null
   const args = parseToolArgs(block)
   if (toolName === 'interview_library') {
     if (args.command === 'list') return h(PracticeLibrary, { sessionId })

@@ -1,15 +1,16 @@
 import React from 'react'
 import { interviewApi } from './api.js'
 
-export function useInterviewQuery(key, loader, dependencies = []) {
+export function useInterviewQuery(key, loader, dependencies = [], options = {}) {
+  const cache = options.cache !== false
   const [state, setState] = React.useState({ loading: true, data: null, error: '' })
   const load = React.useCallback((force = false) => {
     setState((current) => ({ ...current, loading: current.data === null, error: '' }))
-    const request = force ? Promise.resolve().then(loader) : interviewApi.cached(key, loader)
+    const request = force || !cache ? Promise.resolve().then(loader) : interviewApi.cached(key, loader)
     return request
       .then((data) => setState({ loading: false, data, error: '' }))
       .catch((error) => setState((current) => ({ ...current, loading: false, error: error.message || '加载失败' })))
-  }, [key, ...dependencies])
+  }, [key, cache, ...dependencies])
 
   React.useEffect(() => {
     load()

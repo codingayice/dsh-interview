@@ -104,13 +104,14 @@ var interviewApi = {
 
 // src/client/shared/hooks.js
 var import_react = __toESM(require("react"), 1);
-function useInterviewQuery(key, loader, dependencies = []) {
+function useInterviewQuery(key, loader, dependencies = [], options = {}) {
+  const cache2 = options.cache !== false;
   const [state, setState] = import_react.default.useState({ loading: true, data: null, error: "" });
   const load = import_react.default.useCallback((force = false) => {
     setState((current) => ({ ...current, loading: current.data === null, error: "" }));
-    const request = force ? Promise.resolve().then(loader) : interviewApi.cached(key, loader);
+    const request = force || !cache2 ? Promise.resolve().then(loader) : interviewApi.cached(key, loader);
     return request.then((data) => setState({ loading: false, data, error: "" })).catch((error) => setState((current) => ({ ...current, loading: false, error: error.message || "\u52A0\u8F7D\u5931\u8D25" })));
-  }, [key, ...dependencies]);
+  }, [key, cache2, ...dependencies]);
   import_react.default.useEffect(() => {
     load();
     return interviewApi.subscribe(() => load(true));
@@ -224,7 +225,7 @@ function Explanation({ explanation }) {
   );
 }
 function LiveInterviewCard({ sessionId }) {
-  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId]);
+  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
   const command = useCommand(sessionId);
   if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
   if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
@@ -467,10 +468,10 @@ function InsightsCard() {
 var import_react5 = __toESM(require("react"), 1);
 function TimelinePanel({ sessionId, revisionSignal }) {
   const [open, setOpen] = import_react5.default.useState(true);
-  const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal]);
+  const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal], { cache: false });
   const session = sessionQuery.data?.resource?.data;
   const practiceId = session?.practice?.id || null;
-  const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || "none"}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal]);
+  const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || "none"}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal], { cache: false });
   const practice = detailQuery.data?.resource?.data;
   if (!session?.selected || !practice?.questions?.length) return null;
   if (!open) return h("button", { className: "di-button", style: { position: "fixed", right: "16px", top: "112px", zIndex: 40 }, onClick: () => setOpen(true) }, `\u9898\u76EE ${practice.questions.length}`);
@@ -527,6 +528,7 @@ function installStyles() {
 var name = "dsh-interview";
 var inject = ["slots"];
 function ToolResourceView({ toolName, sessionId, block }) {
+  if (!block || !("kind" in block)) return null;
   const args = parseToolArgs(block);
   if (toolName === "interview_library") {
     if (args.command === "list") return h(PracticeLibrary, { sessionId });

@@ -5,10 +5,10 @@ import { h, PhaseBadge, ScoreRail } from '../shared/ui.js'
 
 export function TimelinePanel({ sessionId, revisionSignal }) {
   const [open, setOpen] = React.useState(true)
-  const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal])
+  const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal], { cache: false })
   const session = sessionQuery.data?.resource?.data
   const practiceId = session?.practice?.id || null
-  const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || 'none'}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal])
+  const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || 'none'}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal], { cache: false })
   const practice = detailQuery.data?.resource?.data
   if (!session?.selected || !practice?.questions?.length) return null
   if (!open) return h('button', { className: 'di-button', style: { position: 'fixed', right: '16px', top: '112px', zIndex: 40 }, onClick: () => setOpen(true) }, `题目 ${practice.questions.length}`)
