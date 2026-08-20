@@ -881,37 +881,115 @@ function InsightsCard() {
 
 // src/client/features/timeline.js
 var import_react5 = __toESM(require("react"), 1);
+var TIMELINE_VIEWS = [
+  { id: "question", label: "\u9898\u76EE" },
+  { id: "attempts", label: "\u4F5C\u7B54\u8BB0\u5F55" },
+  { id: "reviews", label: "\u70B9\u8BC4" },
+  { id: "answer", label: "\u7B54\u6848" }
+];
+function EmptyTimelineContent({ children }) {
+  return h("div", { className: "di-time-empty" }, children);
+}
+function TimelineContent({ question, view }) {
+  if (view === "question") return h(Markdown, null, question.prompt);
+  if (view === "attempts") {
+    if (!question.attempts.length) return h(EmptyTimelineContent, null, "\u5C1A\u672A\u4F5C\u7B54");
+    return h("div", { className: "di-time-records" }, question.attempts.map((attempt) => h(
+      "section",
+      { className: "di-time-record", key: attempt.id },
+      h("div", { className: "di-time-record-label" }, `\u7B2C ${attempt.sequence} \u6B21\u56DE\u7B54`),
+      h(Markdown, null, attempt.answer)
+    )));
+  }
+  if (view === "reviews") {
+    const reviewed = question.attempts.filter((attempt) => attempt.evaluation);
+    if (!reviewed.length) return h(EmptyTimelineContent, null, "\u6682\u65E0\u70B9\u8BC4");
+    return h("div", { className: "di-time-records" }, reviewed.map((attempt) => h(
+      "section",
+      { className: "di-time-record", key: attempt.id },
+      h(
+        "div",
+        { className: "di-time-record-label" },
+        h("span", null, `\u7B2C ${attempt.sequence} \u6B21\u56DE\u7B54`),
+        h("strong", null, `${attempt.evaluation.score}/10`)
+      ),
+      h(Markdown, null, attempt.evaluation.feedback)
+    )));
+  }
+  if (!question.explanation) return h(EmptyTimelineContent, null, "\u6682\u65E0\u7B54\u6848");
+  return h(
+    "div",
+    { className: "di-time-answer" },
+    h(Markdown, null, question.explanation.detail),
+    question.explanation.memorizationPoints ? h(
+      "section",
+      { className: "di-time-memorize" },
+      h("div", { className: "di-time-record-label" }, "\u76F4\u63A5\u80CC"),
+      h(Markdown, null, question.explanation.memorizationPoints)
+    ) : null
+  );
+}
 function TimelinePanel({ sessionId, revisionSignal }) {
-  const [open, setOpen] = import_react5.default.useState(true);
+  const [selection, setSelection] = import_react5.default.useState(null);
   const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal], { cache: false });
   const session = sessionQuery.data?.resource?.data;
   const practiceId = session?.practice?.id || null;
   const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || "none"}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal], { cache: false });
   const practice = detailQuery.data?.resource?.data;
   if (!session?.selected || !practice?.questions?.length) return null;
-  if (!open) return h("button", { className: "di-button", style: { position: "fixed", right: "16px", top: "112px", zIndex: 40 }, onClick: () => setOpen(true) }, `\u9898\u76EE ${practice.questions.length}`);
-  return h(
-    "aside",
-    { className: "di-timeline", "aria-label": "\u9898\u76EE\u65F6\u95F4\u8F74" },
-    h(
+  const toggleView = (questionId, view) => {
+    setSelection((current) => current?.questionId === questionId && current.view === view ? null : { questionId, view });
+  };
+  return h("nav", {
+    className: "di-timeline",
+    "aria-label": "\u9898\u76EE\u65F6\u95F4\u8F74",
+    onKeyDown: (event) => {
+      if (event.key === "Escape") setSelection(null);
+    }
+  }, practice.questions.map((question) => {
+    const activeView = selection?.questionId === question.id ? selection.view : null;
+    const activeLabel = TIMELINE_VIEWS.find((item) => item.id === activeView)?.label;
+    return h(
       "div",
-      { className: "di-timeline-head" },
-      h("strong", null, practice.topic),
-      h("button", { className: "di-button", onClick: () => setOpen(false), "aria-label": "\u6536\u8D77\u9898\u76EE\u65F6\u95F4\u8F74" }, "\u6536\u8D77")
-    ),
-    h(
-      "div",
-      { className: "di-timeline-body" },
-      h(PhaseBadge, { phase: session.phase }),
-      practice.questions.map((question) => h(
+      {
+        className: `di-time-item${session.questionId === question.id ? " is-current" : ""}${activeView ? " has-view" : ""}`,
+        key: question.id
+      },
+      h(
+        "button",
+        {
+          className: "di-time-node",
+          type: "button",
+          "aria-label": `\u7B2C ${question.sequence} \u9898\uFF1A${question.prompt}`,
+          onClick: () => toggleView(question.id, "question")
+        },
+        h("span", { className: "di-time-dot", "aria-hidden": "true" }),
+        h("span", null, `Q${String(question.sequence).padStart(2, "0")}`)
+      ),
+      h(
         "div",
-        { className: `di-time-item${session.questionId === question.id ? " is-current" : ""}`, key: question.id },
-        h("div", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
-        h("div", { className: "di-time-q", title: question.prompt }, question.prompt),
-        h("div", { className: "di-time-meta" }, h(ScoreRail, { score: question.latestScore, compact: true }), h("span", null, `${question.attempts.length} \u6B21\u4F5C\u7B54`))
-      ))
-    )
-  );
+        { className: "di-time-actions", role: "toolbar", "aria-label": `\u7B2C ${question.sequence} \u9898\u64CD\u4F5C` },
+        TIMELINE_VIEWS.map((item) => h("button", {
+          className: `di-time-action${activeView === item.id ? " is-active" : ""}`,
+          type: "button",
+          key: item.id,
+          "aria-pressed": activeView === item.id,
+          onClick: () => toggleView(question.id, item.id)
+        }, item.label))
+      ),
+      activeView ? h(
+        "section",
+        { className: "di-time-flyout", "aria-label": `${activeLabel}\u5185\u5BB9` },
+        h(
+          "header",
+          { className: "di-time-flyout-head" },
+          h("strong", null, activeLabel),
+          h("button", { type: "button", onClick: () => setSelection(null), "aria-label": "\u5173\u95ED" }, "\xD7")
+        ),
+        h("div", { className: "di-time-flyout-body" }, h(TimelineContent, { question, view: activeView }))
+      ) : null
+    );
+  }));
 }
 
 // src/protocol/interview-tool-names.js
@@ -959,11 +1037,11 @@ var STYLE_TEXT = `
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
 .di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(1080px,100%);padding:10px 13px;border-left:3px solid var(--di-red);border-radius:0 7px 7px 0;background:#fff1f2;color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--di-muted)}
 .di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{font-size:18px;font-weight:730}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-textarea{min-height:150px;resize:vertical;line-height:1.6}.di-practice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-field{display:grid;gap:6px;font-size:13px;font-weight:600}.di-field-wide{grid-column:1/-1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:500;text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:750;color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
-.di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--di-line);border-radius:12px;background:var(--di-white);box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--di-line)}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--di-white);border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-blue);background:var(--di-blue)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--di-muted)}
+.di-timeline{position:fixed;right:18px;top:112px;z-index:40;display:grid;gap:14px;width:56px;max-height:calc(100vh - 144px);padding:4px 0;overflow:visible;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink)}.di-time-item{position:relative;min-height:34px}.di-time-item:not(:last-child)::after{content:"";position:absolute;z-index:-1;top:27px;right:43px;width:1px;height:25px;background:var(--di-line)}.di-time-node{appearance:none;display:flex;align-items:center;gap:7px;width:56px;height:30px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--di-muted);font:700 11px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:color .15s ease,background .15s ease}.di-time-node:hover,.di-time-node:focus-visible,.di-time-item.has-view .di-time-node{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-node:focus-visible,.di-time-action:focus-visible,.di-time-flyout-head button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-time-dot{width:7px;height:7px;flex:0 0 auto;border:2px solid #b7c0d0;border-radius:50%;background:var(--di-white)}.di-time-item.is-current .di-time-dot{border-color:var(--di-blue);background:var(--di-blue);box-shadow:0 0 0 4px rgba(36,92,255,.1)}.di-time-actions{position:absolute;right:64px;top:-2px;display:flex;gap:3px;width:max-content;padding:4px;border:1px solid var(--di-line);border-radius:9px;background:rgba(255,255,255,.98);box-shadow:0 8px 22px rgba(28,39,67,.1);opacity:0;pointer-events:none;transform:translateX(6px);transition:opacity .15s ease,transform .15s ease}.di-time-item:hover .di-time-actions,.di-time-item:focus-within .di-time-actions,.di-time-item.has-view .di-time-actions{opacity:1;pointer-events:auto;transform:translateX(0)}.di-time-action{appearance:none;border:0;border-radius:6px;padding:7px 9px;background:transparent;color:var(--di-muted);font:600 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;white-space:nowrap;cursor:pointer}.di-time-action:hover,.di-time-action.is-active{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-flyout{position:fixed;right:82px;top:112px;width:min(390px,calc(100vw - 112px));max-height:calc(100vh - 144px);overflow:hidden;border:1px solid var(--di-line);border-radius:11px;background:var(--di-white);box-shadow:0 16px 42px rgba(23,32,51,.14)}.di-time-flyout-head{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--di-line);font-size:13px}.di-time-flyout-head button{appearance:none;width:25px;height:25px;border:0;border-radius:6px;background:transparent;color:var(--di-muted);font-size:20px;line-height:1;cursor:pointer}.di-time-flyout-head button:hover{color:var(--di-ink);background:var(--di-paper)}.di-time-flyout-body{max-height:calc(100vh - 196px);padding:14px;overflow:auto;font-size:13px;line-height:1.7}.di-time-records{display:grid;gap:12px}.di-time-record{padding-bottom:12px;border-bottom:1px solid var(--di-line)}.di-time-record:last-child{padding-bottom:0;border-bottom:0}.di-time-record-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;color:var(--di-muted);font-size:11px;font-weight:700}.di-time-record-label strong{color:var(--di-green)}.di-time-answer>.di-time-memorize{margin-top:14px;padding:12px;border-radius:8px;background:var(--di-green-soft)}.di-time-empty{padding:16px 4px;text-align:center;color:var(--di-muted)}
 @keyframes di-spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.di-question-card{grid-template-columns:1fr;padding:22px}.di-answer-button{justify-self:start}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}}
 @media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-review-score{flex-wrap:wrap;padding:18px}.di-review-score-summary{flex:1}.di-stars{width:100%;margin-left:56px}.di-review-content{padding:20px 18px}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-practice-form{grid-template-columns:1fr;padding:16px 18px}.di-field-wide{grid-column:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}}
-@media(prefers-reduced-motion:reduce){.di-button{transition:none}.di-spinner{animation-duration:1.5s}}
+@media(prefers-reduced-motion:reduce){.di-button,.di-time-node,.di-time-actions{transition:none}.di-spinner{animation-duration:1.5s}}
 `;
 function installStyles() {
   if (document.getElementById("dsh-interview-styles")) return;
