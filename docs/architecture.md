@@ -68,3 +68,22 @@ interview_submit_answer
 ```
 
 若重新作答的题目已经存在参考讲解，保存新评价后直接复用该讲解生成复盘卡片。
+
+直接看答案不会经过作答和评价：
+
+```text
+interview_reveal_answer
+→ interview_complete_review
+→ presentation.kind = review（无 attemptId）
+```
+
+结束练习使用独立总结阶段：
+
+```text
+interview_finish_practice
+→ 读取完整练习上下文并生成总结
+→ interview_complete_summary
+→ presentation.kind = finished
+```
+
+切换练习返回的会话 DTO 内嵌完整练习详情，包括模式配置、总结、全部题目、历次作答、评价和讲解；Agent 无需依赖额外推断恢复上下文。

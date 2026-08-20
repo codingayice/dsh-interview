@@ -8,9 +8,9 @@ dsh-interview 是面向 DeepSeek Harness Web 的本地 AI 面试训练工作区�
 ## 功能
 
 - 三种练习模式：背八股、模拟面试和场景题。
-- 显式面试流程：出题、回答、自动生成完整复盘、下一题和结束。
+- 显式面试流程：单题出题、回答或直接看答案、完整复盘、下一题和练习总结。
 - 历次作答永久保留，重新回答不会覆盖已评价记录。
-- 练习档案支持搜索、筛选、详情、继续、重新打开、删除和导出。
+- 练习档案支持新建、搜索、筛选、详情、修改、继续、重新打开、删除和导出，题目支持查询、修改和删除。
 - 能力复盘提供平均分、主题掌握度和薄弱主题。
 - 聊天卡片与右侧题目时间轴使用同一份权威读模型。
 - 数据默认保存在本地 SQLite，不上传简历和回答。
@@ -58,7 +58,7 @@ dsh plugin --profile web update dsh-interview
 
 ### 回答和完整复盘
 
-直接在正常聊天输入框回答。Agent 会保存回答，并自动完成一份结构化本题复盘：
+可以直接在正常聊天输入框回答，也可以点击题目卡的“看答案”。作答后 Agent 会保存回答，并自动完成一份结构化本题复盘：
 
 - 0–10 分总分
 - 文字反馈
@@ -67,6 +67,8 @@ dsh plugin --profile web update dsh-interview
 - 必填的“直接背”要点
 
 同一道题可以重新回答。每次回答都是独立记录，适合比较进步。
+
+直接看答案不会创建虚假的作答和评价，只展示详细知识点讲解与“直接背”。
 
 ### 复盘后的操作
 
@@ -79,6 +81,8 @@ dsh plugin --profile web update dsh-interview
 ```
 
 评价是内部中间结果，不单独生成半成品卡片。参考讲解和“直接背”保存完成后，题目、作答、评价与讲解会统一展示。
+
+结束练习后，Agent 会读取本次练习的全部题目、历次作答、评价和讲解，生成并保存总体总结、表现亮点和改进建议。
 
 ### 练习档案和复盘
 
@@ -115,8 +119,8 @@ dsh plugin --profile web update dsh-interview
 
 | 范围 | 工具 |
 | --- | --- |
-| 练习生命周期 | `interview_start_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice` |
-| 题目流程 | `interview_present_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question` |
+| 练习生命周期 | `interview_start_practice`、`interview_update_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice`、`interview_complete_summary` |
+| 题目流程 | `interview_present_question`、`interview_get_question`、`interview_update_question`、`interview_delete_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question`、`interview_reveal_answer` |
 | 回答与复盘 | `interview_submit_answer`、`interview_save_evaluation`、`interview_complete_review` |
 | 档案与复盘 | `interview_list_practices`、`interview_read_practice_context`、`interview_get_practice`、`interview_get_insights`、`interview_export_practices`、`interview_delete_practice` |
 
