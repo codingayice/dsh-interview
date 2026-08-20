@@ -9,7 +9,7 @@
     "test:domain": "node --test test/domain/*.test.js",
     "test:application": "node --test test/application/*.test.js",
     "test:storage": "node --test test/infrastructure/*.test.js",
-    "check": "node --check lib/index.js && node --check src/domain/practice.js && node --check client/client.js"
+    "check": "node --check lib/index.js && node --check src/adapters/dsh/plugin.js && node --check client/client.js"
   },
   "exports": {
     ".": "./lib/index.js",
