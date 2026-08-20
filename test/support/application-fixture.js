@@ -1,0 +1,53 @@
+import { InterviewApplication } from '../../src/application/interview-application.js'
+
+function clone(value) {
+  return value === undefined ? undefined : structuredClone(value)
+}
+
+export class InMemoryInterviewRepository {
+  constructor() {
+    this.practices = new Map()
+    this.cursors = new Map()
+  }
+
+  async getPractice(id) { return clone(this.practices.get(id) || null) }
+
+  async listPractices(filters = {}) {
+    return [...this.practices.values()]
+      .filter((practice) => !filters.mode || practice.mode === filters.mode)
+      .filter((practice) => !filters.status || practice.status === filters.status)
+      .filter((practice) => !filters.query || practice.topic.toLowerCase().includes(String(filters.query).toLowerCase()))
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .map(clone)
+  }
+
+  async getCursor(sessionId) { return clone(this.cursors.get(sessionId) || null) }
+
+  async commit({ practice, cursor }) {
+    if (practice) this.practices.set(practice.id, clone(practice))
+    if (cursor) this.cursors.set(cursor.sessionId, clone(cursor))
+  }
+
+  async deletePractice(id) {
+    this.practices.delete(id)
+    for (const [sessionId, cursor] of this.cursors) if (cursor.practiceId === id) this.cursors.delete(sessionId)
+  }
+
+  async clearCursor(sessionId) { this.cursors.delete(sessionId) }
+}
+
+export function applicationFixture() {
+  const repository = new InMemoryInterviewRepository()
+  const published = []
+  const exported = []
+  let now = 100
+  let sequence = 0
+  const application = new InterviewApplication({
+    repository,
+    events: { async publish(events) { published.push(...clone(events)) } },
+    exporter: { async export(practices) { exported.push(...clone(practices)); return practices.map((practice) => ({ practiceId: practice.id, name: `${practice.topic}.md`, token: `download-${practice.id}` })) } },
+    clock: { now() { return ++now } },
+    ids: { next(prefix) { return `${prefix}-${++sequence}` } },
+  })
+  return { application, repository, published, exported }
+}

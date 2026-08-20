@@ -5,8 +5,9 @@
   "type": "module",
   "main": "lib/index.js",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/**/*.test.js",
     "test:domain": "node --test test/domain/*.test.js",
+    "test:application": "node --test test/application/*.test.js",
     "check": "node --check lib/index.js && node --check src/domain/practice.js && node --check client/client.js"
   },
   "exports": {
