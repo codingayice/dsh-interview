@@ -8,6 +8,7 @@ export const INTERVIEW_TOOL_NAMES = Object.freeze([
   'interview_open_question',
   'interview_request_next',
   'interview_retry_question',
+  'interview_reveal_answer',
   'interview_submit_answer',
   'interview_save_evaluation',
   'interview_complete_review',

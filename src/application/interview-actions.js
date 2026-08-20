@@ -8,6 +8,7 @@ export const INTERVIEW_ACTIONS = Object.freeze({
   OPEN_QUESTION: 'question.open',
   REQUEST_NEXT: 'question.request_next',
   RETRY_QUESTION: 'question.retry',
+  REVEAL_ANSWER: 'question.reveal_answer',
   SUBMIT_ANSWER: 'answer.submit',
   SAVE_EVALUATION: 'answer.save_evaluation',
   COMPLETE_REVIEW: 'review.complete',

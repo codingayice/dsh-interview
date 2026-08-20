@@ -119,6 +119,16 @@ const tools = [
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
   }),
   atomicTool({
+    name: 'interview_reveal_answer', action: INTERVIEW_ACTIONS.REVEAL_ANSWER,
+    description: '用户明确选择直接看当前题答案时调用。不得伪造作答或评价；若 nextAction=generate_explanation，读取完整练习上下文后生成详细讲解和直接背，并调用 interview_complete_review。',
+    parameters: {
+      type: 'object',
+      properties: { question_id: { type: 'string', minLength: 1, description: '当前题目 ID；省略时使用会话当前题。' } },
+      additionalProperties: false,
+    },
+    payload: (args) => ({ questionId: args.question_id }),
+  }),
+  atomicTool({
     name: 'interview_submit_answer',
     action: INTERVIEW_ACTIONS.SUBMIT_ANSWER,
     description: '原样保存用户对当前题目的回答。成功后必须按 nextAction 继续生成评价。',

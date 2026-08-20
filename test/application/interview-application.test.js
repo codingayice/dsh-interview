@@ -73,6 +73,23 @@ test('重新作答保留历史 attempt', async () => {
   assert.equal((await fixture.application.getSession('session-1')).resource.data.phase, 'awaiting_next')
 })
 
+test('直接看答案只生成讲解，不伪造作答和评价', async () => {
+  const fixture = applicationFixture()
+  const started = await start(fixture)
+  const asked = await fixture.application.askQuestion('session-1', { prompt: '什么是 JMM？' })
+  const revealed = await fixture.application.revealAnswer('session-1')
+  assert.equal(revealed.resource.data.reviewReady, false)
+  assert.equal((await fixture.application.getSession('session-1')).resource.data.phase, 'generating_explanation')
+  await fixture.application.saveExplanation('session-1', {
+    detail: 'JMM 规定多线程共享内存的可见性与有序性。',
+    memorizationPoints: 'JMM 解决原子性、可见性和有序性。',
+  })
+  const detail = await fixture.application.getPractice(started.resource.data.practice.id)
+  assert.equal(detail.resource.data.questions[0].id, asked.resource.data.id)
+  assert.equal(detail.resource.data.questions[0].attempts.length, 0)
+  assert.equal(detail.resource.data.questions[0].explanation.memorizationPoints, 'JMM 解决原子性、可见性和有序性。')
+})
+
 test('结束、重新打开、洞察和导出通过独立用例完成', async () => {
   const fixture = applicationFixture()
   const started = await start(fixture)

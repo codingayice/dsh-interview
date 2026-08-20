@@ -13,6 +13,7 @@ import {
   createCursor,
   cursorForQuestion,
   markAnswerEvaluated,
+  markAnswerRevealed,
   markAnswerSubmitted,
   markExplanationSaved,
   markNextRequested,
@@ -136,6 +137,22 @@ export class InterviewApplication {
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
     return this.#result('attempt', { questionId, ...added.attempt }, nextCursor, events)
+  }
+
+  async revealAnswer(sessionId, input = {}) {
+    const now = this.clock.now()
+    const { cursor, practice } = await this.#context(sessionId)
+    const questionId = input.questionId || cursor.questionId
+    assertDomain(Boolean(questionId) && questionId === cursor.questionId, 'QUESTION_NOT_FOCUSED', '只能查看当前题目的答案')
+    const question = findQuestion(practice, questionId)
+    const reviewReady = Boolean(question.explanation)
+    const nextCursor = markAnswerRevealed(cursor, now, { reviewReady })
+    const events = reviewReady ? [] : [{
+      type: 'answer.reveal_requested', sessionId, practiceId: practice.id, questionId,
+    }]
+    await this.repository.commit({ cursor: nextCursor })
+    await this.#publish(events)
+    return this.#result('answer-revealed', { questionId, reviewReady }, nextCursor, events)
   }
 
   async evaluateAnswer(sessionId, input) {

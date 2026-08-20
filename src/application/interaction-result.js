@@ -13,6 +13,11 @@ function referencesOf(result, ...names) {
   }))
 }
 
+function optionalReference(result, name) {
+  const value = result.references?.[name]
+  return typeof value === 'string' && value.trim() ? { [name]: value } : {}
+}
+
 function descriptor(action, result) {
   const data = result.resource?.data
   switch (action) {
@@ -57,6 +62,23 @@ function descriptor(action, result) {
         assistantResponse: continueSilently(),
         context: { ...referencesOf(result, 'practiceId', 'questionId', 'attemptId'), answer: data.answer },
       }
+    case INTERVIEW_ACTIONS.REVEAL_ANSWER: {
+      const references = referencesOf(result, 'practiceId', 'questionId')
+      return data.reviewReady
+        ? {
+            state: 'awaiting_next',
+            nextAction: 'wait_for_user',
+            presentation: { kind: 'review', ...references },
+            assistantResponse: exact('答案讲解已打开，请查看卡片。'),
+          }
+        : {
+            state: 'generating_explanation',
+            nextAction: 'generate_explanation',
+            presentation: null,
+            assistantResponse: continueSilently(),
+            context: references,
+          }
+    }
     case INTERVIEW_ACTIONS.SAVE_EVALUATION: {
       const references = referencesOf(result, 'practiceId', 'questionId', 'attemptId')
       return result.resource.data.reviewReady
@@ -78,7 +100,7 @@ function descriptor(action, result) {
       return {
         state: 'awaiting_next',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'review', ...referencesOf(result, 'practiceId', 'questionId', 'attemptId') },
+        presentation: { kind: 'review', ...referencesOf(result, 'practiceId', 'questionId'), ...optionalReference(result, 'attemptId') },
         assistantResponse: exact('本题复盘已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:

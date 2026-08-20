@@ -29,7 +29,7 @@ function ToolResourceView({ toolName, sessionId, block }) {
   const view = resolveToolView(toolName, block)
   switch (view.kind) {
     case 'error': return h(ToolErrorCard, { message: view.message })
-    case 'question': return h(QuestionResourceCard, { presentation: view, revision: view.revision })
+    case 'question': return h(QuestionResourceCard, { presentation: view, revision: view.revision, sessionId })
     case 'review': return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId })
     case 'library': return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId })
     case 'insights': return h(InsightsCard)

@@ -54,6 +54,14 @@ export function markAnswerSubmitted(cursor, attemptId, now) {
   }, now)
 }
 
+export function markAnswerRevealed(cursor, now, { reviewReady = false } = {}) {
+  requirePhase(cursor, WORKFLOW_PHASES.AWAITING_ANSWER)
+  return advance(cursor, {
+    attemptId: null,
+    phase: reviewReady ? WORKFLOW_PHASES.AWAITING_NEXT : WORKFLOW_PHASES.GENERATING_EXPLANATION,
+  }, now)
+}
+
 export function markAnswerEvaluated(cursor, now, { reviewReady = false } = {}) {
   requirePhase(cursor, WORKFLOW_PHASES.AWAITING_EVALUATION)
   return advance(cursor, {

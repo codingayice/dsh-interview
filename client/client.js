@@ -333,10 +333,11 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
     detail ? h("div", { className: "di-card-body" }, detail) : null
   );
 }
-function QuestionResultCard({ question }) {
+function QuestionResultCard({ sessionId, question }) {
   if (!question) return null;
-  const reviewId = `di-review-${question.id}`;
-  const showReview = () => globalThis.document?.getElementById(reviewId)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  const command = useCommand(sessionId);
+  const revealAnswer = () => command.run("question.reveal", { questionId: question.id }).catch(() => {
+  });
   return h(
     "article",
     { className: "di-card di-question-card", "aria-label": "\u9762\u8BD5\u9898" },
@@ -347,18 +348,20 @@ function QuestionResultCard({ question }) {
     ),
     h(Button, {
       className: "di-answer-button",
-      onClick: showReview,
-      "aria-label": "\u67E5\u770B\u672C\u9898\u7B54\u6848\u4E0E\u590D\u76D8"
-    }, h(Icon, { name: "eye" }), "\u67E5\u770B\u7B54\u6848")
+      busy: command.busy === "question.reveal",
+      onClick: revealAnswer,
+      "aria-label": "\u67E5\u770B\u672C\u9898\u7B54\u6848"
+    }, h(Icon, { name: "eye" }), "\u770B\u7B54\u6848"),
+    h(ErrorNotice, null, command.error)
   );
 }
 function ReviewResultCard({ sessionId, question, attempt }) {
-  if (!question || !attempt?.evaluation || !question.explanation) return null;
+  if (!question || !question.explanation || attempt && !attempt.evaluation) return null;
   const command = useCommand(sessionId);
   const [copied, setCopied] = import_react3.default.useState(false);
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });
-  const evaluation = attempt.evaluation;
+  const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
   const copyMemorization = async () => {
     try {
@@ -383,8 +386,8 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   };
   return h(
     "article",
-    { id: `di-review-${question.id}`, className: "di-card di-review-card", "aria-label": "\u672C\u9898\u590D\u76D8" },
-    h(
+    { id: `di-review-${question.id}`, className: `di-card di-review-card${evaluation ? "" : " is-answer-only"}`, "aria-label": "\u672C\u9898\u590D\u76D8" },
+    evaluation ? h(
       "aside",
       { className: "di-review-score" },
       h("span", { className: "di-review-check" }, h(Icon, { name: "check", size: 22 })),
@@ -396,17 +399,17 @@ function ReviewResultCard({ sessionId, question, attempt }) {
         h("span", null, "/ 10")
       ),
       h(StarRating, { score: evaluation.score })
-    ),
+    ) : null,
     h(
       "div",
       { className: "di-review-content" },
-      h(
+      evaluation ? h(
         "section",
         { className: "di-review-section" },
         h("h3", null, "\u8BC4\u4EF7"),
         h("div", { className: "di-feedback-banner" }, h(Markdown, null, evaluation.feedback)),
         Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-dimensions" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("span", { key: name2 }, name2, h("strong", null, `${score}/10`)))) : null
-      ),
+      ) : null,
       h(
         "section",
         { className: "di-review-section" },
@@ -424,12 +427,12 @@ function ReviewResultCard({ sessionId, question, attempt }) {
         ),
         h(Button, { className: "di-copy-button", onClick: copyMemorization }, h(Icon, { name: "copy" }), copied ? "\u5DF2\u590D\u5236" : "\u590D\u5236")
       ),
-      h(
+      attempt ? h(
         "div",
         { className: "di-review-answer" },
         h("span", null, `\u7B2C ${attempt.sequence} \u6B21\u4F5C\u7B54`),
         h(Markdown, null, attempt.answer)
-      ),
+      ) : null,
       h(ErrorNotice, null, command.error),
       h(
         "div",
@@ -463,18 +466,18 @@ function PresentedState({ query, children, missing }) {
   if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
   return children || h("div", { className: "di-card" }, h(Empty, { title: missing }));
 }
-function QuestionResourceCard({ presentation, revision }) {
+function QuestionResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? h(QuestionResultCard, { question }) : null);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? h(QuestionResultCard, { sessionId, question }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  const attempt = question?.attempts?.find((item) => item.id === presentation.attemptId);
-  const complete = attempt?.evaluation && question?.explanation;
+  const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null;
+  const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
   return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u5B8C\u6574\u590D\u76D8\u5361\u7247\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
 }
 
@@ -763,6 +766,7 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_open_question",
   "interview_request_next",
   "interview_retry_question",
+  "interview_reveal_answer",
   "interview_submit_answer",
   "interview_save_evaluation",
   "interview_complete_review",
@@ -786,6 +790,7 @@ var STYLE_TEXT = `
 .di-button{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--di-line);border-radius:8px;padding:9px 13px;background:var(--di-white);color:var(--di-ink);font:600 13px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:#b8c6e6;box-shadow:0 4px 12px rgba(36,92,255,.08)}.di-button:focus-visible,.di-input:focus-visible,.di-select:focus-visible,.di-history-topic:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-blue);border-color:var(--di-blue);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:#ffd9dc;background:#fffafa}
 .di-phase{display:inline-flex;border:1px solid var(--di-line);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;color:var(--di-muted);white-space:nowrap}.di-phase-awaiting_answer{border-color:#b9c8ff;color:var(--di-blue);background:var(--di-blue-soft)}.di-phase-generating_explanation{border-color:#ffe1a3;color:#a76500;background:#fffaf0}.di-phase-awaiting_next{border-color:#bde6cf;color:var(--di-green);background:var(--di-green-soft)}.di-phase-completed{color:var(--di-muted);background:var(--di-paper)}
 .di-review-card{display:grid;grid-template-columns:220px minmax(0,1fr);padding:24px 28px}.di-review-score{padding:8px 28px 8px 0;border-right:1px solid var(--di-line)}.di-review-check{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;margin-bottom:22px;border-radius:9px;color:#fff;background:var(--di-green);box-shadow:0 0 0 8px var(--di-green-soft)}.di-review-score-label{margin-bottom:10px;font-size:14px;font-weight:700}.di-review-score-value{display:flex;align-items:baseline;gap:8px}.di-review-score-value strong{font-size:35px;font-weight:500;line-height:1;color:var(--di-green)}.di-review-score-value span{font-size:16px;color:var(--di-muted)}.di-stars{display:flex;gap:4px;margin-top:16px}.di-star{font-size:25px;line-height:1;background:linear-gradient(90deg,var(--di-amber) var(--di-star-fill),#dfe4ec var(--di-star-fill));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent}.di-review-content{padding-left:30px;min-width:0}.di-review-section+.di-review-section{margin-top:20px}.di-review-section h3{margin:0 0 9px;font-size:15px}.di-feedback-banner{padding:12px 15px;border:1px solid #e0f0e7;border-radius:9px;background:var(--di-green-soft);font-size:14px;line-height:1.65}.di-dimensions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.di-dimensions span{display:inline-flex;gap:8px;padding:6px 9px;border-radius:6px;background:var(--di-paper);font-size:12px;color:var(--di-muted)}.di-dimensions strong{color:var(--di-ink)}.di-explanation-copy{font-size:14px;line-height:1.75}.di-explanation-copy p,.di-explanation-copy ul,.di-explanation-copy ol{margin-top:6px;margin-bottom:6px}.di-memorize-box{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px;margin-top:18px;padding:14px 15px;border:1px solid #dcefe5;border-radius:9px;background:linear-gradient(100deg,#f2faf6,#f8fbf9)}.di-memorize-label{margin-bottom:5px;font-size:13px;font-weight:700;color:#116d40}.di-memorize-copy{font-size:14px;line-height:1.65}.di-copy-button{color:var(--di-green)!important;border-color:#d7ebe0!important;background:rgba(255,255,255,.7)!important}.di-review-answer{margin-top:15px;padding:11px 13px;border-left:3px solid #cbd5e7;background:var(--di-paper);font-size:13px;color:var(--di-muted)}.di-review-answer>span{display:block;margin-bottom:4px;font-weight:700;color:var(--di-ink)}.di-review-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:15px;border-top:1px solid var(--di-line)}
+.di-review-card.is-answer-only{grid-template-columns:minmax(0,1fr)}.di-review-card.is-answer-only .di-review-content{padding-left:0}
 .di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font-size:27px;font-weight:700}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,8px);gap:3px}.di-score-rail i{display:block;height:15px;border-radius:2px;background:#e8ebf2}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:9px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
 .di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--di-line)}.di-section-label{margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--di-muted)}.di-attempt{margin-top:12px;padding:12px 14px;border-left:3px solid var(--di-blue);background:var(--di-paper);border-radius:0 7px 7px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--di-muted)}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
@@ -823,7 +828,7 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "error":
       return h(ToolErrorCard, { message: view.message });
     case "question":
-      return h(QuestionResourceCard, { presentation: view, revision: view.revision });
+      return h(QuestionResourceCard, { presentation: view, revision: view.revision, sessionId });
     case "review":
       return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId });
     case "library":

@@ -49,6 +49,7 @@ async function executeApplicationAction(application, sessionId, action, payload)
     }
     case INTERVIEW_ACTIONS.REQUEST_NEXT: return application.requestNextQuestion(sessionId)
     case INTERVIEW_ACTIONS.RETRY_QUESTION: return application.retryQuestion(sessionId, payload.questionId)
+    case INTERVIEW_ACTIONS.REVEAL_ANSWER: return application.revealAnswer(sessionId, { questionId: payload.questionId })
     case INTERVIEW_ACTIONS.SUBMIT_ANSWER: return application.submitAnswer(sessionId, { questionId: payload.questionId, answer: payload.answer })
     case INTERVIEW_ACTIONS.SAVE_EVALUATION: return application.evaluateAnswer(sessionId, payload)
     case INTERVIEW_ACTIONS.COMPLETE_REVIEW: return application.saveExplanation(sessionId, payload)

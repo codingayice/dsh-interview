@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   createCursor,
   markAnswerEvaluated,
+  markAnswerRevealed,
   markAnswerSubmitted,
   markExplanationSaved,
   markNextRequested,
@@ -33,6 +34,15 @@ test('状态机拒绝越过回答直接评价', () => {
     2,
   )
   assert.throws(() => markAnswerEvaluated(cursor, 3), { code: 'INVALID_WORKFLOW_PHASE' })
+})
+
+test('直接看答案从待回答进入讲解且不创建作答', () => {
+  let cursor = createCursor({ sessionId: 'session-1', practiceId: 'practice-1', now: 1 })
+  cursor = markQuestionAsked(cursor, 'question-1', 2)
+  cursor = markAnswerRevealed(cursor, 3)
+  assert.equal(cursor.phase, WORKFLOW_PHASES.GENERATING_EXPLANATION)
+  assert.equal(cursor.attemptId, null)
+  assert.equal(markExplanationSaved(cursor, 4).phase, WORKFLOW_PHASES.AWAITING_NEXT)
 })
 
 test('已评价题目可以重新作答并创建新的回答流程', () => {

@@ -91,6 +91,21 @@ test('空题目被归类为 Agent 可恢复协议错误而不生成 UI', async (
   assert.equal(invalid.presentation, null)
 })
 
+test('看答案工具直接驱动讲解且复盘不要求作答引用', async () => {
+  const fixture = toolFixture()
+  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
+  await fixture.tools.interview_present_question.execute({ prompt: '什么是双亲委派？' }, exec())
+  const revealed = await fixture.tools.interview_reveal_answer.execute({}, exec())
+  const review = await fixture.tools.interview_complete_review.execute({
+    detail: '类加载器先委托父加载器，父加载器无法完成时再自行加载。',
+    memorization_points: '向上委托，向下加载，避免类重复和核心类被篡改。',
+  }, exec())
+  assert.equal(revealed.nextAction, 'generate_explanation')
+  assert.equal(review.presentation.kind, 'review')
+  assert.equal(review.presentation.attemptId, undefined)
+  assert.equal(review.assistantResponse.text, '本题复盘已生成，请查看卡片。')
+})
+
 test('模拟面试不会自行补全缺失配置', async () => {
   const fixture = toolFixture()
   const invalid = await fixture.tools.interview_start_practice.execute({
@@ -120,6 +135,9 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.match(question, /禁止把多个子问题/)
   assert.match(question, /必须调用 interview_read_practice_context/)
   assert.match(question, /练习开始后禁止重新询问或自行修改配置/)
+  const reveal = instructionFor({ type: 'answer.reveal_requested', practiceId: 'p1', questionId: 'q1' })
+  assert.match(reveal, /禁止创建用户作答、评分或评价/)
+  assert.match(reveal, /interview_complete_review/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 
