@@ -6,7 +6,6 @@ import { h, Markdown } from '../shared/ui.js'
 const TIMELINE_VIEWS = [
   { id: 'question', label: '题目' },
   { id: 'attempts', label: '作答记录' },
-  { id: 'reviews', label: '点评' },
   { id: 'answer', label: '答案' },
 ]
 
@@ -21,19 +20,15 @@ function TimelineContent({ question, view }) {
     if (!question.attempts.length) return h(EmptyTimelineContent, null, '尚未作答')
     return h('div', { className: 'di-time-records' }, question.attempts.map((attempt) =>
       h('section', { className: 'di-time-record', key: attempt.id },
-        h('div', { className: 'di-time-record-label' }, `第 ${attempt.sequence} 次回答`),
-        h(Markdown, null, attempt.answer))))
-  }
-
-  if (view === 'reviews') {
-    const reviewed = question.attempts.filter((attempt) => attempt.evaluation)
-    if (!reviewed.length) return h(EmptyTimelineContent, null, '暂无点评')
-    return h('div', { className: 'di-time-records' }, reviewed.map((attempt) =>
-      h('section', { className: 'di-time-record', key: attempt.id },
         h('div', { className: 'di-time-record-label' },
           h('span', null, `第 ${attempt.sequence} 次回答`),
-          h('strong', null, `${attempt.evaluation.score}/10`)),
-        h(Markdown, null, attempt.evaluation.feedback))))
+          h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '待点评')),
+        h('div', { className: 'di-time-record-answer' },
+          h('div', { className: 'di-time-content-label' }, '回答'),
+          h(Markdown, null, attempt.answer)),
+        attempt.evaluation ? h('div', { className: 'di-time-record-review' },
+          h('div', { className: 'di-time-content-label' }, '点评'),
+          h(Markdown, null, attempt.evaluation.feedback)) : null)))
   }
 
   if (!question.explanation) return h(EmptyTimelineContent, null, '暂无答案')
@@ -55,12 +50,6 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
   const practice = detailQuery.data?.resource?.data
   if (!session?.selected || !practice?.questions?.length) return null
 
-  const toggleView = (questionId, view) => {
-    setSelection((current) => current?.questionId === questionId && current.view === view
-      ? null
-      : { questionId, view })
-  }
-
   return h('nav', {
     className: 'di-timeline',
     'aria-label': '题目时间轴',
@@ -78,22 +67,22 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
       className: 'di-time-node',
       type: 'button',
       'aria-label': `第 ${question.sequence} 题：${question.prompt}`,
-      onClick: () => toggleView(question.id, 'question'),
+      onClick: () => setSelection({ questionId: question.id, view: 'question' }),
     },
     h('span', { className: 'di-time-dot', 'aria-hidden': 'true' }),
     h('span', null, `Q${String(question.sequence).padStart(2, '0')}`)),
-    h('div', { className: 'di-time-actions', role: 'toolbar', 'aria-label': `第 ${question.sequence} 题操作` },
-      TIMELINE_VIEWS.map((item) => h('button', {
-        className: `di-time-action${activeView === item.id ? ' is-active' : ''}`,
-        type: 'button',
-        key: item.id,
-        'aria-pressed': activeView === item.id,
-        onClick: () => toggleView(question.id, item.id),
-      }, item.label))),
     activeView ? h('section', { className: 'di-time-flyout', 'aria-label': `${activeLabel}内容` },
       h('header', { className: 'di-time-flyout-head' },
-        h('strong', null, activeLabel),
+        h('div', { className: 'di-time-tabs', role: 'tablist', 'aria-label': `第 ${question.sequence} 题详情` },
+          TIMELINE_VIEWS.map((item) => h('button', {
+            className: `di-time-tab${activeView === item.id ? ' is-active' : ''}`,
+            type: 'button',
+            role: 'tab',
+            key: item.id,
+            'aria-selected': activeView === item.id,
+            onClick: () => setSelection({ questionId: question.id, view: item.id }),
+          }, item.label))),
         h('button', { type: 'button', onClick: () => setSelection(null), 'aria-label': '关闭' }, '×')),
-      h('div', { className: 'di-time-flyout-body' }, h(TimelineContent, { question, view: activeView }))) : null)
+      h('div', { className: 'di-time-flyout-body', role: 'tabpanel' }, h(TimelineContent, { question, view: activeView }))) : null)
   }))
 }
