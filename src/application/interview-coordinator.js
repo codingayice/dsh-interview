@@ -32,12 +32,16 @@ const AGENT_RECOVERABLE_CODES = new Set([
 async function executeApplicationAction(application, sessionId, action, payload) {
   switch (action) {
     case INTERVIEW_ACTIONS.START_PRACTICE: return application.startPractice(sessionId, payload)
+    case INTERVIEW_ACTIONS.UPDATE_PRACTICE: return application.updatePractice(payload.practiceId, payload)
     case INTERVIEW_ACTIONS.GET_STATUS: return application.getSession(sessionId)
     case INTERVIEW_ACTIONS.SELECT_PRACTICE: return application.selectPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: return application.reopenPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.REQUEST_FINISH: return application.requestPracticeSummary(sessionId)
     case INTERVIEW_ACTIONS.COMPLETE_SUMMARY: return application.completePractice(sessionId, payload)
     case INTERVIEW_ACTIONS.PRESENT_QUESTION: return application.askQuestion(sessionId, { prompt: payload.prompt })
+    case INTERVIEW_ACTIONS.GET_QUESTION: return application.getQuestion(payload.practiceId, payload.questionId)
+    case INTERVIEW_ACTIONS.UPDATE_QUESTION: return application.updateQuestion(payload.practiceId, payload.questionId, payload)
+    case INTERVIEW_ACTIONS.DELETE_QUESTION: return application.deleteQuestion(payload.practiceId, payload.questionId, sessionId)
     case INTERVIEW_ACTIONS.OPEN_QUESTION: {
       const result = await application.openQuestion(sessionId, payload.questionId)
       const session = await application.getSession(sessionId)

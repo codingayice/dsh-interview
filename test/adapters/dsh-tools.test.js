@@ -175,3 +175,30 @@ test('结束练习必须生成并持久化完整总结', async () => {
   const detail = await fixture.application.getPractice(started.resource.data.practice.id)
   assert.equal(detail.resource.data.summary.overall, '完成了一次 JVM 练习。')
 })
+
+test('Agent 工具覆盖练习和题目 CRUD', async () => {
+  const fixture = toolFixture()
+  const started = await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
+  const practiceId = started.resource.data.practice.id
+  const presented = await fixture.tools.interview_present_question.execute({ prompt: '原题目' }, exec())
+  const questionId = presented.resource.data.id
+
+  const updatedPractice = await fixture.tools.interview_update_practice.execute({
+    practice_id: practiceId, mode: 'scenario', topic: '高并发系统',
+  }, exec())
+  assert.equal(updatedPractice.resource.data.config.topic, '高并发系统')
+
+  const updatedQuestion = await fixture.tools.interview_update_question.execute({
+    practice_id: practiceId, question_id: questionId, prompt: '修改后的题目',
+  }, exec())
+  assert.equal(updatedQuestion.resource.data.prompt, '修改后的题目')
+  const readQuestion = await fixture.tools.interview_get_question.execute({ practice_id: practiceId, question_id: questionId }, exec())
+  assert.equal(readQuestion.context.prompt, '修改后的题目')
+
+  const selected = await fixture.tools.interview_select_practice.execute({ practice_id: practiceId }, exec('another-session'))
+  assert.equal(selected.context.practice.questions[0].prompt, '修改后的题目')
+  assert.ok(Array.isArray(selected.context.practice.questions[0].attempts))
+
+  await fixture.tools.interview_delete_question.execute({ practice_id: practiceId, question_id: questionId }, exec())
+  assert.equal((await fixture.application.getPractice(practiceId)).resource.data.questions.length, 0)
+})

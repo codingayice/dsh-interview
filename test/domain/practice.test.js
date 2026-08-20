@@ -9,6 +9,9 @@ import {
   saveExplanation,
   submitAnswer,
   summarizePractice,
+  updatePractice,
+  updateQuestion,
+  deleteQuestion,
 } from '../../src/domain/practice.js'
 import { DomainError } from '../../src/domain/errors.js'
 
@@ -120,4 +123,27 @@ test('题目必须保持简单扼要', () => {
   assert.throws(() => askQuestion(samplePractice(), {
     id: 'question-1', prompt: '什么是线程安全？如何实现？', now: 2,
   }), (error) => error instanceof DomainError && error.code === 'MULTI_PART_QUESTION')
+})
+
+test('练习和题目修改经过领域校验，删除题目后连续重排', () => {
+  let practice = createPractice({ id: 'practice-1', mode: 'bagu', config: { topic: 'JVM' }, now: 1 })
+  practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice
+  practice = submitAnswer(practice, { questionId: 'question-1', attemptId: 'attempt-1', answer: '回答', now: 3 }).practice
+  practice = askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 4 }).practice
+  const updatedQuestion = updateQuestion(practice, { questionId: 'question-1', prompt: '修改后的第一题', now: 5 })
+  practice = updatedQuestion.practice
+  assert.equal(updatedQuestion.question.attempts.length, 1)
+  practice = deleteQuestion(practice, { questionId: 'question-1', now: 6 }).practice
+  assert.deepEqual(practice.questions.map((question) => [question.id, question.sequence]), [['question-2', 1]])
+
+  practice = updatePractice(practice, {
+    mode: 'mock',
+    config: { resume: '完整简历', interviewerStyle: '深挖项目', coding: false, difficulty: 'senior' },
+    now: 7,
+  })
+  assert.equal(practice.mode, 'mock')
+  assert.equal(practice.config.coding, false)
+  assert.throws(() => updatePractice(practice, { mode: 'mock', config: { resume: '简历', interviewerStyle: '压力面', difficulty: 'senior' }, now: 8 }), {
+    code: 'CODING_REQUIRED',
+  })
 })

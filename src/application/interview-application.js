@@ -3,11 +3,14 @@ import {
   askQuestion as addQuestion,
   completePractice,
   createPractice,
+  deleteQuestion as removeQuestion,
   evaluateAnswer as addEvaluation,
   findQuestion,
   reopenPractice,
   saveExplanation as addExplanation,
   submitAnswer as addAnswer,
+  updatePractice as revisePractice,
+  updateQuestion as reviseQuestion,
 } from '../domain/practice.js'
 import {
   createCursor,
@@ -83,6 +86,14 @@ export class InterviewApplication {
     return this.#result('practice-started', toSessionDto(cursor, practice), cursor, events)
   }
 
+  async updatePractice(practiceId, input) {
+    const now = this.clock.now()
+    const current = await this.#practice(practiceId)
+    const practice = revisePractice(current, { ...input, now })
+    await this.repository.commit({ practice })
+    return this.#result('practice-detail', toPracticeDetailDto(practice), null, [], { practiceId: practice.id })
+  }
+
   async getSession(sessionId) {
     const cursor = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
     const practice = cursor ? await this.repository.getPractice(cursor.practiceId) : null
@@ -120,6 +131,38 @@ export class InterviewApplication {
       : cursorForQuestion(cursor, question, now)
     await this.repository.commit({ cursor: nextCursor })
     return this.#result('question', toQuestionDto(question), nextCursor)
+  }
+
+  async getQuestion(practiceId, questionId) {
+    const practice = await this.#practice(practiceId)
+    const question = findQuestion(practice, questionId)
+    return this.#result('question-detail', toQuestionDto(question), null, [], { practiceId: practice.id, questionId: question.id })
+  }
+
+  async updateQuestion(practiceId, questionId, input) {
+    const now = this.clock.now()
+    const current = await this.#practice(practiceId)
+    const updated = reviseQuestion(current, { questionId, prompt: input.prompt, now })
+    await this.repository.commit({ practice: updated.practice })
+    return this.#result('question-detail', toQuestionDto(updated.question), null, [], { practiceId: current.id, questionId: updated.question.id })
+  }
+
+  async deleteQuestion(practiceId, questionId, sessionId = null) {
+    const now = this.clock.now()
+    const current = await this.#practice(practiceId)
+    const removed = removeQuestion(current, { questionId, now })
+    let cursor = null
+    if (sessionId) {
+      const selected = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
+      if (selected?.practiceId === current.id && selected.questionId === questionId) {
+        cursor = createCursor({ sessionId, practiceId: current.id, now })
+        const latestQuestion = removed.practice.questions.at(-1) || null
+        if (latestQuestion) cursor = cursorForQuestion(cursor, latestQuestion, now)
+        if (removed.practice.status === 'completed') cursor = { ...cursor, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1 }
+      }
+    }
+    await this.repository.commit({ practice: removed.practice, cursor })
+    return this.#result('question-deleted', { practiceId: current.id, questionId }, cursor, [], { practiceId: current.id, questionId })
   }
 
   async submitAnswer(sessionId, input) {
@@ -257,7 +300,10 @@ export class InterviewApplication {
   async deletePractice(practiceId, sessionId = null) {
     const practice = await this.#practice(practiceId)
     await this.repository.deletePractice(practice.id)
-    if (sessionId) await this.repository.clearCursor(sessionId)
+    if (sessionId) {
+      const cursor = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
+      if (cursor?.practiceId === practice.id) await this.repository.clearCursor(sessionId)
+    }
     return this.#result('practice-deleted', { practiceId: practice.id }, null, [], { practiceId: practice.id })
   }
 

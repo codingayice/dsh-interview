@@ -2,10 +2,13 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 
 const UI_ACTIONS = Object.freeze({
   'session.start': INTERVIEW_ACTIONS.START_PRACTICE,
+  'practice.update': INTERVIEW_ACTIONS.UPDATE_PRACTICE,
   'session.select': INTERVIEW_ACTIONS.SELECT_PRACTICE,
   'session.finish': INTERVIEW_ACTIONS.REQUEST_FINISH,
   'session.reopen': INTERVIEW_ACTIONS.REOPEN_PRACTICE,
   'question.open': INTERVIEW_ACTIONS.OPEN_QUESTION,
+  'question.update': INTERVIEW_ACTIONS.UPDATE_QUESTION,
+  'question.delete': INTERVIEW_ACTIONS.DELETE_QUESTION,
   'question.next': INTERVIEW_ACTIONS.REQUEST_NEXT,
   'question.retry': INTERVIEW_ACTIONS.RETRY_QUESTION,
   'question.reveal': INTERVIEW_ACTIONS.REVEAL_ANSWER,

@@ -15,6 +15,41 @@ function idParameters(name, description) {
   }
 }
 
+function practiceConfigurationParameters({ includePracticeId = false } = {}) {
+  const identityProperties = includePracticeId
+    ? { practice_id: { type: 'string', minLength: 1, description: '练习 ID' } }
+    : {}
+  const identityRequired = includePracticeId ? ['practice_id'] : []
+  const variant = (mode, properties, required) => ({
+    type: 'object',
+    properties: { ...identityProperties, mode: { const: mode }, ...properties },
+    required: [...identityRequired, 'mode', ...required],
+    additionalProperties: false,
+  })
+  return {
+    oneOf: [
+      variant('bagu', { topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' } }, ['topic']),
+      variant('scenario', { topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' } }, ['topic']),
+      variant('mock', {
+        resume: { type: 'string', minLength: 1, description: '用户明确提供的完整简历内容。' },
+        interviewer_style: { type: 'string', minLength: 1, description: '用户明确选择的面试官风格。' },
+        coding: { type: 'boolean', description: '用户明确选择是否包含手撕代码，禁止默认。' },
+        difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'], description: '用户明确选择的面试难度。' },
+      }, ['resume', 'interviewer_style', 'coding', 'difficulty']),
+    ],
+  }
+}
+
+function practiceConfigurationPayload(args) {
+  return {
+    ...(args.practice_id ? { practiceId: args.practice_id } : {}),
+    mode: args.mode,
+    config: args.mode === 'mock'
+      ? { resume: args.resume, interviewerStyle: args.interviewer_style, coding: args.coding, difficulty: args.difficulty }
+      : { topic: args.topic },
+  }
+}
+
 function sessionIdOf(exec) {
   return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || 'global'
 }
@@ -50,47 +85,18 @@ const tools = [
     name: 'interview_start_practice',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
     description: `开始一条全新的面试练习。成功后先调用 interview_read_practice_context 读取已保存配置，再按 nextAction 生成第一题。${PRACTICE_CONFIGURATION_POLICY}`,
-    parameters: {
-      oneOf: [
-        {
-          type: 'object',
-          properties: {
-            mode: { const: 'bagu', description: '背八股模式。' },
-            topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' },
-          },
-          required: ['mode', 'topic'],
-          additionalProperties: false,
-        },
-        {
-          type: 'object',
-          properties: {
-            mode: { const: 'scenario', description: '场景题模式。' },
-            topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' },
-          },
-          required: ['mode', 'topic'],
-          additionalProperties: false,
-        },
-        {
-          type: 'object',
-          properties: {
-            mode: { const: 'mock', description: '模拟面试模式。' },
-            resume: { type: 'string', minLength: 1, description: '用户明确提供的完整简历内容。' },
-            interviewer_style: { type: 'string', minLength: 1, description: '用户明确选择的面试官风格。' },
-            coding: { type: 'boolean', description: '用户明确选择是否包含手撕代码，禁止默认。' },
-            difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'], description: '用户明确选择的面试难度。' },
-          },
-          required: ['mode', 'resume', 'interviewer_style', 'coding', 'difficulty'],
-          additionalProperties: false,
-        },
-      ],
-    },
-    payload: (args) => args.mode === 'mock'
-      ? { mode: args.mode, config: { resume: args.resume, interviewerStyle: args.interviewer_style, coding: args.coding, difficulty: args.difficulty } }
-      : { mode: args.mode, config: { topic: args.topic } },
+    parameters: practiceConfigurationParameters(),
+    payload: practiceConfigurationPayload,
+  }),
+  atomicTool({
+    name: 'interview_update_practice', action: INTERVIEW_ACTIONS.UPDATE_PRACTICE,
+    description: `完整替换指定练习的模式配置。所有字段必须由用户明确提供，禁止保留或补全未明确字段。${PRACTICE_CONFIGURATION_POLICY}`,
+    parameters: practiceConfigurationParameters({ includePracticeId: true }),
+    payload: practiceConfigurationPayload,
   }),
   atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
   atomicTool({
-    name: 'interview_select_practice', action: INTERVIEW_ACTIONS.SELECT_PRACTICE, description: '把当前会话切换到指定练习。',
+    name: 'interview_select_practice', action: INTERVIEW_ACTIONS.SELECT_PRACTICE, description: '把当前会话切换到指定练习。返回上下文包含该练习配置、总结、全部题目、历次作答、评价和讲解，必须据此继续。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),
   atomicTool({
@@ -122,6 +128,46 @@ const tools = [
       required: ['prompt'],
       additionalProperties: false,
     },
+  }),
+  atomicTool({
+    name: 'interview_get_question', action: INTERVIEW_ACTIONS.GET_QUESTION, description: '读取指定练习中的一道题及其全部作答、评价和讲解。',
+    parameters: {
+      type: 'object',
+      properties: {
+        practice_id: { type: 'string', minLength: 1 },
+        question_id: { type: 'string', minLength: 1 },
+      },
+      required: ['practice_id', 'question_id'],
+      additionalProperties: false,
+    },
+    payload: (args) => ({ practiceId: args.practice_id, questionId: args.question_id }),
+  }),
+  atomicTool({
+    name: 'interview_update_question', action: INTERVIEW_ACTIONS.UPDATE_QUESTION, description: `修改指定题目的题干，不改变历次作答、评价和讲解。${QUESTION_GENERATION_POLICY}`,
+    parameters: {
+      type: 'object',
+      properties: {
+        practice_id: { type: 'string', minLength: 1 },
+        question_id: { type: 'string', minLength: 1 },
+        prompt: { type: 'string', minLength: 1, maxLength: 120 },
+      },
+      required: ['practice_id', 'question_id', 'prompt'],
+      additionalProperties: false,
+    },
+    payload: (args) => ({ practiceId: args.practice_id, questionId: args.question_id, prompt: args.prompt }),
+  }),
+  atomicTool({
+    name: 'interview_delete_question', action: INTERVIEW_ACTIONS.DELETE_QUESTION, description: '永久删除指定题目及其全部作答、评价和讲解。仅在用户明确确认后调用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        practice_id: { type: 'string', minLength: 1 },
+        question_id: { type: 'string', minLength: 1 },
+      },
+      required: ['practice_id', 'question_id'],
+      additionalProperties: false,
+    },
+    payload: (args) => ({ practiceId: args.practice_id, questionId: args.question_id }),
   }),
   atomicTool({
     name: 'interview_open_question', action: INTERVIEW_ACTIONS.OPEN_QUESTION, description: '打开并通过 UI 展示指定历史题目，不创建新题。',

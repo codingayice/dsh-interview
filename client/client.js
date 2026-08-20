@@ -811,12 +811,16 @@ function TimelinePanel({ sessionId, revisionSignal }) {
 // src/protocol/interview-tool-names.js
 var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_start_practice",
+  "interview_update_practice",
   "interview_get_status",
   "interview_select_practice",
   "interview_reopen_practice",
   "interview_finish_practice",
   "interview_complete_summary",
   "interview_present_question",
+  "interview_get_question",
+  "interview_update_question",
+  "interview_delete_question",
   "interview_open_question",
   "interview_request_next",
   "interview_retry_question",

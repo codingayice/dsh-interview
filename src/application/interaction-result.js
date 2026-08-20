@@ -23,6 +23,8 @@ function descriptor(action, result) {
   switch (action) {
     case INTERVIEW_ACTIONS.START_PRACTICE:
       return { state: data.phase, nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
+    case INTERVIEW_ACTIONS.UPDATE_PRACTICE:
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('练习配置已更新。'), context: data }
     case INTERVIEW_ACTIONS.GET_STATUS: {
       const generating = ['awaiting_question', 'generating_explanation', 'generating_summary'].includes(data.phase)
       return {
@@ -60,6 +62,12 @@ function descriptor(action, result) {
         presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
         assistantResponse: exact('已出题，请开始作答。'),
       }
+    case INTERVIEW_ACTIONS.GET_QUESTION:
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('题目详情已打开。'), context: data }
+    case INTERVIEW_ACTIONS.UPDATE_QUESTION:
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('题目已更新。'), context: data }
+    case INTERVIEW_ACTIONS.DELETE_QUESTION:
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('题目已删除。') }
     case INTERVIEW_ACTIONS.SUBMIT_ANSWER:
       return {
         state: 'awaiting_evaluation',

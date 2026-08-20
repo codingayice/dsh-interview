@@ -119,3 +119,28 @@ test('练习查询支持筛选，删除会清理会话游标', async () => {
   await fixture.application.deletePractice(practiceId, 'session-1')
   assert.equal((await fixture.application.getSession('session-1')).resource.data.selected, false)
 })
+
+test('应用层提供练习与题目 CRUD，切换时返回完整模型上下文', async () => {
+  const fixture = applicationFixture()
+  const started = await start(fixture)
+  const practiceId = started.resource.data.practice.id
+  const asked = await fixture.application.askQuestion('session-1', { prompt: '原题目' })
+  const questionId = asked.resource.data.id
+  await fixture.application.submitAnswer('session-1', { answer: '历史回答' })
+  await fixture.application.evaluateAnswer('session-1', { score: 7, feedback: '历史评价' })
+  await fixture.application.saveExplanation('session-1', { detail: '历史讲解', memorizationPoints: '历史直接背' })
+
+  await fixture.application.updateQuestion(practiceId, questionId, { prompt: '修改后的题目' })
+  const question = await fixture.application.getQuestion(practiceId, questionId)
+  assert.equal(question.resource.data.prompt, '修改后的题目')
+  assert.equal(question.resource.data.attempts[0].evaluation.feedback, '历史评价')
+
+  await fixture.application.updatePractice(practiceId, { mode: 'scenario', config: { topic: '分布式场景' } })
+  const selected = await fixture.application.selectPractice('session-2', practiceId)
+  assert.equal(selected.resource.data.practice.questions[0].explanation.detail, '历史讲解')
+  assert.equal(selected.resource.data.practice.questions[0].attempts[0].answer, '历史回答')
+
+  await fixture.application.deleteQuestion(practiceId, questionId, 'session-2')
+  assert.equal((await fixture.application.getPractice(practiceId)).resource.data.questions.length, 0)
+  assert.equal((await fixture.application.getSession('session-2')).resource.data.phase, 'awaiting_question')
+})

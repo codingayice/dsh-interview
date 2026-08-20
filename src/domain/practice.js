@@ -17,6 +17,14 @@ function withUpdatedAt(practice, now, patch = {}) {
   return { ...practice, ...patch, updatedAt: now }
 }
 
+function normalizeQuestionPrompt(prompt) {
+  const normalizedPrompt = requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空')
+  assertDomain(normalizedPrompt.length <= 120, 'QUESTION_TOO_LONG', '题目必须简单扼要，长度不能超过 120 个字符')
+  const questionMarkCount = (normalizedPrompt.match(/[?？]/g) || []).length
+  assertDomain(questionMarkCount <= 1 && !/[\r\n]/.test(normalizedPrompt), 'MULTI_PART_QUESTION', '每轮只能提出一道问题，不能拼接多个子问题')
+  return normalizedPrompt
+}
+
 function normalizeConfiguration(definition, config) {
   assertDomain(config && typeof config === 'object' && !Array.isArray(config), 'CONFIGURATION_REQUIRED', '必须明确提供练习配置')
   if (definition.configuration === 'topic') {
@@ -53,6 +61,21 @@ export function createPractice({ id, mode, config, now }) {
   }
 }
 
+export function updatePractice(practice, { mode, config, now }) {
+  assertDomain(practice && typeof practice === 'object', 'PRACTICE_REQUIRED', '练习不能为空')
+  const definition = modeDefinition(mode)
+  const normalizedConfig = normalizeConfiguration(definition, config)
+  const topic = definition.configuration === 'topic' ? normalizedConfig.topic : definition.label
+  return withUpdatedAt(practice, now, {
+    mode,
+    topic,
+    source: definition.configuration === 'topic'
+      ? { kind: 'topic', content: normalizedConfig.topic }
+      : { kind: 'resume', content: normalizedConfig.resume },
+    config: normalizedConfig,
+  })
+}
+
 export function findQuestion(practice, questionId) {
   const question = practice?.questions?.find((item) => item.id === questionId)
   assertDomain(question, 'QUESTION_NOT_FOUND', `找不到题目：${String(questionId)}`)
@@ -68,10 +91,7 @@ export function findAttempt(question, attemptId) {
 export function askQuestion(practice, { id, prompt, now }) {
   activePractice(practice)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
-  const normalizedPrompt = requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空')
-  assertDomain(normalizedPrompt.length <= 120, 'QUESTION_TOO_LONG', '题目必须简单扼要，长度不能超过 120 个字符')
-  const questionMarkCount = (normalizedPrompt.match(/[?？]/g) || []).length
-  assertDomain(questionMarkCount <= 1 && !/[\r\n]/.test(normalizedPrompt), 'MULTI_PART_QUESTION', '每轮只能提出一道问题，不能拼接多个子问题')
+  const normalizedPrompt = normalizeQuestionPrompt(prompt)
   assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
   const question = {
     id: questionId,
@@ -85,6 +105,22 @@ export function askQuestion(practice, { id, prompt, now }) {
     practice: withUpdatedAt(practice, now, { questions: [...practice.questions, question] }),
     question,
   }
+}
+
+export function updateQuestion(practice, { questionId, prompt, now }) {
+  const target = findQuestion(practice, questionId)
+  const questions = practice.questions.map((question) => question.id === target.id
+    ? { ...question, prompt: normalizeQuestionPrompt(prompt) }
+    : question)
+  return { practice: withUpdatedAt(practice, now, { questions }), question: questions.find((question) => question.id === target.id) }
+}
+
+export function deleteQuestion(practice, { questionId, now }) {
+  const target = findQuestion(practice, questionId)
+  const questions = practice.questions
+    .filter((question) => question.id !== target.id)
+    .map((question, index) => ({ ...question, sequence: index + 1 }))
+  return { practice: withUpdatedAt(practice, now, { questions }), question: target }
 }
 
 export function submitAnswer(practice, { questionId, attemptId, answer, now }) {
