@@ -103,6 +103,8 @@ dsh plugin --profile web update dsh-interview
 
 插件使用四个面向业务场景的工具，而不是公开数据库 CRUD：
 
+练习模式标识为 `bagu`（八股）、`mock`（模拟面试）、`scenario`（场景题）和 `resume`（简历出题）。
+
 | 工具 | 职责 | Commands |
 | --- | --- | --- |
 | `interview_session` | 练习生命周期 | `start`、`status`、`select`、`finish`、`reopen` |

@@ -38,7 +38,7 @@ test('工具协议驱动完整的开始、出题、回答和评价流程', async
 test('UI 命令分发与 Agent 工具复用同一应用用例', async () => {
   const fixture = applicationFixture()
   await dispatchCommand(fixture.application, 'session-1', 'session.start', {
-    mode: 'baogu', topic: 'JVM', source: { kind: 'topic', content: 'JVM' },
+    mode: 'bagu', topic: 'JVM', source: { kind: 'topic', content: 'JVM' },
   })
   const question = await fixture.application.askQuestion('session-1', { prompt: '类加载过程？' })
   const result = await dispatchCommand(fixture.application, 'session-1', 'question.open', { questionId: question.resource.data.id })
@@ -62,7 +62,7 @@ test('HTTP 错误响应包含稳定错误码', () => {
 test('未指定范围时只导出当前选择的练习', async () => {
   const fixture = applicationFixture()
   const tools = Object.fromEntries(createToolDefinitions(fixture.application).map((tool) => [tool.name, tool]))
-  await tools.interview_session.execute({ command: 'start', mode: 'baogu', topic: 'JVM' }, exec())
+  await tools.interview_session.execute({ command: 'start', mode: 'bagu', topic: 'JVM' }, exec())
   await tools.interview_session.execute({ command: 'start', mode: 'scenario', topic: 'Redis' }, exec())
   const result = await tools.interview_library.execute({ command: 'export' }, exec())
   assert.equal(result.resource.data.length, 1)

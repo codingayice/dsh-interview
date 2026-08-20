@@ -405,7 +405,7 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
         "select",
         { className: "di-select", value: mode, onChange: (event) => setMode(event.target.value), "aria-label": "\u7B5B\u9009\u6A21\u5F0F" },
         h("option", { value: "" }, "\u5168\u90E8\u6A21\u5F0F"),
-        h("option", { value: "baogu" }, "\u80CC\u516B\u80A1"),
+        h("option", { value: "bagu" }, "\u80CC\u516B\u80A1"),
         h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
         h("option", { value: "scenario" }, "\u573A\u666F\u9898"),
         h("option", { value: "resume" }, "\u7B80\u5386\u51FA\u9898")

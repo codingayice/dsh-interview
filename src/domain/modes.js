@@ -1,8 +1,8 @@
 import { assertDomain } from './errors.js'
 
 export const INTERVIEW_MODES = Object.freeze({
-  baogu: Object.freeze({
-    id: 'baogu',
+  bagu: Object.freeze({
+    id: 'bagu',
     label: '背八股',
     questionStyle: 'knowledge',
     defaultFollowUp: false,

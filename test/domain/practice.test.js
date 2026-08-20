@@ -29,6 +29,14 @@ test('练习配置会应用模式默认策略', () => {
   assert.equal(practice.status, 'active')
 })
 
+test('八股模式只接受 bagu 标识', () => {
+  const practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', now: 1 })
+  assert.equal(practice.mode, 'bagu')
+  assert.throws(() => createPractice({ id: 'practice-2', mode: ['bao', 'gu'].join(''), topic: 'JVM', now: 1 }), {
+    code: 'INVALID_MODE',
+  })
+})
+
 test('简历模式必须提供来源内容', () => {
   assert.throws(() => createPractice({
     id: 'practice-1', mode: 'resume', topic: '简历面试', source: { kind: 'resume', content: '' }, now: 1,
@@ -85,7 +93,7 @@ test('结束后的练习禁止继续出题，重新打开后恢复写入', () =>
 })
 
 test('达到配置的目标题数后禁止继续出题', () => {
-  let practice = createPractice({ id: 'practice-1', mode: 'baogu', topic: 'JVM', config: { targetQuestionCount: 1 }, now: 1 })
+  let practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { targetQuestionCount: 1 }, now: 1 })
   practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice
   assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 3 }), {
     code: 'QUESTION_LIMIT_REACHED',

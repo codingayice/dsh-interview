@@ -26,7 +26,7 @@ const sessionTool = (application) => ({
     properties: {
       command: { type: 'string', enum: ['start', 'status', 'select', 'finish', 'reopen'] },
       practice_id: { type: 'string' },
-      mode: { type: 'string', enum: ['baogu', 'mock', 'scenario', 'resume'] },
+      mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'] },
       topic: { type: 'string' },
       source_kind: { type: 'string', enum: ['topic', 'resume', 'job_description'] },
       source_content: { type: 'string' },
@@ -139,7 +139,7 @@ const libraryTool = (application) => ({
       practice_id: { type: 'string' },
       practice_ids: { type: 'array', items: { type: 'string' } },
       query: { type: 'string' },
-      mode: { type: 'string', enum: ['baogu', 'mock', 'scenario', 'resume'] },
+      mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'] },
       status: { type: 'string', enum: ['active', 'completed'] },
       scope: { type: 'string', enum: ['selected', 'all'] },
       include: {

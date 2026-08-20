@@ -6,6 +6,7 @@
 
 - 使用面试领域模型和显式状态机重写全部业务流程，不兼容 0.1.x 的工具协议与 JSON 数据。
 - 将单一 `interview` 工具拆分为 `interview_session`、`interview_question`、`interview_answer` 和 `interview_library`。
+- 将八股模式的协议标识统一为 `bagu`。
 - 数据存储从单文件 JSON 切换为启用事务和外键约束的 SQLite。
 
 ### 新增
