@@ -11,7 +11,15 @@ export function Markdown({ children }) {
 }
 
 export function parseToolArgs(block) {
-  const candidates = [block?.args, block?.arguments, block?.call?.args, block?.call?.arguments, block?.input]
+  const candidates = [
+    block?.args,
+    block?.arguments,
+    block?.argsRaw,
+    block?.call?.args,
+    block?.call?.arguments,
+    block?.call?.argsRaw,
+    block?.input,
+  ]
   for (const value of candidates) {
     if (value && typeof value === 'object') return value
     if (typeof value === 'string') {
@@ -19,6 +27,41 @@ export function parseToolArgs(block) {
     }
   }
   return {}
+}
+
+function resultText(block) {
+  return (block?.content || [])
+    .filter((item) => item?.type === 'text' && typeof item.text === 'string')
+    .map((item) => item.text)
+    .join('\n')
+}
+
+export function parseToolResult(block) {
+  const text = resultText(block)
+  const kind = text.match(/^resource_kind:\s*(.+)$/m)?.[1]?.trim()
+  if (!kind) return null
+  const revision = Number(text.match(/^revision:\s*(\d+)$/m)?.[1] || 0)
+  const marker = 'resource_data:\n'
+  const start = text.indexOf(marker)
+  if (start < 0) return { kind, revision, data: null }
+  const dataStart = start + marker.length
+  const eventsStart = text.indexOf('\nevents:\n', dataStart)
+  const raw = text.slice(dataStart, eventsStart < 0 ? text.length : eventsStart).trim()
+  try {
+    return { kind, revision, data: JSON.parse(raw) }
+  } catch {
+    return { kind, revision, data: null }
+  }
+}
+
+export function toolCallState(block) {
+  if (!block || !('kind' in block)) return 'running'
+  return block.isError ? 'error' : 'success'
+}
+
+export function toolErrorMessage(block) {
+  const text = resultText(block).trim()
+  return text || block?.error?.message || block?.error?.code || '工具执行失败'
 }
 
 export function PhaseBadge({ phase }) {

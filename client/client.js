@@ -33,7 +33,8 @@ __export(index_exports, {
   ToolResourceView: () => ToolResourceView,
   apply: () => apply,
   inject: () => inject,
-  name: () => name
+  name: () => name,
+  resolveToolView: () => resolveToolView
 });
 module.exports = __toCommonJS(index_exports);
 var import_react6 = __toESM(require("react"), 1);
@@ -144,7 +145,15 @@ function Markdown({ children }) {
   return MarkdownText2 ? h(MarkdownText2, { text, content: text }) : h("div", { className: "di-preline" }, text);
 }
 function parseToolArgs(block) {
-  const candidates = [block?.args, block?.arguments, block?.call?.args, block?.call?.arguments, block?.input];
+  const candidates = [
+    block?.args,
+    block?.arguments,
+    block?.argsRaw,
+    block?.call?.args,
+    block?.call?.arguments,
+    block?.call?.argsRaw,
+    block?.input
+  ];
   for (const value of candidates) {
     if (value && typeof value === "object") return value;
     if (typeof value === "string") {
@@ -155,6 +164,34 @@ function parseToolArgs(block) {
     }
   }
   return {};
+}
+function resultText(block) {
+  return (block?.content || []).filter((item) => item?.type === "text" && typeof item.text === "string").map((item) => item.text).join("\n");
+}
+function parseToolResult(block) {
+  const text = resultText(block);
+  const kind = text.match(/^resource_kind:\s*(.+)$/m)?.[1]?.trim();
+  if (!kind) return null;
+  const revision = Number(text.match(/^revision:\s*(\d+)$/m)?.[1] || 0);
+  const marker = "resource_data:\n";
+  const start = text.indexOf(marker);
+  if (start < 0) return { kind, revision, data: null };
+  const dataStart = start + marker.length;
+  const eventsStart = text.indexOf("\nevents:\n", dataStart);
+  const raw = text.slice(dataStart, eventsStart < 0 ? text.length : eventsStart).trim();
+  try {
+    return { kind, revision, data: JSON.parse(raw) };
+  } catch {
+    return { kind, revision, data: null };
+  }
+}
+function toolCallState(block) {
+  if (!block || !("kind" in block)) return "running";
+  return block.isError ? "error" : "success";
+}
+function toolErrorMessage(block) {
+  const text = resultText(block).trim();
+  return text || block?.error?.message || block?.error?.code || "\u5DE5\u5177\u6267\u884C\u5931\u8D25";
 }
 function PhaseBadge({ phase }) {
   const labels = {
@@ -289,6 +326,76 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
       h(PhaseBadge, { phase: tone === "completed" ? "completed" : "awaiting_next" })
     ),
     detail ? h("div", { className: "di-card-body" }, detail) : null
+  );
+}
+function QuestionResultCard({ question }) {
+  if (!question) return null;
+  return h(
+    "article",
+    { className: "di-card", "aria-label": "\u9762\u8BD5\u9898" },
+    h(
+      "header",
+      { className: "di-card-head" },
+      h(
+        "div",
+        null,
+        h("div", { className: "di-eyebrow" }, `INTERVIEW QUESTION \xB7 Q${String(question.sequence || 0).padStart(2, "0")}`),
+        h("div", { className: "di-title" }, "\u8BF7\u56DE\u7B54\u8FD9\u9053\u9898")
+      ),
+      h(PhaseBadge, { phase: "awaiting_answer" })
+    ),
+    h(
+      "div",
+      { className: "di-card-body" },
+      h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt))
+    )
+  );
+}
+function EvaluationResultCard({ evaluation }) {
+  if (!evaluation) return null;
+  return h(
+    "article",
+    { className: "di-card", "aria-label": "\u56DE\u7B54\u8BC4\u4EF7" },
+    h(
+      "header",
+      { className: "di-card-head" },
+      h("div", null, h("div", { className: "di-eyebrow" }, "ANSWER REVIEW"), h("div", { className: "di-title" }, "\u672C\u9898\u8BC4\u4EF7")),
+      h(PhaseBadge, { phase: "ready_for_explanation" })
+    ),
+    h(
+      "div",
+      { className: "di-card-body" },
+      h("div", { className: "di-score-row" }, h("span", { className: "di-score-number" }, evaluation.score), h(ScoreRail, { score: evaluation.score })),
+      evaluation.feedback ? h("div", { className: "di-section" }, h(Markdown, null, evaluation.feedback)) : null,
+      Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-attempt" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("div", { className: "di-attempt-head", key: name2 }, h("span", null, name2), h("strong", null, `${score}/10`)))) : null
+    )
+  );
+}
+function ExplanationResultCard({ explanation }) {
+  if (!explanation) return null;
+  return h(
+    "article",
+    { className: "di-card", "aria-label": "\u53C2\u8003\u8BB2\u89E3" },
+    h(
+      "header",
+      { className: "di-card-head" },
+      h("div", null, h("div", { className: "di-eyebrow" }, "REFERENCE NOTES"), h("div", { className: "di-title" }, "\u53C2\u8003\u8BB2\u89E3")),
+      h(PhaseBadge, { phase: "awaiting_next" })
+    ),
+    h(
+      "div",
+      { className: "di-card-body" },
+      h(Markdown, null, explanation.detail),
+      explanation.memorizationPoints ? h("div", { className: "di-attempt" }, h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"), h(Markdown, null, explanation.memorizationPoints)) : null
+    )
+  );
+}
+function ToolErrorCard({ message }) {
+  return h(
+    "div",
+    { className: "di-tool-error", role: "alert" },
+    h("strong", null, "\u9762\u8BD5\u64CD\u4F5C\u5931\u8D25"),
+    h("span", null, message)
   );
 }
 
@@ -509,6 +616,7 @@ var STYLE_TEXT = `
 .di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font:700 26px/1 Bahnschrift,"Segoe UI",sans-serif}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,9px);gap:3px}.di-score-rail i{display:block;height:16px;border-radius:2px;background:var(--color-bg-tertiary,#e8ebf2)}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:10px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
 .di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border-secondary,var(--di-line))}.di-section-label{margin-bottom:8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-secondary,var(--di-muted))}.di-attempt{margin-top:12px;padding:12px;border-left:3px solid var(--di-cobalt);background:var(--color-bg-secondary,var(--di-paper));border-radius:0 6px 6px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--color-text-secondary,var(--di-muted))}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-cobalt);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 0;padding:10px 12px;border-radius:6px;background:rgba(49,91,232,.08);font-size:13px}.di-notice.is-error{background:rgba(201,75,86,.1);color:var(--di-red)}
+.di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(680px,100%);padding:9px 12px;border-left:3px solid var(--di-red);border-radius:0 6px 6px 0;background:rgba(201,75,86,.08);color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--color-text-secondary,var(--di-muted))}
 .di-ledger{width:min(980px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden}.di-ledger-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-ledger-title{font-size:21px;font-weight:720}.di-ledger-tools{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-input,.di-select{min-width:0;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 10px;background:var(--color-bg-primary,var(--di-white));color:inherit}.di-input{flex:1}.di-ledger-grid{display:grid;grid-template-columns:minmax(320px,1fr) minmax(330px,.95fr);min-height:360px}.di-practice-list{border-right:1px solid var(--color-border-secondary,var(--di-line));padding:8px}.di-practice-row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;width:100%;padding:12px;border:0;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:transparent;color:inherit;text-align:left;cursor:pointer}.di-practice-row:hover,.di-practice-row.is-selected{background:rgba(49,91,232,.06)}.di-sequence{font:700 13px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--di-cobalt)}.di-row-title{font-weight:650}.di-row-meta{margin-top:4px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-detail{padding:18px;max-height:620px;overflow:auto}.di-detail-question{padding:14px 0;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.55}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-link{color:var(--di-cobalt);text-decoration:none}.di-confirm{margin-top:10px;padding:10px;border:1px solid rgba(201,75,86,.35);border-radius:6px}
 .di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--color-border-secondary,var(--di-line))}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--color-bg-primary,var(--di-white));border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-cobalt);background:var(--di-cobalt)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--color-text-secondary,var(--di-muted))}
 @keyframes di-spin{to{transform:rotate(360deg)}}
@@ -527,17 +635,60 @@ function installStyles() {
 // src/client/index.js
 var name = "dsh-interview";
 var inject = ["slots"];
-function ToolResourceView({ toolName, sessionId, block }) {
-  if (!block || !("kind" in block)) return null;
+function resolveToolView(toolName, block) {
+  const state = toolCallState(block);
+  if (state === "running") return { kind: "hidden" };
+  if (state === "error") return { kind: "error", message: toolErrorMessage(block) };
   const args = parseToolArgs(block);
+  const result = parseToolResult(block);
   if (toolName === "interview_library") {
-    if (args.command === "list") return h(PracticeLibrary, { sessionId });
-    if (args.command === "get") return h(PracticeLibrary, { sessionId, initialPracticeId: args.practice_id });
-    if (args.command === "insights") return h(InsightsCard);
-    if (args.command === "delete") return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u5220\u9664", detail: "\u6863\u6848\u548C\u5BF9\u5E94\u4F1A\u8BDD\u6E38\u6807\u5DF2\u7ECF\u6E05\u7406\u3002", tone: "completed" });
-    if (args.command === "export") return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
+    if (args.command === "list") return { kind: "library" };
+    if (args.command === "get") return { kind: "library", practiceId: args.practice_id };
+    if (args.command === "insights") return { kind: "insights" };
+    if (args.command === "delete") return { kind: "deleted" };
+    if (args.command === "export") return { kind: "exported" };
   }
-  return h(LiveInterviewCard, { sessionId });
+  if (toolName === "interview_question") {
+    if (["ask", "open"].includes(args.command) && result?.kind === "question") return { kind: "question", data: result.data };
+    if (args.command === "save_explanation" && result?.kind === "explanation") return { kind: "explanation", data: result.data };
+    return { kind: "hidden" };
+  }
+  if (toolName === "interview_answer") {
+    if (args.command === "evaluate" && result?.kind === "evaluation") return { kind: "evaluation", data: result.data };
+    return { kind: "hidden" };
+  }
+  if (toolName === "interview_session") {
+    if (["status", "select", "reopen"].includes(args.command)) return { kind: "live" };
+    if (args.command === "finish") return { kind: "finished", data: result?.data };
+  }
+  return { kind: "hidden" };
+}
+function ToolResourceView({ toolName, sessionId, block }) {
+  const view = resolveToolView(toolName, block);
+  switch (view.kind) {
+    case "error":
+      return h(ToolErrorCard, { message: view.message });
+    case "question":
+      return h(QuestionResultCard, { question: view.data });
+    case "evaluation":
+      return h(EvaluationResultCard, { evaluation: view.data });
+    case "explanation":
+      return h(ExplanationResultCard, { explanation: view.data });
+    case "library":
+      return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId });
+    case "insights":
+      return h(InsightsCard);
+    case "deleted":
+      return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u5220\u9664", detail: "\u6863\u6848\u548C\u5BF9\u5E94\u4F1A\u8BDD\u6E38\u6807\u5DF2\u7ECF\u6E05\u7406\u3002", tone: "completed" });
+    case "exported":
+      return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
+    case "finished":
+      return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u7ED3\u675F", detail: view.data?.topic ? `${view.data.topic} \u5DF2\u5F52\u6863\uFF0C\u53EF\u4EE5\u5728\u7EC3\u4E60\u6863\u6848\u4E2D\u67E5\u770B\u590D\u76D8\u3002` : "\u672C\u6B21\u7EC3\u4E60\u5DF2\u7ECF\u5F52\u6863\u3002", tone: "completed" });
+    case "live":
+      return h(LiveInterviewCard, { sessionId });
+    default:
+      return null;
+  }
 }
 function apply(ctx) {
   installStyles();

@@ -83,3 +83,49 @@ export function CompactResultCard({ title, detail, tone = 'quiet' }) {
       h(PhaseBadge, { phase: tone === 'completed' ? 'completed' : 'awaiting_next' })),
     detail ? h('div', { className: 'di-card-body' }, detail) : null)
 }
+
+export function QuestionResultCard({ question }) {
+  if (!question) return null
+  return h('article', { className: 'di-card', 'aria-label': '面试题' },
+    h('header', { className: 'di-card-head' },
+      h('div', null,
+        h('div', { className: 'di-eyebrow' }, `INTERVIEW QUESTION · Q${String(question.sequence || 0).padStart(2, '0')}`),
+        h('div', { className: 'di-title' }, '请回答这道题')),
+      h(PhaseBadge, { phase: 'awaiting_answer' })),
+    h('div', { className: 'di-card-body' },
+      h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt))))
+}
+
+export function EvaluationResultCard({ evaluation }) {
+  if (!evaluation) return null
+  return h('article', { className: 'di-card', 'aria-label': '回答评价' },
+    h('header', { className: 'di-card-head' },
+      h('div', null, h('div', { className: 'di-eyebrow' }, 'ANSWER REVIEW'), h('div', { className: 'di-title' }, '本题评价')),
+      h(PhaseBadge, { phase: 'ready_for_explanation' })),
+    h('div', { className: 'di-card-body' },
+      h('div', { className: 'di-score-row' }, h('span', { className: 'di-score-number' }, evaluation.score), h(ScoreRail, { score: evaluation.score })),
+      evaluation.feedback ? h('div', { className: 'di-section' }, h(Markdown, null, evaluation.feedback)) : null,
+      Object.keys(evaluation.dimensions || {}).length
+        ? h('div', { className: 'di-attempt' }, Object.entries(evaluation.dimensions).map(([name, score]) =>
+            h('div', { className: 'di-attempt-head', key: name }, h('span', null, name), h('strong', null, `${score}/10`))))
+        : null))
+}
+
+export function ExplanationResultCard({ explanation }) {
+  if (!explanation) return null
+  return h('article', { className: 'di-card', 'aria-label': '参考讲解' },
+    h('header', { className: 'di-card-head' },
+      h('div', null, h('div', { className: 'di-eyebrow' }, 'REFERENCE NOTES'), h('div', { className: 'di-title' }, '参考讲解')),
+      h(PhaseBadge, { phase: 'awaiting_next' })),
+    h('div', { className: 'di-card-body' },
+      h(Markdown, null, explanation.detail),
+      explanation.memorizationPoints
+        ? h('div', { className: 'di-attempt' }, h('div', { className: 'di-section-label' }, '直接背'), h(Markdown, null, explanation.memorizationPoints))
+        : null))
+}
+
+export function ToolErrorCard({ message }) {
+  return h('div', { className: 'di-tool-error', role: 'alert' },
+    h('strong', null, '面试操作失败'),
+    h('span', null, message))
+}
