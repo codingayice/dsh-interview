@@ -32,6 +32,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   const fixture = toolFixture()
   const definitions = createToolDefinitions(fixture.coordinator)
   assert.deepEqual(definitions.map((tool) => tool.name), INTERVIEW_TOOL_NAMES)
+  assert.ok(definitions.every((tool) => tool.parameters.type === 'object'), '所有函数参数 Schema 顶层必须声明 type: object')
   assert.ok(definitions.every((tool) => !Object.hasOwn(tool.parameters.properties || {}, 'command')))
 
   const presentQuestion = fixture.tools.interview_present_question
@@ -40,6 +41,8 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.equal(presentQuestion.parameters.properties.prompt.maxLength, 120)
   assert.equal(presentQuestion.parameters.additionalProperties, false)
   const startVariants = fixture.tools.interview_start_practice.parameters.oneOf
+  assert.equal(fixture.tools.interview_start_practice.parameters.type, 'object')
+  assert.equal(fixture.tools.interview_update_practice.parameters.type, 'object')
   assert.deepEqual(startVariants.map((schema) => schema.required), [
     ['mode', 'topic'],
     ['mode', 'topic'],

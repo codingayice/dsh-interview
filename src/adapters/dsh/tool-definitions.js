@@ -27,6 +27,7 @@ function practiceConfigurationParameters({ includePracticeId = false } = {}) {
     additionalProperties: false,
   })
   return {
+    type: 'object',
     oneOf: [
       variant('bagu', { topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' } }, ['topic']),
       variant('scenario', { topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' } }, ['topic']),
