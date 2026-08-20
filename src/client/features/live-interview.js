@@ -76,7 +76,7 @@ export function LiveInterviewCard({ sessionId }) {
 export function CompactResultCard({ title, detail, tone = 'quiet' }) {
   return h('div', { className: 'di-card' },
     h('div', { className: 'di-card-head' },
-      h('div', null, h('div', { className: 'di-eyebrow' }, 'INTERVIEW WORKSPACE'), h('div', { className: 'di-title' }, title)),
+      h('div', { className: 'di-title' }, title),
       h(PhaseBadge, { phase: tone === 'completed' ? 'completed' : 'awaiting_next' })),
     detail ? h('div', { className: 'di-card-body' }, detail) : null)
 }

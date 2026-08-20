@@ -3,9 +3,55 @@ import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail } from '../shared/ui.js'
 
+function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
+  const [mode, setMode] = React.useState(initial?.mode || '')
+  const [topic, setTopic] = React.useState(initial?.config?.topic || '')
+  const [resume, setResume] = React.useState(initial?.config?.resume || '')
+  const [interviewerStyle, setInterviewerStyle] = React.useState(initial?.config?.interviewerStyle || '')
+  const [coding, setCoding] = React.useState(typeof initial?.config?.coding === 'boolean' ? String(initial.config.coding) : '')
+  const [difficulty, setDifficulty] = React.useState(initial?.config?.difficulty || '')
+  const topicMode = mode === 'bagu' || mode === 'scenario'
+  const valid = topicMode
+    ? Boolean(topic.trim())
+    : mode === 'mock' && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty)
+  const submit = () => {
+    if (!valid) return
+    onSubmit(mode === 'mock'
+      ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === 'true', difficulty } }
+      : { mode, config: { topic: topic.trim() } })
+  }
+  return h('div', { className: 'di-practice-form' },
+    h('label', { className: 'di-field' }, h('span', null, '模式'),
+      h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value) },
+        h('option', { value: '' }, '请选择'),
+        h('option', { value: 'bagu' }, '背八股'),
+        h('option', { value: 'mock' }, '模拟面试'),
+        h('option', { value: 'scenario' }, '场景题'))),
+    topicMode ? h('label', { className: 'di-field' }, h('span', null, '主题'),
+      h('input', { className: 'di-input', value: topic, onChange: (event) => setTopic(event.target.value) })) : null,
+    mode === 'mock' ? h(React.Fragment, null,
+      h('label', { className: 'di-field di-field-wide' }, h('span', null, '简历'),
+        h('textarea', { className: 'di-input di-textarea', value: resume, onChange: (event) => setResume(event.target.value) })),
+      h('label', { className: 'di-field' }, h('span', null, '面试官风格'),
+        h('input', { className: 'di-input', value: interviewerStyle, onChange: (event) => setInterviewerStyle(event.target.value) })),
+      h('label', { className: 'di-field' }, h('span', null, '是否手撕代码'),
+        h('select', { className: 'di-select', value: coding, onChange: (event) => setCoding(event.target.value) },
+          h('option', { value: '' }, '请选择'), h('option', { value: 'true' }, '是'), h('option', { value: 'false' }, '否'))),
+      h('label', { className: 'di-field' }, h('span', null, '面试难度'),
+        h('select', { className: 'di-select', value: difficulty, onChange: (event) => setDifficulty(event.target.value) },
+          h('option', { value: '' }, '请选择'), h('option', { value: 'junior' }, '初级'), h('option', { value: 'intermediate' }, '中级'), h('option', { value: 'senior' }, '高级')))) : null,
+    h('div', { className: 'di-actions di-field-wide' },
+      h(Button, { onClick: onCancel }, '取消'),
+      h(Button, { tone: 'primary', disabled: !valid, busy, onClick: submit }, initial ? '保存配置' : '开始练习')))
+}
+
 function PracticeDetail({ practice, sessionId, onDeleted }) {
   const command = useCommand(sessionId)
   const [confirming, setConfirming] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
+  const [editingQuestionId, setEditingQuestionId] = React.useState(null)
+  const [questionDraft, setQuestionDraft] = React.useState('')
+  const [deletingQuestionId, setDeletingQuestionId] = React.useState(null)
   const [downloads, setDownloads] = React.useState([])
   if (!practice) return h(Empty, { title: '选择一条练习', detail: '右侧会展示题目、历次作答和讲解。' })
   const run = (name, payload) => command.run(name, payload).catch(() => null)
@@ -20,6 +66,18 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     const result = await run('library.delete', { practiceId: practice.id })
     if (result) onDeleted()
   }
+  const updateConfiguration = async (payload) => {
+    const result = await run('practice.update', { practiceId: practice.id, ...payload })
+    if (result) setEditing(false)
+  }
+  const updateQuestion = async (questionId) => {
+    const result = await run('question.update', { practiceId: practice.id, questionId, prompt: questionDraft })
+    if (result) { setEditingQuestionId(null); setQuestionDraft('') }
+  }
+  const deleteQuestion = async (questionId) => {
+    const result = await run('question.delete', { practiceId: practice.id, questionId })
+    if (result) setDeletingQuestionId(null)
+  }
   const retry = async (questionId) => {
     if (practice.status !== 'active') return
     await run('session.select', { practiceId: practice.id })
@@ -31,6 +89,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     h('div', { className: 'di-subtitle' }, `${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`),
     h('div', { className: 'di-actions' },
       h(Button, { tone: 'primary', busy: Boolean(command.busy?.startsWith('session.')), onClick: activate }, practice.status === 'completed' ? '重新打开' : '切换到练习'),
+      h(Button, { onClick: () => setEditing((value) => !value) }, '编辑配置'),
       h(Button, { busy: command.busy === 'library.export', onClick: exportOne }, '导出 Markdown'),
       h(Button, { tone: 'danger', onClick: () => setConfirming(true) }, '删除')),
     downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
@@ -40,6 +99,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       h('div', { className: 'di-actions' },
         h(Button, { onClick: () => setConfirming(false) }, '取消'),
         h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: remove }, '确认删除'))) : null,
+    editing ? h(PracticeForm, { initial: practice, busy: command.busy === 'practice.update', onSubmit: updateConfiguration, onCancel: () => setEditing(false) }) : null,
     h(ErrorNotice, null, command.error),
     practice.summary ? h('section', { className: 'di-section' },
       h('div', { className: 'di-section-label' }, '练习总结'),
@@ -54,7 +114,9 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       return h('article', { className: 'di-detail-question', key: question.id },
         h('div', { className: 'di-detail-question-head' },
           h('span', { className: 'di-sequence' }, `Q${String(question.sequence).padStart(2, '0')}`),
-          h('div', { className: 'di-detail-question-text' }, h(Markdown, null, question.prompt)),
+          h('div', { className: 'di-detail-question-text' }, editingQuestionId === question.id
+            ? h('input', { className: 'di-input', value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) })
+            : h(Markdown, null, question.prompt)),
           h(ScoreRail, { score: question.latestScore, compact: true })),
         question.attempts.map((attempt) => h('div', { className: 'di-attempt', key: attempt.id },
           h('div', { className: 'di-attempt-head' }, h('span', null, `第 ${attempt.sequence} 次作答`), h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '未评价')),
@@ -64,9 +126,20 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           h('div', { className: 'di-section-label' }, '参考讲解'),
           h(Markdown, null, question.explanation.detail)) : null,
         h('div', { className: 'di-detail-actions' },
+          editingQuestionId === question.id
+            ? h(React.Fragment, null,
+                h(Button, { tone: 'primary', disabled: !questionDraft.trim(), busy: command.busy === 'question.update', onClick: () => updateQuestion(question.id) }, '保存题目'),
+                h(Button, { onClick: () => { setEditingQuestionId(null); setQuestionDraft('') } }, '取消'))
+            : h(Button, { onClick: () => { setEditingQuestionId(question.id); setQuestionDraft(question.prompt) } }, '编辑题目'),
           practice.status === 'active' && latest?.evaluation
             ? h(Button, { onClick: () => retry(question.id) }, '重新作答')
-            : null))
+            : null,
+          h(Button, { tone: 'danger', onClick: () => setDeletingQuestionId(question.id) }, '删除题目')),
+        deletingQuestionId === question.id ? h('div', { className: 'di-confirm' },
+          h('div', null, '确认删除该题及其全部作答、评价和讲解？'),
+          h('div', { className: 'di-actions' },
+            h(Button, { onClick: () => setDeletingQuestionId(null) }, '取消'),
+            h(Button, { tone: 'danger', busy: command.busy === 'question.delete', onClick: () => deleteQuestion(question.id) }, '确认删除'))) : null)
     }) : h(Empty, { title: '这条练习还没有题目' }))
 }
 
@@ -77,6 +150,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const [selectedId, setSelectedId] = React.useState(initialPracticeId)
   const [confirmingId, setConfirmingId] = React.useState(null)
   const [downloads, setDownloads] = React.useState([])
+  const [creating, setCreating] = React.useState(false)
   const command = useCommand(sessionId)
   const filters = { query: queryText, mode, status }
   const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status])
@@ -84,6 +158,12 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const detail = useInterviewQuery(`practice:${selectedId || 'none'}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId])
   const selected = detail.data?.resource?.data || null
   const run = (name, payload) => command.run(name, payload).catch(() => null)
+  const createPractice = async (payload) => {
+    const result = await run('session.start', payload)
+    if (!result) return
+    setCreating(false)
+    setSelectedId(result.resource?.data?.practice?.id || null)
+  }
   const activate = async (practice) => {
     await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
   }
@@ -119,10 +199,8 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   return h('section', { className: 'di-ledger di-history', 'aria-label': '练习历史' },
     h('header', { className: 'di-history-head' },
       h('div', null, h('div', { className: 'di-ledger-title' }, '练习历史'), h('div', { className: 'di-subtitle' }, `共 ${practices.length} 条练习记录`)),
-      h('div', { className: 'di-history-legend', 'aria-hidden': 'true' },
-        h('span', null, h(Icon, { name: 'swap' }), '切换到该练习'),
-        h('span', null, h(Icon, { name: 'trash' }), '删除'),
-        h('span', null, h(Icon, { name: 'download' }), '导出'))),
+      h(Button, { tone: 'primary', onClick: () => setCreating((value) => !value) }, '新建练习')),
+    creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
       h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
@@ -155,7 +233,7 @@ export function InsightsCard() {
   if (query.error) return h('div', { className: 'di-card' }, h(ErrorNotice, null, query.error))
   const insight = query.data?.resource?.data
   return h('article', { className: 'di-card' },
-    h('header', { className: 'di-card-head' }, h('div', null, h('div', { className: 'di-eyebrow' }, 'CAPABILITY REVIEW'), h('div', { className: 'di-title' }, '能力复盘'))),
+    h('header', { className: 'di-card-head' }, h('div', { className: 'di-title' }, '能力复盘')),
     h('div', { className: 'di-card-body' },
       h('div', { className: 'di-score-row' }, h('span', { className: 'di-score-number' }, insight.averageScore ?? '—'), h(ScoreRail, { score: insight.averageScore })),
       h('div', { className: 'di-subtitle', style: { marginTop: '8px' } }, `${insight.practiceCount} 次练习 · ${insight.questionCount} 道题 · ${insight.evaluatedCount} 次评价`),

@@ -14,7 +14,7 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
   if (!open) return h('button', { className: 'di-button', style: { position: 'fixed', right: '16px', top: '112px', zIndex: 40 }, onClick: () => setOpen(true) }, `题目 ${practice.questions.length}`)
   return h('aside', { className: 'di-timeline', 'aria-label': '题目时间轴' },
     h('div', { className: 'di-timeline-head' },
-      h('div', null, h('div', { className: 'di-eyebrow' }, 'QUESTION TRACK'), h('strong', null, practice.topic)),
+      h('strong', null, practice.topic),
       h('button', { className: 'di-button', onClick: () => setOpen(false), 'aria-label': '收起题目时间轴' }, '收起')),
     h('div', { className: 'di-timeline-body' },
       h(PhaseBadge, { phase: session.phase }),

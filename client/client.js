@@ -328,7 +328,7 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
     h(
       "div",
       { className: "di-card-head" },
-      h("div", null, h("div", { className: "di-eyebrow" }, "INTERVIEW WORKSPACE"), h("div", { className: "di-title" }, title)),
+      h("div", { className: "di-title" }, title),
       h(PhaseBadge, { phase: tone === "completed" ? "completed" : "awaiting_next" })
     ),
     detail ? h("div", { className: "di-card-body" }, detail) : null
@@ -522,9 +522,97 @@ function PracticeSummaryCard({ presentation, revision }) {
 
 // src/client/features/practice-library.js
 var import_react4 = __toESM(require("react"), 1);
+function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
+  const [mode, setMode] = import_react4.default.useState(initial?.mode || "");
+  const [topic, setTopic] = import_react4.default.useState(initial?.config?.topic || "");
+  const [resume, setResume] = import_react4.default.useState(initial?.config?.resume || "");
+  const [interviewerStyle, setInterviewerStyle] = import_react4.default.useState(initial?.config?.interviewerStyle || "");
+  const [coding, setCoding] = import_react4.default.useState(typeof initial?.config?.coding === "boolean" ? String(initial.config.coding) : "");
+  const [difficulty, setDifficulty] = import_react4.default.useState(initial?.config?.difficulty || "");
+  const topicMode = mode === "bagu" || mode === "scenario";
+  const valid = topicMode ? Boolean(topic.trim()) : mode === "mock" && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty);
+  const submit = () => {
+    if (!valid) return;
+    onSubmit(mode === "mock" ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === "true", difficulty } } : { mode, config: { topic: topic.trim() } });
+  };
+  return h(
+    "div",
+    { className: "di-practice-form" },
+    h(
+      "label",
+      { className: "di-field" },
+      h("span", null, "\u6A21\u5F0F"),
+      h(
+        "select",
+        { className: "di-select", value: mode, onChange: (event) => setMode(event.target.value) },
+        h("option", { value: "" }, "\u8BF7\u9009\u62E9"),
+        h("option", { value: "bagu" }, "\u80CC\u516B\u80A1"),
+        h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
+        h("option", { value: "scenario" }, "\u573A\u666F\u9898")
+      )
+    ),
+    topicMode ? h(
+      "label",
+      { className: "di-field" },
+      h("span", null, "\u4E3B\u9898"),
+      h("input", { className: "di-input", value: topic, onChange: (event) => setTopic(event.target.value) })
+    ) : null,
+    mode === "mock" ? h(
+      import_react4.default.Fragment,
+      null,
+      h(
+        "label",
+        { className: "di-field di-field-wide" },
+        h("span", null, "\u7B80\u5386"),
+        h("textarea", { className: "di-input di-textarea", value: resume, onChange: (event) => setResume(event.target.value) })
+      ),
+      h(
+        "label",
+        { className: "di-field" },
+        h("span", null, "\u9762\u8BD5\u5B98\u98CE\u683C"),
+        h("input", { className: "di-input", value: interviewerStyle, onChange: (event) => setInterviewerStyle(event.target.value) })
+      ),
+      h(
+        "label",
+        { className: "di-field" },
+        h("span", null, "\u662F\u5426\u624B\u6495\u4EE3\u7801"),
+        h(
+          "select",
+          { className: "di-select", value: coding, onChange: (event) => setCoding(event.target.value) },
+          h("option", { value: "" }, "\u8BF7\u9009\u62E9"),
+          h("option", { value: "true" }, "\u662F"),
+          h("option", { value: "false" }, "\u5426")
+        )
+      ),
+      h(
+        "label",
+        { className: "di-field" },
+        h("span", null, "\u9762\u8BD5\u96BE\u5EA6"),
+        h(
+          "select",
+          { className: "di-select", value: difficulty, onChange: (event) => setDifficulty(event.target.value) },
+          h("option", { value: "" }, "\u8BF7\u9009\u62E9"),
+          h("option", { value: "junior" }, "\u521D\u7EA7"),
+          h("option", { value: "intermediate" }, "\u4E2D\u7EA7"),
+          h("option", { value: "senior" }, "\u9AD8\u7EA7")
+        )
+      )
+    ) : null,
+    h(
+      "div",
+      { className: "di-actions di-field-wide" },
+      h(Button, { onClick: onCancel }, "\u53D6\u6D88"),
+      h(Button, { tone: "primary", disabled: !valid, busy, onClick: submit }, initial ? "\u4FDD\u5B58\u914D\u7F6E" : "\u5F00\u59CB\u7EC3\u4E60")
+    )
+  );
+}
 function PracticeDetail({ practice, sessionId, onDeleted }) {
   const command = useCommand(sessionId);
   const [confirming, setConfirming] = import_react4.default.useState(false);
+  const [editing, setEditing] = import_react4.default.useState(false);
+  const [editingQuestionId, setEditingQuestionId] = import_react4.default.useState(null);
+  const [questionDraft, setQuestionDraft] = import_react4.default.useState("");
+  const [deletingQuestionId, setDeletingQuestionId] = import_react4.default.useState(null);
   const [downloads, setDownloads] = import_react4.default.useState([]);
   if (!practice) return h(Empty, { title: "\u9009\u62E9\u4E00\u6761\u7EC3\u4E60", detail: "\u53F3\u4FA7\u4F1A\u5C55\u793A\u9898\u76EE\u3001\u5386\u6B21\u4F5C\u7B54\u548C\u8BB2\u89E3\u3002" });
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
@@ -538,6 +626,21 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const remove = async () => {
     const result = await run("library.delete", { practiceId: practice.id });
     if (result) onDeleted();
+  };
+  const updateConfiguration = async (payload) => {
+    const result = await run("practice.update", { practiceId: practice.id, ...payload });
+    if (result) setEditing(false);
+  };
+  const updateQuestion = async (questionId) => {
+    const result = await run("question.update", { practiceId: practice.id, questionId, prompt: questionDraft });
+    if (result) {
+      setEditingQuestionId(null);
+      setQuestionDraft("");
+    }
+  };
+  const deleteQuestion = async (questionId) => {
+    const result = await run("question.delete", { practiceId: practice.id, questionId });
+    if (result) setDeletingQuestionId(null);
   };
   const retry = async (questionId) => {
     if (practice.status !== "active") return;
@@ -554,6 +657,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       "div",
       { className: "di-actions" },
       h(Button, { tone: "primary", busy: Boolean(command.busy?.startsWith("session.")), onClick: activate }, practice.status === "completed" ? "\u91CD\u65B0\u6253\u5F00" : "\u5207\u6362\u5230\u7EC3\u4E60"),
+      h(Button, { onClick: () => setEditing((value) => !value) }, "\u7F16\u8F91\u914D\u7F6E"),
       h(Button, { busy: command.busy === "library.export", onClick: exportOne }, "\u5BFC\u51FA Markdown"),
       h(Button, { tone: "danger", onClick: () => setConfirming(true) }, "\u5220\u9664")
     ),
@@ -569,6 +673,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(Button, { tone: "danger", busy: command.busy === "library.delete", onClick: remove }, "\u786E\u8BA4\u5220\u9664")
       )
     ) : null,
+    editing ? h(PracticeForm, { initial: practice, busy: command.busy === "practice.update", onSubmit: updateConfiguration, onCancel: () => setEditing(false) }) : null,
     h(ErrorNotice, null, command.error),
     practice.summary ? h(
       "section",
@@ -593,7 +698,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           "div",
           { className: "di-detail-question-head" },
           h("span", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
-          h("div", { className: "di-detail-question-text" }, h(Markdown, null, question.prompt)),
+          h("div", { className: "di-detail-question-text" }, editingQuestionId === question.id ? h("input", { className: "di-input", value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) }) : h(Markdown, null, question.prompt)),
           h(ScoreRail, { score: question.latestScore, compact: true })
         ),
         question.attempts.map((attempt) => h(
@@ -612,8 +717,32 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(
           "div",
           { className: "di-detail-actions" },
-          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => retry(question.id) }, "\u91CD\u65B0\u4F5C\u7B54") : null
-        )
+          editingQuestionId === question.id ? h(
+            import_react4.default.Fragment,
+            null,
+            h(Button, { tone: "primary", disabled: !questionDraft.trim(), busy: command.busy === "question.update", onClick: () => updateQuestion(question.id) }, "\u4FDD\u5B58\u9898\u76EE"),
+            h(Button, { onClick: () => {
+              setEditingQuestionId(null);
+              setQuestionDraft("");
+            } }, "\u53D6\u6D88")
+          ) : h(Button, { onClick: () => {
+            setEditingQuestionId(question.id);
+            setQuestionDraft(question.prompt);
+          } }, "\u7F16\u8F91\u9898\u76EE"),
+          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => retry(question.id) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
+          h(Button, { tone: "danger", onClick: () => setDeletingQuestionId(question.id) }, "\u5220\u9664\u9898\u76EE")
+        ),
+        deletingQuestionId === question.id ? h(
+          "div",
+          { className: "di-confirm" },
+          h("div", null, "\u786E\u8BA4\u5220\u9664\u8BE5\u9898\u53CA\u5176\u5168\u90E8\u4F5C\u7B54\u3001\u8BC4\u4EF7\u548C\u8BB2\u89E3\uFF1F"),
+          h(
+            "div",
+            { className: "di-actions" },
+            h(Button, { onClick: () => setDeletingQuestionId(null) }, "\u53D6\u6D88"),
+            h(Button, { tone: "danger", busy: command.busy === "question.delete", onClick: () => deleteQuestion(question.id) }, "\u786E\u8BA4\u5220\u9664")
+          )
+        ) : null
       );
     }) : h(Empty, { title: "\u8FD9\u6761\u7EC3\u4E60\u8FD8\u6CA1\u6709\u9898\u76EE" })
   );
@@ -625,6 +754,7 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const [selectedId, setSelectedId] = import_react4.default.useState(initialPracticeId);
   const [confirmingId, setConfirmingId] = import_react4.default.useState(null);
   const [downloads, setDownloads] = import_react4.default.useState([]);
+  const [creating, setCreating] = import_react4.default.useState(false);
   const command = useCommand(sessionId);
   const filters = { query: queryText, mode, status };
   const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status]);
@@ -632,6 +762,12 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const detail = useInterviewQuery(`practice:${selectedId || "none"}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId]);
   const selected = detail.data?.resource?.data || null;
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
+  const createPractice = async (payload) => {
+    const result = await run("session.start", payload);
+    if (!result) return;
+    setCreating(false);
+    setSelectedId(result.resource?.data?.practice?.id || null);
+  };
   const activate = async (practice) => {
     await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
   };
@@ -681,14 +817,9 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
       "header",
       { className: "di-history-head" },
       h("div", null, h("div", { className: "di-ledger-title" }, "\u7EC3\u4E60\u5386\u53F2"), h("div", { className: "di-subtitle" }, `\u5171 ${practices.length} \u6761\u7EC3\u4E60\u8BB0\u5F55`)),
-      h(
-        "div",
-        { className: "di-history-legend", "aria-hidden": "true" },
-        h("span", null, h(Icon, { name: "swap" }), "\u5207\u6362\u5230\u8BE5\u7EC3\u4E60"),
-        h("span", null, h(Icon, { name: "trash" }), "\u5220\u9664"),
-        h("span", null, h(Icon, { name: "download" }), "\u5BFC\u51FA")
-      )
+      h(Button, { tone: "primary", onClick: () => setCreating((value) => !value) }, "\u65B0\u5EFA\u7EC3\u4E60")
     ),
+    creating ? h(PracticeForm, { busy: command.busy === "session.start", onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h(
       "div",
       { className: "di-history-filters" },
@@ -758,7 +889,7 @@ function InsightsCard() {
   return h(
     "article",
     { className: "di-card" },
-    h("header", { className: "di-card-head" }, h("div", null, h("div", { className: "di-eyebrow" }, "CAPABILITY REVIEW"), h("div", { className: "di-title" }, "\u80FD\u529B\u590D\u76D8"))),
+    h("header", { className: "di-card-head" }, h("div", { className: "di-title" }, "\u80FD\u529B\u590D\u76D8")),
     h(
       "div",
       { className: "di-card-body" },
@@ -790,7 +921,7 @@ function TimelinePanel({ sessionId, revisionSignal }) {
     h(
       "div",
       { className: "di-timeline-head" },
-      h("div", null, h("div", { className: "di-eyebrow" }, "QUESTION TRACK"), h("strong", null, practice.topic)),
+      h("strong", null, practice.topic),
       h("button", { className: "di-button", onClick: () => setOpen(false), "aria-label": "\u6536\u8D77\u9898\u76EE\u65F6\u95F4\u8F74" }, "\u6536\u8D77")
     ),
     h(
@@ -853,11 +984,11 @@ var STYLE_TEXT = `
 .di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--di-line)}.di-section-label{margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--di-muted)}.di-attempt{margin-top:12px;padding:12px 14px;border-left:3px solid var(--di-blue);background:var(--di-paper);border-radius:0 7px 7px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--di-muted)}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
 .di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(1080px,100%);padding:10px 13px;border-left:3px solid var(--di-red);border-radius:0 7px 7px 0;background:#fff1f2;color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--di-muted)}
-.di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{font-size:18px;font-weight:730}.di-history-legend{display:flex;gap:28px;color:var(--di-muted);font-size:13px}.di-history-legend span{display:inline-flex;align-items:center;gap:7px}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:500;text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:750;color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
+.di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{font-size:18px;font-weight:730}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-textarea{min-height:150px;resize:vertical;line-height:1.6}.di-practice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-field{display:grid;gap:6px;font-size:13px;font-weight:600}.di-field-wide{grid-column:1/-1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:500;text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:750;color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
 .di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--di-line);border-radius:12px;background:var(--di-white);box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--di-line)}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--di-white);border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-blue);background:var(--di-blue)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--di-muted)}
 @keyframes di-spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.di-question-card{grid-template-columns:1fr;padding:22px}.di-answer-button{justify-self:start}.di-review-card{grid-template-columns:1fr;padding:22px}.di-review-score{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:14px;padding:0 0 20px;border-right:0;border-bottom:1px solid var(--di-line)}.di-review-check{margin:0}.di-review-score-label{margin:0}.di-review-score-value{justify-self:end}.di-stars{grid-column:1/-1;margin-top:0}.di-review-content{padding:22px 0 0}.di-history-legend{display:none}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}}
-@media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-review-card{padding:18px}.di-memorize-box{grid-template-columns:1fr}.di-copy-button{justify-self:start}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}}
+@media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-review-card{padding:18px}.di-memorize-box{grid-template-columns:1fr}.di-copy-button{justify-self:start}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-practice-form{grid-template-columns:1fr;padding:16px 18px}.di-field-wide{grid-column:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}}
 @media(prefers-reduced-motion:reduce){.di-button{transition:none}.di-spinner{animation-duration:1.5s}}
 `;
 function installStyles() {
