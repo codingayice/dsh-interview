@@ -1,0 +1,169 @@
+import { assertDomain } from './errors.js'
+import { modeDefinition } from './modes.js'
+
+const DIFFICULTIES = new Set(['junior', 'intermediate', 'senior'])
+
+function requiredText(value, code, message) {
+  const text = typeof value === 'string' ? value.trim() : ''
+  assertDomain(text, code, message)
+  return text
+}
+
+function activePractice(practice) {
+  assertDomain(practice?.status === 'active', 'PRACTICE_NOT_ACTIVE', '练习未处于进行中状态')
+}
+
+function withUpdatedAt(practice, now, patch = {}) {
+  return { ...practice, ...patch, updatedAt: now }
+}
+
+export function createPractice({ id, mode, topic, source, config = {}, now }) {
+  const definition = modeDefinition(mode)
+  const normalizedTopic = requiredText(topic, 'INVALID_TOPIC', '练习主题不能为空')
+  const normalizedSource = source && typeof source === 'object'
+    ? {
+        kind: ['topic', 'resume', 'job_description'].includes(source.kind) ? source.kind : 'topic',
+        content: typeof source.content === 'string' ? source.content.trim() : '',
+      }
+    : { kind: 'topic', content: normalizedTopic }
+  if (definition.requiresSource) {
+    assertDomain(normalizedSource.content, 'SOURCE_REQUIRED', '简历出题模式必须提供简历内容')
+  }
+
+  const difficulty = config.difficulty || 'intermediate'
+  assertDomain(DIFFICULTIES.has(difficulty), 'INVALID_DIFFICULTY', `不支持的难度：${difficulty}`)
+  const targetQuestionCount = Number(config.targetQuestionCount ?? 10)
+  assertDomain(Number.isInteger(targetQuestionCount) && targetQuestionCount >= 1 && targetQuestionCount <= 100, 'INVALID_QUESTION_COUNT', '目标题数必须是 1–100 的整数')
+
+  return {
+    id: requiredText(id, 'INVALID_PRACTICE_ID', '练习 ID 不能为空'),
+    mode,
+    topic: normalizedTopic,
+    source: normalizedSource,
+    config: {
+      difficulty,
+      targetQuestionCount,
+      followUp: typeof config.followUp === 'boolean' ? config.followUp : definition.defaultFollowUp,
+    },
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+    questions: [],
+  }
+}
+
+export function findQuestion(practice, questionId) {
+  const question = practice?.questions?.find((item) => item.id === questionId)
+  assertDomain(question, 'QUESTION_NOT_FOUND', `找不到题目：${String(questionId)}`)
+  return question
+}
+
+export function findAttempt(question, attemptId) {
+  const attempt = question?.attempts?.find((item) => item.id === attemptId)
+  assertDomain(attempt, 'ATTEMPT_NOT_FOUND', `找不到作答：${String(attemptId)}`)
+  return attempt
+}
+
+export function askQuestion(practice, { id, prompt, now }) {
+  activePractice(practice)
+  const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
+  assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
+  const question = {
+    id: questionId,
+    sequence: practice.questions.length + 1,
+    prompt: requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空'),
+    createdAt: now,
+    attempts: [],
+    explanation: null,
+  }
+  return {
+    practice: withUpdatedAt(practice, now, { questions: [...practice.questions, question] }),
+    question,
+  }
+}
+
+export function submitAnswer(practice, { questionId, attemptId, answer, now }) {
+  activePractice(practice)
+  const target = findQuestion(practice, questionId)
+  const id = requiredText(attemptId, 'INVALID_ATTEMPT_ID', '作答 ID 不能为空')
+  assertDomain(!target.attempts.some((item) => item.id === id), 'DUPLICATE_ATTEMPT', `作答已存在：${id}`)
+  const attempt = {
+    id,
+    sequence: target.attempts.length + 1,
+    answer: requiredText(answer, 'INVALID_ANSWER', '回答不能为空'),
+    submittedAt: now,
+    evaluation: null,
+  }
+  const questions = practice.questions.map((question) => question.id === target.id
+    ? { ...question, attempts: [...question.attempts, attempt] }
+    : question)
+  return { practice: withUpdatedAt(practice, now, { questions }), attempt }
+}
+
+export function evaluateAnswer(practice, { questionId, attemptId, score, feedback, dimensions = {}, now }) {
+  activePractice(practice)
+  const targetQuestion = findQuestion(practice, questionId)
+  const targetAttempt = findAttempt(targetQuestion, attemptId)
+  assertDomain(!targetAttempt.evaluation, 'ATTEMPT_ALREADY_EVALUATED', '该作答已经评价，重新回答会创建新的作答记录')
+  const normalizedScore = Number(score)
+  assertDomain(Number.isFinite(normalizedScore) && normalizedScore >= 0 && normalizedScore <= 10, 'INVALID_SCORE', '评分必须在 0–10 之间')
+  const normalizedDimensions = Object.fromEntries(Object.entries(dimensions || {}).map(([key, value]) => {
+    const dimensionScore = Number(value)
+    assertDomain(Number.isFinite(dimensionScore) && dimensionScore >= 0 && dimensionScore <= 10, 'INVALID_DIMENSION_SCORE', `维度 ${key} 的评分必须在 0–10 之间`)
+    return [key, dimensionScore]
+  }))
+  const evaluation = {
+    score: normalizedScore,
+    feedback: requiredText(feedback, 'INVALID_FEEDBACK', '评价内容不能为空'),
+    dimensions: normalizedDimensions,
+    evaluatedAt: now,
+  }
+  const questions = practice.questions.map((question) => question.id !== targetQuestion.id ? question : {
+    ...question,
+    attempts: question.attempts.map((attempt) => attempt.id === targetAttempt.id
+      ? { ...attempt, evaluation }
+      : attempt),
+  })
+  return { practice: withUpdatedAt(practice, now, { questions }), evaluation }
+}
+
+export function saveExplanation(practice, { questionId, detail, memorizationPoints, now }) {
+  activePractice(practice)
+  const target = findQuestion(practice, questionId)
+  assertDomain(!target.explanation, 'EXPLANATION_ALREADY_EXISTS', '该题已经存在讲解')
+  const explanation = {
+    detail: requiredText(detail, 'INVALID_EXPLANATION', '讲解内容不能为空'),
+    memorizationPoints: typeof memorizationPoints === 'string' ? memorizationPoints.trim() : '',
+    createdAt: now,
+  }
+  const questions = practice.questions.map((question) => question.id === target.id
+    ? { ...question, explanation }
+    : question)
+  return { practice: withUpdatedAt(practice, now, { questions }), explanation }
+}
+
+export function completePractice(practice, now) {
+  activePractice(practice)
+  return withUpdatedAt(practice, now, { status: 'completed', completedAt: now })
+}
+
+export function reopenPractice(practice, now) {
+  assertDomain(practice?.status === 'completed', 'PRACTICE_NOT_COMPLETED', '只有已结束练习可以重新打开')
+  return withUpdatedAt(practice, now, { status: 'active', completedAt: null })
+}
+
+export function summarizePractice(practice) {
+  const attempts = practice.questions.flatMap((question) => question.attempts)
+  const evaluated = attempts.filter((attempt) => attempt.evaluation)
+  const averageScore = evaluated.length
+    ? Math.round((evaluated.reduce((sum, attempt) => sum + attempt.evaluation.score, 0) / evaluated.length) * 10) / 10
+    : null
+  return {
+    questionCount: practice.questions.length,
+    attemptCount: attempts.length,
+    evaluatedCount: evaluated.length,
+    averageScore,
+    verdict: averageScore === null ? '未评分' : averageScore >= 8 ? '优秀' : averageScore >= 6 ? '合格' : '需要加强',
+  }
+}

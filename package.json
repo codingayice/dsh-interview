@@ -4,6 +4,11 @@
   "description": "DeepSeek Harness Web 本地面试复习插件：支持八股、模拟面试、场景题和简历出题，结构化保存题目、作答、评价、讲解与 Markdown 导出。",
   "type": "module",
   "main": "lib/index.js",
+  "scripts": {
+    "test": "node --test",
+    "test:domain": "node --test test/domain/*.test.js",
+    "check": "node --check lib/index.js && node --check src/domain/practice.js && node --check client/client.js"
+  },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./client/client.js",
