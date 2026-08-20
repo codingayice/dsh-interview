@@ -23,7 +23,19 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: return application.reopenPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.FINISH_PRACTICE: return application.completePractice(sessionId)
     case INTERVIEW_ACTIONS.PRESENT_QUESTION: return application.askQuestion(sessionId, { prompt: payload.prompt })
-    case INTERVIEW_ACTIONS.OPEN_QUESTION: return application.openQuestion(sessionId, payload.questionId)
+    case INTERVIEW_ACTIONS.OPEN_QUESTION: {
+      const result = await application.openQuestion(sessionId, payload.questionId)
+      const session = await application.getSession(sessionId)
+      return {
+        ...result,
+        events: [...result.events, {
+          type: 'question.opened',
+          sessionId,
+          practiceId: session.resource.data.practice?.id,
+          questionId: result.resource.data.id,
+        }],
+      }
+    }
     case INTERVIEW_ACTIONS.REQUEST_NEXT: return application.requestNextQuestion(sessionId)
     case INTERVIEW_ACTIONS.RETRY_QUESTION: return application.retryQuestion(sessionId, payload.questionId)
     case INTERVIEW_ACTIONS.SUBMIT_ANSWER: return application.submitAnswer(sessionId, { questionId: payload.questionId, answer: payload.answer })
@@ -33,7 +45,12 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.LIST_PRACTICES: return application.listPractices(payload)
     case INTERVIEW_ACTIONS.GET_PRACTICE: return application.getPractice(payload.practiceId)
     case INTERVIEW_ACTIONS.GET_INSIGHTS: return application.getInsights()
-    case INTERVIEW_ACTIONS.EXPORT_PRACTICES: return application.exportPractices(payload)
+    case INTERVIEW_ACTIONS.EXPORT_PRACTICES: {
+      if (payload.practiceIds?.length || payload.scope === 'all') return application.exportPractices(payload)
+      const session = await application.getSession(sessionId)
+      const practiceId = session.resource.data.practice?.id
+      return application.exportPractices({ ...payload, practiceIds: practiceId ? [practiceId] : undefined })
+    }
     case INTERVIEW_ACTIONS.DELETE_PRACTICE: return application.deletePractice(payload.practiceId, sessionId)
     default: throw new TypeError(`不支持的面试动作：${String(action)}`)
   }

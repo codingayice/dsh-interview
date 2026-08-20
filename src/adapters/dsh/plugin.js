@@ -1,4 +1,5 @@
 import { InterviewApplication } from '../../application/interview-application.js'
+import { InterviewCoordinator } from '../../application/interview-coordinator.js'
 import { MarkdownPracticeExporter } from '../../infrastructure/markdown-practice-exporter.js'
 import { SqliteInterviewRepository } from '../../infrastructure/sqlite-interview-repository.js'
 import { createSystemPorts } from '../../infrastructure/system-ports.js'
@@ -20,17 +21,20 @@ export function createRuntime(ctx, options = {}) {
     clock: options.clock || system.clock,
     ids: options.ids || system.ids,
   })
+  const eventBridge = new AgentEventBridge(ctx)
+  const coordinator = options.coordinator || new InterviewCoordinator({ application, eventBridge })
   return {
     application,
+    coordinator,
     repository,
     exporter,
-    eventBridge: new AgentEventBridge(ctx),
+    eventBridge,
   }
 }
 
 export function apply(ctx) {
   const runtime = createRuntime(ctx)
-  for (const tool of createToolDefinitions(runtime.application)) ctx.tools.register(tool)
+  for (const tool of createToolDefinitions(runtime.coordinator)) ctx.tools.register(tool)
 
   ctx.inject(['webServer'], (hostCtx) => {
     registerApiRoutes(hostCtx, runtime)

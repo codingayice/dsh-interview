@@ -129,3 +129,41 @@ export function ToolErrorCard({ message }) {
     h('strong', null, '面试操作失败'),
     h('span', null, message))
 }
+
+function usePresentedPractice(presentation, revision) {
+  const practiceId = presentation?.practiceId
+  return useInterviewQuery(
+    `presented-practice:${practiceId || 'none'}:${revision || 0}`,
+    () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
+    [practiceId, revision],
+    { cache: false },
+  )
+}
+
+function PresentedState({ query, children, missing }) {
+  if (query.loading && !query.data) return h('div', { className: 'di-card' }, h(Loading))
+  if (query.error) return h('div', { className: 'di-card' }, h(ErrorNotice, null, query.error))
+  return children || h('div', { className: 'di-card' }, h(Empty, { title: missing }))
+}
+
+export function QuestionResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision)
+  const practice = query.data?.resource?.data
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId)
+  return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question ? h(QuestionResultCard, { question }) : null)
+}
+
+export function EvaluationResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision)
+  const practice = query.data?.resource?.data
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId)
+  const attempt = question?.attempts?.find((item) => item.id === presentation.attemptId)
+  return h(PresentedState, { query, missing: '找不到评价卡片数据' }, attempt?.evaluation ? h(EvaluationResultCard, { evaluation: attempt.evaluation }) : null)
+}
+
+export function ExplanationResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision)
+  const practice = query.data?.resource?.data
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId)
+  return h(PresentedState, { query, missing: '找不到讲解卡片数据' }, question?.explanation ? h(ExplanationResultCard, { explanation: question.explanation }) : null)
+}

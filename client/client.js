@@ -144,46 +144,15 @@ function Markdown({ children }) {
   const text = String(children || "");
   return MarkdownText2 ? h(MarkdownText2, { text, content: text }) : h("div", { className: "di-preline" }, text);
 }
-function parseToolArgs(block) {
-  const candidates = [
-    block?.args,
-    block?.arguments,
-    block?.argsRaw,
-    block?.call?.args,
-    block?.call?.arguments,
-    block?.call?.argsRaw,
-    block?.input
-  ];
-  for (const value of candidates) {
-    if (value && typeof value === "object") return value;
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-      }
-    }
-  }
-  return {};
-}
 function resultText(block) {
   return (block?.content || []).filter((item) => item?.type === "text" && typeof item.text === "string").map((item) => item.text).join("\n");
 }
-function parseToolResult(block) {
-  const text = resultText(block);
-  const kind = text.match(/^resource_kind:\s*(.+)$/m)?.[1]?.trim();
-  if (!kind) return null;
-  const revision = Number(text.match(/^revision:\s*(\d+)$/m)?.[1] || 0);
-  const marker = "resource_data:\n";
-  const start = text.indexOf(marker);
-  if (start < 0) return { kind, revision, data: null };
-  const dataStart = start + marker.length;
-  const sectionStarts = ["\nevents:\n", "\nassistant_response:\n"].map((section) => text.indexOf(section, dataStart)).filter((index) => index >= 0);
-  const dataEnd = sectionStarts.length ? Math.min(...sectionStarts) : text.length;
-  const raw = text.slice(dataStart, dataEnd).trim();
+function parseInteractionResult(block) {
   try {
-    return { kind, revision, data: JSON.parse(raw) };
+    const value = JSON.parse(resultText(block));
+    return value?.protocol === "dsh-interview/interaction-v1" ? value : null;
   } catch {
-    return { kind, revision, data: null };
+    return null;
   }
 }
 function toolCallState(block) {
@@ -399,6 +368,39 @@ function ToolErrorCard({ message }) {
     h("span", null, message)
   );
 }
+function usePresentedPractice(presentation, revision) {
+  const practiceId = presentation?.practiceId;
+  return useInterviewQuery(
+    `presented-practice:${practiceId || "none"}:${revision || 0}`,
+    () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
+    [practiceId, revision],
+    { cache: false }
+  );
+}
+function PresentedState({ query, children, missing }) {
+  if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
+  if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
+  return children || h("div", { className: "di-card" }, h(Empty, { title: missing }));
+}
+function QuestionResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision);
+  const practice = query.data?.resource?.data;
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? h(QuestionResultCard, { question }) : null);
+}
+function EvaluationResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision);
+  const practice = query.data?.resource?.data;
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
+  const attempt = question?.attempts?.find((item) => item.id === presentation.attemptId);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BC4\u4EF7\u5361\u7247\u6570\u636E" }, attempt?.evaluation ? h(EvaluationResultCard, { evaluation: attempt.evaluation }) : null);
+}
+function ExplanationResourceCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision);
+  const practice = query.data?.resource?.data;
+  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u5361\u7247\u6570\u636E" }, question?.explanation ? h(ExplanationResultCard, { explanation: question.explanation }) : null);
+}
 
 // src/client/features/practice-library.js
 var import_react4 = __toESM(require("react"), 1);
@@ -607,6 +609,28 @@ function TimelinePanel({ sessionId, revisionSignal }) {
   );
 }
 
+// src/protocol/interview-tool-names.js
+var INTERVIEW_TOOL_NAMES = Object.freeze([
+  "interview_start_practice",
+  "interview_get_status",
+  "interview_select_practice",
+  "interview_reopen_practice",
+  "interview_finish_practice",
+  "interview_present_question",
+  "interview_open_question",
+  "interview_request_next",
+  "interview_retry_question",
+  "interview_submit_answer",
+  "interview_present_evaluation",
+  "interview_request_explanation",
+  "interview_present_explanation",
+  "interview_list_practices",
+  "interview_get_practice",
+  "interview_get_insights",
+  "interview_export_practices",
+  "interview_delete_practice"
+]);
+
 // src/client/shared/styles.js
 var STYLE_TEXT = `
 :root{--di-ink:#172033;--di-muted:#667085;--di-paper:#f7f8fc;--di-line:#d9dfeb;--di-cobalt:#315be8;--di-amber:#d8932b;--di-green:#2e8b72;--di-red:#c94b56;--di-white:#fff}
@@ -640,29 +664,9 @@ function resolveToolView(toolName, block) {
   const state = toolCallState(block);
   if (state === "running") return { kind: "hidden" };
   if (state === "error") return { kind: "error", message: toolErrorMessage(block) };
-  const args = parseToolArgs(block);
-  const result = parseToolResult(block);
-  if (toolName === "interview_library") {
-    if (args.command === "list") return { kind: "library" };
-    if (args.command === "get") return { kind: "library", practiceId: args.practice_id };
-    if (args.command === "insights") return { kind: "insights" };
-    if (args.command === "delete") return { kind: "deleted" };
-    if (args.command === "export") return { kind: "exported" };
-  }
-  if (toolName === "interview_question") {
-    if (["ask", "open"].includes(args.command) && result?.kind === "question") return { kind: "question", data: result.data };
-    if (args.command === "save_explanation" && result?.kind === "explanation") return { kind: "explanation", data: result.data };
-    return { kind: "hidden" };
-  }
-  if (toolName === "interview_answer") {
-    if (args.command === "evaluate" && result?.kind === "evaluation") return { kind: "evaluation", data: result.data };
-    return { kind: "hidden" };
-  }
-  if (toolName === "interview_session") {
-    if (["status", "select", "reopen"].includes(args.command)) return { kind: "live" };
-    if (args.command === "finish") return { kind: "finished", data: result?.data };
-  }
-  return { kind: "hidden" };
+  const result = parseInteractionResult(block);
+  if (!result || result.error?.audience === "agent" || !result.presentation) return { kind: "hidden" };
+  return { ...result.presentation, revision: result.revision, toolName };
 }
 function ToolResourceView({ toolName, sessionId, block }) {
   const view = resolveToolView(toolName, block);
@@ -670,11 +674,11 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "error":
       return h(ToolErrorCard, { message: view.message });
     case "question":
-      return h(QuestionResultCard, { question: view.data });
+      return h(QuestionResourceCard, { presentation: view, revision: view.revision });
     case "evaluation":
-      return h(EvaluationResultCard, { evaluation: view.data });
+      return h(EvaluationResourceCard, { presentation: view, revision: view.revision });
     case "explanation":
-      return h(ExplanationResultCard, { explanation: view.data });
+      return h(ExplanationResourceCard, { presentation: view, revision: view.revision });
     case "library":
       return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId });
     case "insights":
@@ -684,8 +688,8 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "exported":
       return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
     case "finished":
-      return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u7ED3\u675F", detail: view.data?.topic ? `${view.data.topic} \u5DF2\u5F52\u6863\uFF0C\u53EF\u4EE5\u5728\u7EC3\u4E60\u6863\u6848\u4E2D\u67E5\u770B\u590D\u76D8\u3002` : "\u672C\u6B21\u7EC3\u4E60\u5DF2\u7ECF\u5F52\u6863\u3002", tone: "completed" });
-    case "live":
+      return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u7ED3\u675F", detail: "\u672C\u6B21\u7EC3\u4E60\u5DF2\u7ECF\u5F52\u6863\uFF0C\u53EF\u4EE5\u5728\u7EC3\u4E60\u6863\u6848\u4E2D\u67E5\u770B\u590D\u76D8\u3002", tone: "completed" });
+    case "live-session":
       return h(LiveInterviewCard, { sessionId });
     default:
       return null;
@@ -695,7 +699,7 @@ function apply(ctx) {
   installStyles();
   const slots = ctx.get("slots");
   if (!slots) return;
-  for (const toolName of ["interview_session", "interview_question", "interview_answer", "interview_library"]) {
+  for (const toolName of INTERVIEW_TOOL_NAMES) {
     slots.inject("tool.call.toolview", () => slots.register(
       { name: "tool.call.toolview", key: toolName },
       (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId || "global", block: props.block })

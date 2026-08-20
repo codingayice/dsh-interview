@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { InterviewApplication } from '../../src/application/interview-application.js'
+import { InterviewCoordinator } from '../../src/application/interview-coordinator.js'
 import { createToolDefinitions } from '../../src/adapters/dsh/tool-definitions.js'
 import { MarkdownPracticeExporter } from '../../src/infrastructure/markdown-practice-exporter.js'
 import { SqliteInterviewRepository } from '../../src/infrastructure/sqlite-interview-repository.js'
@@ -23,26 +24,27 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
     clock: { now: () => ++time },
     ids: { next: (prefix) => `${prefix}-${++sequence}` },
   })
-  const tools = Object.fromEntries(createToolDefinitions(application).map((tool) => [tool.name, tool]))
+  const coordinator = new InterviewCoordinator({ application })
+  const tools = Object.fromEntries(createToolDefinitions(coordinator).map((tool) => [tool.name, tool]))
   const exec = { agent: { session: { id: 'session-e2e' } } }
 
   try {
-    const started = await tools.interview_session.execute({ command: 'start', mode: 'scenario', topic: 'Redis 高可用', difficulty: 'senior', target_question_count: 2 }, exec)
+    const started = await tools.interview_start_practice.execute({ mode: 'scenario', topic: 'Redis 高可用', difficulty: 'senior', target_question_count: 2 }, exec)
     const practiceId = started.resource.data.practice.id
-    await tools.interview_question.execute({ command: 'ask', prompt: '缓存击穿时如何保护数据库？' }, exec)
-    await tools.interview_answer.execute({ command: 'submit', answer: '使用互斥锁、逻辑过期并限制回源并发。' }, exec)
-    await tools.interview_answer.execute({ command: 'evaluate', score: 8.5, feedback: '方案完整，建议补充降级策略。', dimensions: { accuracy: 9, tradeoff: 8 } }, exec)
-    await tools.interview_question.execute({ command: 'request_explanation' }, exec)
-    await tools.interview_question.execute({ command: 'save_explanation', detail: '互斥重建、逻辑过期和热点隔离需要结合业务选择。', memorization_points: '互斥重建、逻辑过期、限流降级。' }, exec)
-    await tools.interview_question.execute({ command: 'next' }, exec)
-    await tools.interview_question.execute({ command: 'ask', prompt: 'Redis 主从切换时如何避免数据丢失？' }, exec)
-    await tools.interview_answer.execute({ command: 'submit', answer: '配置合理复制策略并评估一致性与可用性的权衡。' }, exec)
-    await tools.interview_answer.execute({ command: 'evaluate', score: 7.5, feedback: '需要补充复制积压缓冲区和故障转移条件。' }, exec)
-    await tools.interview_session.execute({ command: 'finish' }, exec)
+    await tools.interview_present_question.execute({ prompt: '缓存击穿时如何保护数据库？' }, exec)
+    await tools.interview_submit_answer.execute({ answer: '使用互斥锁、逻辑过期并限制回源并发。' }, exec)
+    await tools.interview_present_evaluation.execute({ score: 8.5, feedback: '方案完整，建议补充降级策略。', dimensions: { accuracy: 9, tradeoff: 8 } }, exec)
+    await tools.interview_request_explanation.execute({}, exec)
+    await tools.interview_present_explanation.execute({ detail: '互斥重建、逻辑过期和热点隔离需要结合业务选择。', memorization_points: '互斥重建、逻辑过期、限流降级。' }, exec)
+    await tools.interview_request_next.execute({}, exec)
+    await tools.interview_present_question.execute({ prompt: 'Redis 主从切换时如何避免数据丢失？' }, exec)
+    await tools.interview_submit_answer.execute({ answer: '配置合理复制策略并评估一致性与可用性的权衡。' }, exec)
+    await tools.interview_present_evaluation.execute({ score: 7.5, feedback: '需要补充复制积压缓冲区和故障转移条件。' }, exec)
+    await tools.interview_finish_practice.execute({}, exec)
 
-    const detail = await tools.interview_library.execute({ command: 'get', practice_id: practiceId }, exec)
-    const insight = await tools.interview_library.execute({ command: 'insights' }, exec)
-    const exported = await tools.interview_library.execute({ command: 'export', practice_ids: [practiceId] }, exec)
+    const detail = await tools.interview_get_practice.execute({ practice_id: practiceId }, exec)
+    const insight = await tools.interview_get_insights.execute({}, exec)
+    const exported = await tools.interview_export_practices.execute({ practice_ids: [practiceId] }, exec)
     const download = exporter.resolveDownload(exported.resource.data[0].token)
 
     assert.equal(detail.resource.data.status, 'completed')

@@ -1,15 +1,22 @@
-export async function dispatchCommand(application, sessionId, command, payload = {}) {
-  switch (command) {
-    case 'session.start': return application.startPractice(sessionId, payload)
-    case 'session.select': return application.selectPractice(sessionId, payload.practiceId)
-    case 'session.finish': return application.completePractice(sessionId)
-    case 'session.reopen': return application.reopenPractice(sessionId, payload.practiceId)
-    case 'question.open': return application.openQuestion(sessionId, payload.questionId)
-    case 'question.request_explanation': return application.requestExplanation(sessionId)
-    case 'question.next': return application.requestNextQuestion(sessionId)
-    case 'question.retry': return application.retryQuestion(sessionId, payload.questionId)
-    case 'library.delete': return application.deletePractice(payload.practiceId, sessionId)
-    case 'library.export': return application.exportPractices(payload)
-    default: throw new TypeError(`不支持的 UI command：${String(command)}`)
-  }
+import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
+
+const UI_ACTIONS = Object.freeze({
+  'session.start': INTERVIEW_ACTIONS.START_PRACTICE,
+  'session.select': INTERVIEW_ACTIONS.SELECT_PRACTICE,
+  'session.finish': INTERVIEW_ACTIONS.FINISH_PRACTICE,
+  'session.reopen': INTERVIEW_ACTIONS.REOPEN_PRACTICE,
+  'question.open': INTERVIEW_ACTIONS.OPEN_QUESTION,
+  'question.request_explanation': INTERVIEW_ACTIONS.REQUEST_EXPLANATION,
+  'question.next': INTERVIEW_ACTIONS.REQUEST_NEXT,
+  'question.retry': INTERVIEW_ACTIONS.RETRY_QUESTION,
+  'library.delete': INTERVIEW_ACTIONS.DELETE_PRACTICE,
+  'library.export': INTERVIEW_ACTIONS.EXPORT_PRACTICES,
+})
+
+export async function dispatchCommand(coordinator, sessionId, command, payload = {}) {
+  const action = UI_ACTIONS[command]
+  if (!action) throw new TypeError(`不支持的 UI command：${String(command)}`)
+  return coordinator.execute({ sessionId, action, payload, source: 'ui' })
 }
+
+export { UI_ACTIONS }

@@ -10,25 +10,6 @@ export function Markdown({ children }) {
   return MarkdownText ? h(MarkdownText, { text, content: text }) : h('div', { className: 'di-preline' }, text)
 }
 
-export function parseToolArgs(block) {
-  const candidates = [
-    block?.args,
-    block?.arguments,
-    block?.argsRaw,
-    block?.call?.args,
-    block?.call?.arguments,
-    block?.call?.argsRaw,
-    block?.input,
-  ]
-  for (const value of candidates) {
-    if (value && typeof value === 'object') return value
-    if (typeof value === 'string') {
-      try { return JSON.parse(value) } catch {}
-    }
-  }
-  return {}
-}
-
 function resultText(block) {
   return (block?.content || [])
     .filter((item) => item?.type === 'text' && typeof item.text === 'string')
@@ -36,24 +17,12 @@ function resultText(block) {
     .join('\n')
 }
 
-export function parseToolResult(block) {
-  const text = resultText(block)
-  const kind = text.match(/^resource_kind:\s*(.+)$/m)?.[1]?.trim()
-  if (!kind) return null
-  const revision = Number(text.match(/^revision:\s*(\d+)$/m)?.[1] || 0)
-  const marker = 'resource_data:\n'
-  const start = text.indexOf(marker)
-  if (start < 0) return { kind, revision, data: null }
-  const dataStart = start + marker.length
-  const sectionStarts = ['\nevents:\n', '\nassistant_response:\n']
-    .map((section) => text.indexOf(section, dataStart))
-    .filter((index) => index >= 0)
-  const dataEnd = sectionStarts.length ? Math.min(...sectionStarts) : text.length
-  const raw = text.slice(dataStart, dataEnd).trim()
+export function parseInteractionResult(block) {
   try {
-    return { kind, revision, data: JSON.parse(raw) }
+    const value = JSON.parse(resultText(block))
+    return value?.protocol === 'dsh-interview/interaction-v1' ? value : null
   } catch {
-    return { kind, revision, data: null }
+    return null
   }
 }
 

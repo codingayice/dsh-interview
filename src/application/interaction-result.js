@@ -148,6 +148,9 @@ export function createAgentProtocolError(action, error) {
 }
 
 export function toAgentInteractionResult(interaction) {
+  const assistantInstruction = interaction.assistantResponse.mode === 'continue'
+    ? '继续执行 nextAction 指定的必要步骤，不要向用户输出普通文本。'
+    : `立即结束当前工具链，最终回复必须且只能是“${interaction.assistantResponse.text}”，不得复述 UI 内容。`
   return {
     protocol: interaction.protocol,
     action: interaction.action,
@@ -156,6 +159,7 @@ export function toAgentInteractionResult(interaction) {
     nextAction: interaction.nextAction,
     presentation: interaction.presentation,
     assistantResponse: interaction.assistantResponse,
+    assistantInstruction,
     ...(interaction.context ? { context: interaction.context } : {}),
     ...(interaction.error ? { error: interaction.error } : {}),
   }

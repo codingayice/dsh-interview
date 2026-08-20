@@ -2,56 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
+import { INTERVIEW_TOOL_NAMES } from '../../src/protocol/interview-tool-names.js'
 
-test('构建后的 Client 注册四种工具视图和一个时间轴槽位', () => {
+function loadPlugin() {
   const source = readFileSync(new URL('../../client/client.js', import.meta.url), 'utf8')
   let plugin = null
   const appended = []
-  const registrations = []
-  const fakeReact = {
-    Fragment: Symbol('Fragment'),
-    createElement: (...args) => ({ args }),
-    useState: () => [null, () => {}],
-    useEffect: () => {},
-    useCallback: (callback) => callback,
-  }
-  const context = {
-    console,
-    URLSearchParams,
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    setTimeout,
-    clearTimeout,
-    document: {
-      getElementById: () => null,
-      createElement: () => ({}),
-      head: { appendChild: (node) => appended.push(node) },
-    },
-    window: {
-      __ModuleLoader__: {
-        load(definition) {
-          plugin = definition.factory((name) => name === 'react' ? fakeReact : {})
-        },
-      },
-    },
-  }
-  vm.runInNewContext(source, context)
-  const slots = {
-    inject(_name, callback) { callback() },
-    register(config) { registrations.push(config); return () => {} },
-  }
-  plugin.apply({ get: () => slots })
-
-  assert.equal(appended.length, 1)
-  assert.deepEqual(
-    registrations.filter((item) => item.name === 'tool.call.toolview').map((item) => item.key),
-    ['interview_session', 'interview_question', 'interview_answer', 'interview_library'],
-  )
-  assert.equal(registrations.find((item) => item.name === 'conversation.input.dock').id, 'interview-timeline')
-})
-
-test('工具视图只为用户可见结果生成对应卡片', () => {
-  const source = readFileSync(new URL('../../client/client.js', import.meta.url), 'utf8')
-  let plugin = null
   const fakeReact = {
     Fragment: Symbol('Fragment'),
     createElement: (...args) => ({ args }),
@@ -65,39 +21,63 @@ test('工具视图只为用户可见结果生成对应卡片', () => {
     fetch: async () => ({ ok: true, json: async () => ({}) }),
     setTimeout,
     clearTimeout,
-    document: { getElementById: () => null, createElement: () => ({}), head: { appendChild: () => {} } },
+    document: {
+      getElementById: () => null,
+      createElement: () => ({}),
+      head: { appendChild: (node) => appended.push(node) },
+    },
     window: { __ModuleLoader__: { load(definition) { plugin = definition.factory((name) => name === 'react' ? fakeReact : {}) } } },
   })
+  return { plugin, appended }
+}
 
-  const settled = (command, kind, data, extra = {}) => ({
+function settled(interaction, extra = {}) {
+  return {
     kind: 'tool-result',
-    call: { argsRaw: JSON.stringify({ command }) },
-    content: [{ type: 'text', text: `resource_kind: ${kind}\nrevision: 2\nresource_data:\n${JSON.stringify(data)}\nevents:\n[]` }],
+    content: [{ type: 'text', text: JSON.stringify({ protocol: 'dsh-interview/interaction-v1', ...interaction }) }],
     ...extra,
-  })
-  const question = { id: 'q1', sequence: 1, prompt: '什么是 JMM？' }
-
-  assert.equal(plugin.resolveToolView('interview_session', { argsRaw: '{"command":"start"}' }).kind, 'hidden')
-  assert.equal(plugin.resolveToolView('interview_session', settled('start', 'practice-started', {})).kind, 'hidden')
-  assert.equal(plugin.resolveToolView('interview_question', settled('next', 'question-requested', {})).kind, 'hidden')
-  assert.equal(plugin.resolveToolView('interview_answer', settled('submit', 'attempt', {})).kind, 'hidden')
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(plugin.resolveToolView('interview_question', settled('ask', 'question', question)))),
-    { kind: 'question', data: question },
-  )
-  assert.equal(plugin.resolveToolView('interview_answer', settled('evaluate', 'evaluation', { score: 8 })).kind, 'evaluation')
-  assert.equal(plugin.resolveToolView('interview_question', settled('ask', 'unknown', null, { isError: true })).kind, 'error')
-
-  const questionWithResponseContract = {
-    kind: 'tool-result',
-    call: { argsRaw: JSON.stringify({ command: 'ask' }) },
-    content: [{
-      type: 'text',
-      text: `resource_kind: question\nrevision: 3\nresource_data:\n${JSON.stringify(question)}\nassistant_response:\n{"mode":"exact","text":"已出题，请开始作答。"}`,
-    }],
   }
+}
+
+test('构建后的 Client 注册全部原子工具视图和时间轴槽位', () => {
+  const { plugin, appended } = loadPlugin()
+  const registrations = []
+  const slots = {
+    inject(_name, callback) { callback() },
+    register(config) { registrations.push(config); return () => {} },
+  }
+  plugin.apply({ get: () => slots })
+
+  assert.equal(appended.length, 1)
   assert.deepEqual(
-    JSON.parse(JSON.stringify(plugin.resolveToolView('interview_question', questionWithResponseContract).data)),
-    question,
+    registrations.filter((item) => item.name === 'tool.call.toolview').map((item) => item.key),
+    INTERVIEW_TOOL_NAMES,
   )
+  assert.equal(registrations.find((item) => item.name === 'conversation.input.dock').id, 'interview-timeline')
+})
+
+test('工具视图只按结构化 presentation 渲染用户可见卡片', () => {
+  const { plugin } = loadPlugin()
+  assert.equal(plugin.resolveToolView('interview_start_practice', { argsRaw: '{}' }).kind, 'hidden')
+  assert.equal(plugin.resolveToolView('interview_start_practice', settled({ revision: 1, presentation: null })).kind, 'hidden')
+
+  const question = plugin.resolveToolView('interview_present_question', settled({
+    revision: 2,
+    presentation: { kind: 'question', practiceId: 'p1', questionId: 'q1' },
+  }))
+  assert.deepEqual(JSON.parse(JSON.stringify(question)), {
+    kind: 'question', practiceId: 'p1', questionId: 'q1', revision: 2, toolName: 'interview_present_question',
+  })
+
+  const recoverable = plugin.resolveToolView('interview_present_question', settled({
+    revision: 0,
+    presentation: null,
+    error: { audience: 'agent', recoverable: true },
+  }))
+  assert.equal(recoverable.kind, 'hidden')
+
+  const failed = plugin.resolveToolView('interview_present_question', {
+    kind: 'tool-result', isError: true, content: [{ type: 'text', text: 'schema validation failed' }],
+  })
+  assert.equal(failed.kind, 'error')
 })
