@@ -1,1160 +1,556 @@
-// dsh-interview client：题目卡片、评价卡片、讲解卡片和练习面板。
-// interview 工具调用（question.open 动作）位置渲染为题目卡片：
-// 问题文本 + 「看答案」按钮；作答走正常输入框。无 emoji，样式用应用主题 token。
-window.__ModuleLoader__.load({ id: "dsh-interview", factory: (require) => {
-  var module = { exports: {} };
-  var exports = module.exports;
-  Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-  var react = require("react");
-  var primitives = require("@deepseek-ai/dsh-client-ui-primitives");
-
-  const name = "dsh-interview";
-  const inject = ["slots"];
-  // MarkdownText 渲染 markdown（聊天消息同款）；若组件不可用则降级为纯文本
-  const MarkdownText = primitives && primitives.MarkdownText ? primitives.MarkdownText : null;
-  const ACTION_PRESENTATION = {
-    "practice.create": { kind: "status", label: "练习已创建" },
-    "practice.list": { kind: "dashboard" },
-    "practice.get": { kind: "practice-detail" },
-    "practice.update": { kind: "status", label: "练习设置已更新" },
-    "practice.delete": { kind: "status", label: "练习已删除", danger: true },
-    "practice.finish": { kind: "summary" },
-    "practice.reopen": { kind: "status", label: "练习已重新打开" },
-    "practice.dashboard": { kind: "dashboard" },
-    "practice.timeline": { kind: "practice-detail" },
-    "practice.summary": { kind: "summary" },
-    "question.open": { kind: "question" },
-    "question.list": { kind: "practice-detail" },
-    "question.get": { kind: "question-detail" },
-    "question.update": { kind: "status", label: "题目已更新" },
-    "question.delete": { kind: "status", label: "题目已删除", danger: true },
-    "attempt.create": { kind: "silent" },
-    "attempt.list": { kind: "attempts" },
-    "attempt.get": { kind: "attempts" },
-    "attempt.update": { kind: "status", label: "作答已更新" },
-    "attempt.delete": { kind: "status", label: "作答已删除", danger: true },
-    "evaluation.create": { kind: "evaluation" },
-    "evaluation.get": { kind: "attempts" },
-    "evaluation.update": { kind: "evaluation" },
-    "evaluation.list": { kind: "attempts" },
-    "explanation.create": { kind: "explanation" },
-    "explanation.get": { kind: "question-detail" },
-    "explanation.update": { kind: "explanation" },
-    "explanation.delete": { kind: "status", label: "讲解已删除", danger: true },
-    "session.get": { kind: "silent" },
-    "session.select_practice": { kind: "status", label: "已切换练习" },
-    "session.focus_question": { kind: "silent" },
-    "session.clear_focus": { kind: "silent" },
-    "export.create": { kind: "export" },
-  };
-
-  // markdown 渲染（可用时）或纯文本（降级）
-  function renderMd(text) {
-    if (MarkdownText) return react.createElement(MarkdownText, { text: text });
-    return text;
+window.__ModuleLoader__.load({ id: "dsh-interview", factory: (require) => { var module = { exports: {} }; var exports = module.exports;
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
   }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  const CSS = `
-.ivq-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);font-size:13px;color:var(--dsw-alias-label-primary);margin:4px 0;max-width:520px;}
-.ivq-text{font-size:13px;line-height:1.8;font-weight:600;}
-.ivq-text p{margin:0;}
-.ivq-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.ivq-btn{padding:5px 14px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;cursor:pointer;line-height:22px;}
-.ivq-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);}
-.ivq-btn-primary{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary);color:#fff;font-weight:600;}
-.ivq-btn-primary:hover{color:#fff;}
-.ivq-btn:disabled{opacity:.65;cursor:default;}
-.ivq-wait{font-size:12px;color:var(--dsw-alias-label-secondary);}
-.ivq-ans{font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.7;border-top:1px solid var(--dsw-alias-border-l1);padding-top:8px;}
-.ivq-ans b{color:var(--dsw-alias-label-primary);}
-.ivq-atitle{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);}
-.ivq-sec{display:flex;flex-direction:column;gap:4px;}
-.ivq-sec-label{display:inline-block;font-size:11px;font-weight:700;color:var(--dsw-alias-label-primary);padding:2px 8px;border-radius:4px;background-image:linear-gradient(104deg,color-mix(in srgb,var(--dsw-alias-state-warn-primary) 45%,transparent) 0%,color-mix(in srgb,var(--dsw-alias-state-warn-primary) 30%,transparent) 55%,color-mix(in srgb,var(--dsw-alias-state-warn-primary) 42%,transparent) 100%);width:fit-content;}
-.ivq-sec-body{font-size:12px;line-height:1.7;color:var(--dsw-alias-label-primary);}
-.ivq-sec-body p{margin:0;}
-.ivq-jrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.ivq-score{display:inline-block;padding:2px 12px;border-radius:999px;font-weight:700;font-size:13px;}
-.ivq-score-ok{color:var(--dsw-alias-state-success-primary);background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 18%,transparent);}
-.ivq-score-mid{color:var(--dsw-alias-state-warn-primary);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 18%,transparent);}
-.ivq-score-bad{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,transparent);}
-.ivq-score-none{color:var(--dsw-alias-label-secondary);background:color-mix(in srgb,var(--dsw-alias-label-secondary) 12%,transparent);}
-.ivq-jverdict{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);}
-.ivq-mini{font-size:12px;color:var(--dsw-alias-label-secondary);padding:2px 0;}
-.iv-report{box-sizing:border-box;width:min(640px,100%);max-width:640px;gap:0;padding:0;overflow:hidden;}
-.iv-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:15px 16px;border-bottom:1px solid var(--dsw-alias-border-l1);}
-.iv-report-title{font-size:14px;font-weight:720;line-height:1.4;}.iv-report-sub{margin-top:3px;font-size:10px;color:var(--dsw-alias-label-secondary);}
-.iv-report-body{padding:14px 16px;}.iv-report-actions{display:flex;align-items:center;gap:8px;padding:11px 16px;border-top:1px solid var(--dsw-alias-border-l1);}
-.iv-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--dsw-alias-border-l1);}
-.iv-metric{padding:11px 14px;border-right:1px solid var(--dsw-alias-border-l1);}.iv-metric:last-child{border-right:0;}
-.iv-metric strong{display:block;font:700 18px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;}.iv-metric span{display:block;margin-top:3px;font-size:10px;color:var(--dsw-alias-label-secondary);}
-.iv-rail{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:100%;max-width:150px;margin-top:7px;}.iv-rail span{height:5px;background:var(--dsw-alias-border-l1);}.iv-rail .is-on.is-good{background:#2f7d67}.iv-rail .is-on.is-mid{background:#c98724}.iv-rail .is-on.is-low{background:#c95c54}
-.iv-section-title{margin:0 0 8px;font-size:10px;font-weight:700;color:var(--dsw-alias-label-secondary);text-transform:uppercase;}
-.iv-review-list{display:flex;flex-direction:column;border-top:1px solid var(--dsw-alias-border-l1);}.iv-review-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:9px;padding:9px 0;border-bottom:1px solid var(--dsw-alias-border-l1);align-items:start;}.iv-review-row:last-child{border-bottom:0}.iv-review-q{font-size:11px;line-height:1.55;}.iv-review-score{font:700 11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;}
-.iv-attempt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}.iv-attempt{min-width:0;padding:13px 16px;border-right:1px solid var(--dsw-alias-border-l1);border-bottom:1px solid var(--dsw-alias-border-l1);}.iv-attempt:nth-child(2n){border-right:0}.iv-attempt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;}.iv-attempt-label{font:700 10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#2f7d67}.iv-attempt-score{font:700 13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;}.iv-attempt-answer{font-size:11px;line-height:1.65;word-break:break-word;}.iv-attempt-comment{margin-top:9px;padding-top:9px;border-top:1px solid var(--dsw-alias-border-l1);font-size:10px;line-height:1.6;color:var(--dsw-alias-label-secondary);}.iv-delta{font:700 11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#2f7d67;}
-.iv-export-list{display:flex;flex-direction:column;}.iv-export-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--dsw-alias-border-l1);}.iv-export-row:last-child{border-bottom:0}.iv-export-title{font-size:11px;font-weight:650;line-height:1.5;}.iv-export-path{margin-top:3px;font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--dsw-alias-label-secondary);word-break:break-all;}.iv-export-actions{display:flex;gap:4px;}
-.iv-detail-table{display:flex;flex-direction:column;}.iv-detail-columns,.iv-detail-row{display:grid;grid-template-columns:38px minmax(0,1fr) 58px 54px;gap:10px;align-items:center;}.iv-detail-columns{padding:8px 16px;border-bottom:1px solid var(--dsw-alias-border-l1);font-size:9px;color:var(--dsw-alias-label-secondary);text-transform:uppercase;}.iv-detail-row{padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l1);cursor:pointer;min-height:42px;}.iv-detail-row:hover,.iv-detail-row.is-open{background:color-mix(in srgb,#2f7d67 6%,transparent);}.iv-detail-num{font:700 10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:#2f7d67;}.iv-detail-question{font-size:11px;line-height:1.5;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.iv-detail-score{font:700 11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;text-align:right;}.iv-detail-attempts{font-size:10px;color:var(--dsw-alias-label-secondary);text-align:right;}.iv-detail-expanded{grid-column:1/-1;padding:4px 0 2px 48px;cursor:default;}.iv-detail-attempt{padding:9px 0;border-top:1px solid var(--dsw-alias-border-l1);}.iv-detail-attempt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;}.iv-detail-attempt-body{margin-top:5px;font-size:11px;line-height:1.65;word-break:break-word;}.iv-detail-attempt-comment{margin-top:5px;color:var(--dsw-alias-label-secondary);font-size:10px;line-height:1.6;}
-.iv-status{display:flex;align-items:center;gap:8px;width:fit-content;max-width:520px;padding:7px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:11px;}.iv-status-icon{display:flex;color:#2f7d67}.iv-status.is-danger .iv-status-icon{color:#c95c54}.iv-question-meta{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-secondary);font-size:10px}.iv-question-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.iv-explanation-empty{padding:12px 0;color:var(--dsw-alias-label-secondary);font-size:11px;}
-.iv-inline-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:30px;padding:4px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:11px;cursor:pointer;}.iv-inline-btn:hover,.iv-inline-btn:focus-visible{border-color:#2f7d67;color:#2f7d67;outline:none}.iv-inline-btn.is-primary{border-color:#2f7d67;background:#2f7d67;color:#fff}.iv-inline-btn:disabled{opacity:.55;cursor:default}
-.iva-retry-row{display:flex;justify-content:flex-end;margin-top:10px;}
-.ivt-toggle{position:fixed;right:12px;top:64px;z-index:50;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.12);}
-.ivt-toggle:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);}
-.ivt-panel{position:fixed;right:12px;top:60px;bottom:84px;width:240px;z-index:50;display:flex;flex-direction:column;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 4px 20px rgba(0,0,0,.14);font-size:12px;color:var(--dsw-alias-label-primary);overflow:hidden;}
-.ivt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);font-weight:600;font-size:12px;flex:none;}
-.ivt-btn{padding:2px 8px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font-size:11px;cursor:pointer;}
-.ivt-btn:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);}
-.ivt-body{flex:1;overflow-y:auto;padding:12px;}
-.ivt-list{position:relative;display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none;}
-.ivt-list:before{content:"";position:absolute;left:5px;top:5px;bottom:5px;width:2px;background:var(--dsw-alias-border-l2);}
-.ivt-item{position:relative;padding-left:20px;}
-.ivt-item:before{content:"";position:absolute;left:0;top:3px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);border:2px solid var(--dsw-alias-border-l2);box-sizing:border-box;}
-.ivt-item:hover .ivt-q{color:var(--dsw-alias-brand-primary);}
-.ivt-item-current:before{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);}
-.ivt-num{font-size:10px;color:var(--dsw-alias-label-secondary);margin-bottom:2px;}
-.ivt-q{line-height:1.5;word-break:break-word;color:var(--dsw-alias-label-primary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.ivt-actions{display:none;gap:4px;margin-top:4px;flex-wrap:wrap;}
-.ivt-item:hover .ivt-actions{display:flex;}
-.ivt-act{padding:1px 9px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font-size:10px;cursor:pointer;line-height:16px;}
-.ivt-act:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);}
-.ivt-drawer{position:fixed;right:262px;top:60px;bottom:84px;width:300px;z-index:50;display:flex;flex-direction:column;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 4px 20px rgba(0,0,0,.14);font-size:12px;color:var(--dsw-alias-label-primary);overflow:hidden;}
-.ivt-dhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);font-weight:600;font-size:12px;flex:none;}
-.ivt-dbody{flex:1;overflow-y:auto;padding:12px;font-size:12px;line-height:1.7;color:var(--dsw-alias-label-primary);word-break:break-word;}
-.ivt-dbody p{margin:0;}
-.ivt-empty{color:var(--dsw-alias-label-secondary);padding:6px 2px;line-height:1.6;}
-.iva-ledger{width:min(860px,calc(100vw - 32px));margin:6px 0;border:1px solid var(--dsw-alias-border-l1,#e3e5e8);border-radius:8px;background:var(--dsw-alias-bg-layer-1,#fcfcfd);color:var(--dsw-alias-label-primary,#202124);overflow:hidden;box-shadow:0 10px 30px rgba(25,28,33,.08);font-size:13px;}
-.iva-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:18px 20px 16px;border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);}
-.iva-title{margin:0;font-size:17px;line-height:1.35;font-weight:720;letter-spacing:0;}
-.iva-kicker{margin-top:3px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:11px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;}
-.iva-stats{display:grid;grid-template-columns:repeat(4,minmax(58px,1fr));min-width:330px;border-left:1px solid var(--dsw-alias-border-l1,#e3e5e8);}
-.iva-stat{padding:1px 14px;border-right:1px solid var(--dsw-alias-border-l1,#e3e5e8);}
-.iva-stat:last-child{border-right:0;}
-.iva-stat-value{display:block;font-size:16px;line-height:1.25;font-weight:720;font-variant-numeric:tabular-nums;}
-.iva-stat-label{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:10px;}
-.iva-tools{display:flex;align-items:center;gap:10px;padding:11px 20px;border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fcfcfd) 92%,#2f7d67 8%);}
-.iva-search{position:relative;flex:1;min-width:160px;}
-.iva-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);display:flex;color:var(--dsw-alias-label-secondary,#6d7178);pointer-events:none;}
-.iva-search input{width:100%;height:32px;box-sizing:border-box;padding:0 10px 0 32px;border:1px solid var(--dsw-alias-border-l2,#d5d8dc);border-radius:6px;background:var(--dsw-alias-bg-layer-1,#fcfcfd);color:var(--dsw-alias-label-primary,#202124);font:inherit;outline:none;}
-.iva-search input:focus{border-color:#2f7d67;box-shadow:0 0 0 2px color-mix(in srgb,#2f7d67 18%,transparent);}
-.iva-mode{height:32px;padding:0 28px 0 10px;border:1px solid var(--dsw-alias-border-l2,#d5d8dc);border-radius:6px;background:var(--dsw-alias-bg-layer-1,#fcfcfd);color:var(--dsw-alias-label-primary,#202124);font-size:11px;outline:none;}
-.iva-main{display:grid;grid-template-columns:minmax(0,1fr);min-height:250px;max-height:560px;}
-.iva-main.iva-has-detail{grid-template-columns:minmax(330px,1.05fr) minmax(300px,.95fr);}
-.iva-list{overflow:auto;min-width:0;}
-.iva-columns{display:grid;grid-template-columns:58px minmax(150px,1fr) 70px 130px 112px;align-items:center;gap:12px;padding:8px 16px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:10px;border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);text-transform:uppercase;}
-.iva-row{display:grid;grid-template-columns:58px minmax(150px,1fr) 70px 130px 112px;align-items:center;gap:12px;min-height:68px;padding:9px 16px;border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);cursor:pointer;outline:none;transition:background-color .16s ease,box-shadow .16s ease;}
-.iva-row:hover,.iva-row:focus-visible{background:color-mix(in srgb,#2f7d67 6%,transparent);}
-.iva-row.iva-selected{background:color-mix(in srgb,#2f7d67 9%,transparent);box-shadow:inset 3px 0 #2f7d67;}
-.iva-date{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--dsw-alias-label-secondary,#6d7178);font-variant-numeric:tabular-nums;}
-.iva-date-day{display:block;font-size:14px;font-weight:700;color:var(--dsw-alias-label-primary,#202124);}
-.iva-date-year{display:block;margin-top:2px;font-size:9px;}
-.iva-topic{min-width:0;}
-.iva-topic-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:680;}
-.iva-topic-meta{display:flex;align-items:center;gap:6px;margin-top:5px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:10px;}
-.iva-mode-tag{padding:1px 6px;border-radius:3px;background:color-mix(in srgb,#2f7d67 11%,transparent);color:#2f7d67;font-weight:650;}
-.iva-current{color:#2f7d67;font-weight:650;}
-.iva-count{font-variant-numeric:tabular-nums;}
-.iva-count strong{display:block;font-size:13px;color:var(--dsw-alias-label-primary,#202124);}
-.iva-count span{font-size:9px;color:var(--dsw-alias-label-secondary,#6d7178);}
-.iva-scoreline{display:flex;align-items:center;gap:8px;}
-.iva-score-value{width:25px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
-.iva-rail{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:86px;}
-.iva-tick{height:14px;background:var(--dsw-alias-border-l1,#e3e5e8);}
-.iva-tick-on.iva-good{background:#2f7d67;}.iva-tick-on.iva-mid{background:#c98724;}.iva-tick-on.iva-low{background:#c95c54;}
-.iva-actions{display:flex;align-items:center;justify-content:flex-end;gap:3px;}
-.iva-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--dsw-alias-label-secondary,#6d7178);cursor:pointer;}
-.iva-icon-btn:hover,.iva-icon-btn:focus-visible{border-color:var(--dsw-alias-border-l2,#d5d8dc);background:var(--dsw-alias-bg-layer-1,#fcfcfd);color:#2f7d67;outline:none;}
-.iva-icon-btn:disabled{opacity:.4;cursor:default;}
-.iva-delete{color:#c95c54;}
-.iva-confirm{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-top:8px;color:#c95c54;font-size:11px;}
-.iva-confirm button{height:26px;padding:0 9px;border:1px solid var(--dsw-alias-border-l2,#d5d8dc);border-radius:5px;background:transparent;color:inherit;font-size:11px;cursor:pointer;}
-.iva-confirm .iva-danger{border-color:#c95c54;background:#c95c54;color:#fff;}
-.iva-detail{min-width:0;overflow:auto;border-left:1px solid var(--dsw-alias-border-l1,#e3e5e8);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fcfcfd) 96%,#2f7d67 4%);animation:iva-enter .18s ease-out;}
-.iva-detail-head{position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);background:var(--dsw-alias-bg-layer-1,#fcfcfd);}
-.iva-detail-title{font-size:14px;font-weight:700;}.iva-detail-sub{margin-top:3px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:10px;}
-.iva-question{border-bottom:1px solid var(--dsw-alias-border-l1,#e3e5e8);}
-.iva-question-toggle{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:start;gap:8px;width:100%;padding:12px 16px;border:0;background:transparent;color:var(--dsw-alias-label-primary,#202124);text-align:left;cursor:pointer;}
-.iva-question-toggle:hover{background:color-mix(in srgb,#2f7d67 5%,transparent);}
-.iva-qnum{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#2f7d67;font-size:10px;font-weight:700;}
-.iva-qtext{font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.iva-qscore{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;font-weight:700;color:var(--dsw-alias-label-secondary,#6d7178);}
-.iva-question-body{padding:0 16px 14px 50px;font-size:11px;line-height:1.7;}
-.iva-block{margin-top:10px;}.iva-block:first-child{margin-top:0;}.iva-block-label{margin-bottom:3px;color:var(--dsw-alias-label-secondary,#6d7178);font-size:9px;font-weight:700;}.iva-block-body{word-break:break-word;}.iva-block-body p{margin:0;}
-.iva-empty{display:flex;align-items:center;justify-content:center;min-height:210px;padding:28px;color:var(--dsw-alias-label-secondary,#6d7178);text-align:center;line-height:1.7;}
-.iva-notice{padding:9px 20px;border-top:1px solid var(--dsw-alias-border-l1,#e3e5e8);background:color-mix(in srgb,#2f7d67 8%,transparent);color:#2f7d67;font-size:10px;white-space:pre-wrap;word-break:break-all;}
-.iva-error{color:#c95c54;background:color-mix(in srgb,#c95c54 8%,transparent);}
-@keyframes iva-enter{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
-@media(max-width:760px){.iva-ledger{width:calc(100vw - 20px)}.iva-head{display:block;padding:15px}.iva-stats{margin-top:14px;min-width:0;border:1px solid var(--dsw-alias-border-l1,#e3e5e8)}.iva-stat{padding:7px 9px}.iva-tools{align-items:stretch;flex-wrap:wrap;padding:10px 15px}.iva-search{flex-basis:100%}.iva-mode{flex:1}.iva-columns{display:none}.iva-main.iva-has-detail{grid-template-columns:1fr}.iva-main.iva-has-detail .iva-list{display:none}.iva-row{grid-template-columns:48px minmax(120px,1fr) 88px;gap:10px;padding:10px 14px}.iva-count{display:none}.iva-scoreline{justify-self:end}.iva-actions{grid-column:2/-1;justify-content:flex-start;margin-top:-4px}.iva-detail{border-left:0}.iva-confirm{grid-column:1/-1}.iva-detail-head{padding:13px 14px}.iva-question-toggle{padding:12px 14px}.iva-question-body{padding:0 14px 14px 48px}.iv-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.iv-metric:nth-child(2){border-right:0}.iv-metric:nth-child(-n+2){border-bottom:1px solid var(--dsw-alias-border-l1)}.iv-attempt-grid{grid-template-columns:1fr}.iv-attempt{border-right:0}.iv-export-row{grid-template-columns:1fr}.iv-export-actions{justify-content:flex-start}.iv-detail-columns{display:none}.iv-detail-row{grid-template-columns:30px minmax(0,1fr) 48px 45px;gap:7px;padding:10px 12px}.iv-detail-expanded{padding-left:37px}}
-@media(prefers-reduced-motion:reduce){.iva-row,.iva-detail{transition:none;animation:none}}
-`;
+// src/client/index.js
+var index_exports = {};
+__export(index_exports, {
+  ToolResourceView: () => ToolResourceView,
+  apply: () => apply,
+  inject: () => inject,
+  name: () => name
+});
+module.exports = __toCommonJS(index_exports);
+var import_react6 = __toESM(require("react"), 1);
 
-  function installCss() {
-    if (typeof document === "undefined") return;
-    const key = 'style[data-plugin-css="dsh-interview"]';
-    if (document.querySelector(key)) return;
-    const tag = document.createElement("style");
-    tag.setAttribute("data-plugin-css", "dsh-interview");
-    tag.textContent = CSS;
-    document.head.appendChild(tag);
+// src/client/features/live-interview.js
+var import_react3 = __toESM(require("react"), 1);
+
+// src/client/shared/api.js
+var cache = /* @__PURE__ */ new Map();
+var listeners = /* @__PURE__ */ new Set();
+async function jsonRequest(url, options) {
+  const response = await fetch(url, options);
+  const value = await response.json().catch(() => null);
+  if (!response.ok || value?.error) {
+    const error = new Error(value?.error?.message || `HTTP ${response.status}`);
+    error.code = value?.error?.code || "REQUEST_FAILED";
+    throw error;
   }
+  return value;
+}
+function queryString(values) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) if (value !== void 0 && value !== null && value !== "") params.set(key, value);
+  return params.toString();
+}
+var interviewApi = {
+  session(sessionId) {
+    return jsonRequest(`/interview/api/session?${queryString({ session: sessionId })}`);
+  },
+  practices(filters = {}) {
+    return jsonRequest(`/interview/api/practices?${queryString(filters)}`);
+  },
+  practice(practiceId) {
+    return jsonRequest(`/interview/api/practice?${queryString({ id: practiceId })}`);
+  },
+  insights() {
+    return jsonRequest("/interview/api/insights");
+  },
+  async command(sessionId, command, payload = {}) {
+    const value = await jsonRequest("/interview/api/command", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ session: sessionId, command, payload })
+    });
+    cache.clear();
+    for (const listener of listeners) listener(value.revision);
+    return value;
+  },
+  downloadUrl(token) {
+    return `/interview/api/download?${queryString({ token })}`;
+  },
+  subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+  cached(key, loader) {
+    if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => {
+      cache.delete(key);
+      throw error;
+    }));
+    return cache.get(key);
+  },
+  invalidate() {
+    cache.clear();
+    for (const listener of listeners) listener(Date.now());
+  }
+};
 
-  function apply(ctx) {
-    installCss();
-
-    function control(sessionId, payload) {
-      return fetch("/interview/control", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(Object.assign({ session: sessionId }, payload)),
-      })
-        .then((r) => r.json())
-        .then((value) => {
-          if (value && !value.error && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("dsh-interview-state-change", { detail: { sessionId } }));
-          return value;
-        })
-        .catch(() => null);
+// src/client/shared/hooks.js
+var import_react = __toESM(require("react"), 1);
+function useInterviewQuery(key, loader, dependencies = []) {
+  const [state, setState] = import_react.default.useState({ loading: true, data: null, error: "" });
+  const load = import_react.default.useCallback((force = false) => {
+    setState((current) => ({ ...current, loading: current.data === null, error: "" }));
+    const request = force ? Promise.resolve().then(loader) : interviewApi.cached(key, loader);
+    return request.then((data) => setState({ loading: false, data, error: "" })).catch((error) => setState((current) => ({ ...current, loading: false, error: error.message || "\u52A0\u8F7D\u5931\u8D25" })));
+  }, [key, ...dependencies]);
+  import_react.default.useEffect(() => {
+    load();
+    return interviewApi.subscribe(() => load(true));
+  }, [load]);
+  return { ...state, reload: () => load(true) };
+}
+function useCommand(sessionId) {
+  const [state, setState] = import_react.default.useState({ busy: "", error: "" });
+  const run = import_react.default.useCallback(async (command, payload = {}) => {
+    setState({ busy: command, error: "" });
+    try {
+      return await interviewApi.command(sessionId, command, payload);
+    } catch (error) {
+      setState({ busy: "", error: error.message || "\u64CD\u4F5C\u5931\u8D25" });
+      throw error;
+    } finally {
+      setState((current) => ({ ...current, busy: "" }));
     }
+  }, [sessionId]);
+  return { ...state, run, clearError: () => setState((current) => ({ ...current, error: "" })) };
+}
 
-    function parseArgs(block) {
-      const raw = block && block.call ? block.call.argsRaw : block ? block.argsRaw : "";
+// src/client/shared/ui.js
+var import_react2 = __toESM(require("react"), 1);
+var primitives = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
+var h = import_react2.default.createElement;
+var MarkdownText2 = primitives.MarkdownText;
+function Markdown({ children }) {
+  const text = String(children || "");
+  return MarkdownText2 ? h(MarkdownText2, { text, content: text }) : h("div", { className: "di-preline" }, text);
+}
+function parseToolArgs(block) {
+  const candidates = [block?.args, block?.arguments, block?.call?.args, block?.call?.arguments, block?.input];
+  for (const value of candidates) {
+    if (value && typeof value === "object") return value;
+    if (typeof value === "string") {
       try {
-        const parsed = JSON.parse(raw || "{}");
-        return parsed && typeof parsed === "object" ? parsed : {};
+        return JSON.parse(value);
       } catch {
-        return {};
       }
     }
-
-    function icon(name, size) {
-      const Icon = primitives && primitives[name];
-      return Icon ? react.createElement(Icon, { size: size || 14 }) : null;
-    }
-
-    function ledgerDate(value) {
-      const date = new Date(Number(value));
-      if (!Number.isFinite(date.getTime())) return { day: "--", year: "----" };
-      return {
-        day: String(date.getMonth() + 1).padStart(2, "0") + "/" + String(date.getDate()).padStart(2, "0"),
-        year: String(date.getFullYear()),
-      };
-    }
-
-    function ScoreRail(props) {
-      const hasScore = props.score !== null && props.score !== undefined && props.score !== "";
-      const score = hasScore ? Number(props.score) : NaN;
-      const filled = Number.isFinite(score) ? Math.max(0, Math.min(10, Math.round(score))) : 0;
-      const tone = !Number.isFinite(score) ? "" : score >= 8 ? "is-good" : score >= 6 ? "is-mid" : "is-low";
-      return react.createElement("span", { className: "iv-rail", "aria-label": Number.isFinite(score) ? "得分 " + String(score) + " 分" : "未评分" },
-        Array.from({ length: 10 }, (_, index) => react.createElement("span", { key: index, className: index < filled ? "is-on " + tone : "" })));
-    }
-
-    function findQuestion(practice, args) {
-      if (!practice || !Array.isArray(practice.questions)) return null;
-      if (typeof args.question_id === "string" && args.question_id) return practice.questions.find((item) => item.id === args.question_id) || null;
-      const index = Number(args.question_index);
-      if (Number.isInteger(index) && index >= 1) return practice.questions[index - 1] || null;
-      if (typeof args.attempt_id === "string" && args.attempt_id) return practice.questions.find((item) => Array.isArray(item.attempts) && item.attempts.some((attempt) => attempt.id === args.attempt_id)) || null;
-      return null;
-    }
-
-    function findAttempt(question, args) {
-      if (!question || !Array.isArray(question.attempts)) return null;
-      if (typeof args.attempt_id === "string" && args.attempt_id) return question.attempts.find((item) => item.id === args.attempt_id) || null;
-      const index = Number(args.attempt_index);
-      return Number.isInteger(index) && index >= 1 ? question.attempts[index - 1] || null : null;
-    }
-
-    function usePracticeData(sessionId, args) {
-      const dataPair = react.useState(null);
-      const data = dataPair[0];
-      const setData = dataPair[1];
-      const loadingPair = react.useState(true);
-      const loading = loadingPair[0];
-      const setLoading = loadingPair[1];
-      const errorPair = react.useState("");
-      const error = errorPair[0];
-      const setError = errorPair[1];
-      const sessionPair = react.useState(null);
-      const session = sessionPair[0];
-      const setSession = sessionPair[1];
-      const practiceId = typeof args.practice_id === "string" ? args.practice_id : "";
-      const practiceIndex = Number(args.index);
-      const reload = () => {
-        setLoading(true);
-        return fetch("/interview/state?session=" + encodeURIComponent(sessionId)).then((response) => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return response.json();
-        }).then((state) => {
-          setSession(state);
-          if (practiceId) return practiceId;
-          if (Number.isInteger(practiceIndex) && practiceIndex >= 1) {
-            const match = Array.isArray(state.practices) ? state.practices.find((item) => item.index === practiceIndex) : null;
-            return match ? match.id : "";
-          }
-          return state.practiceId || "";
-        }).then((id) => {
-          if (!id) throw new Error("practice not selected");
-          return fetch("/interview/practice?practice_id=" + encodeURIComponent(id));
-        }).then((response) => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return response.json();
-        }).then((value) => { setData(value); setError(""); return value; })
-          .catch(() => { setData(null); setError("练习数据加载失败。"); return null; })
-          .finally(() => setLoading(false));
-      };
-      react.useEffect(() => { reload(); }, [sessionId, practiceId, practiceIndex]);
-      return { data, loading, error, reload, setData, session };
-    }
-
-    function AttemptComparisonView(props) {
-      const args = parseArgs(props.block);
-      const action = typeof args.action === "string" ? args.action : "attempt.list";
-      const resource = usePracticeData(props.sessionId || "global", args);
-      const retryPair = react.useState(false);
-      const retrying = retryPair[0];
-      const setRetrying = retryPair[1];
-      if (resource.loading) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, "正在整理作答记录…"));
-      if (resource.error || !resource.data) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, resource.error || "找不到练习。"));
-      const question = findQuestion(resource.data, args) || (resource.session && resource.session.questionId ? resource.data.questions.find((item) => item.id === resource.session.questionId) || null : null);
-      if (!question) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, "找不到要比较的题目。"));
-      const showSingle = action === "attempt.get" || action === "evaluation.get";
-      const selectedAttempt = findAttempt(question, args) || (showSingle && resource.session && resource.session.attemptId
-        ? findAttempt(question, { attempt_id: resource.session.attemptId })
-        : null);
-      const attempts = showSingle ? (selectedAttempt ? [selectedAttempt] : []) : Array.isArray(question.attempts) ? question.attempts : [];
-      const scored = attempts.filter((item) => item.score !== null);
-      const delta = scored.length >= 2 ? Math.round((Number(scored[scored.length - 1].score) - Number(scored[0].score)) * 10) / 10 : null;
-      const retry = () => {
-        setRetrying(true);
-        control(props.sessionId, { action: "retry", practice_id: resource.data.id, question_id: question.id })
-          .then((value) => { if (!value || value.error) setRetrying(false); });
-      };
-      return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "历次作答对比" },
-        react.createElement("div", { className: "iv-report-head" },
-          react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, showSingle ? (action === "evaluation.get" ? "评价详情" : "作答详情") : action === "evaluation.list" ? "评价记录" : "历次作答"), react.createElement("div", { className: "iv-report-sub" }, "第 " + String(question.index) + " 题 · " + String(attempts.length) + " 次记录")),
-          delta === null ? null : react.createElement("span", { className: "iv-delta" }, (delta > 0 ? "+" : "") + String(delta) + " 分")),
-        react.createElement("div", { className: "iv-report-body ivq-text" }, renderMd(question.question)),
-        attempts.length
-          ? react.createElement("div", { className: "iv-attempt-grid" }, attempts.map((attempt) =>
-              react.createElement("article", { className: "iv-attempt", key: attempt.id },
-                react.createElement("div", { className: "iv-attempt-head" }, react.createElement("span", { className: "iv-attempt-label" }, "ATTEMPT " + String(attempt.index).padStart(2, "0")), react.createElement("span", { className: "iv-attempt-score" }, attempt.score === null ? "未评分" : String(attempt.score) + "/10")),
-                react.createElement("div", { className: "iv-attempt-answer" }, renderMd(attempt.answer || "暂无回答")),
-                react.createElement(ScoreRail, { score: attempt.score }),
-                attempt.comment ? react.createElement("div", { className: "iv-attempt-comment" }, renderMd(attempt.comment)) : null)))
-          : react.createElement("div", { className: "iv-report-body ivq-wait" }, "这道题还没有作答记录。"),
-        react.createElement("div", { className: "iv-report-actions" },
-          react.createElement("button", { className: "iv-inline-btn is-primary", onClick: retry, disabled: retrying || resource.data.ended }, icon("IconRefreshOutline14", 14), retrying ? "正在打开…" : resource.data.ended ? "练习已结束" : "再次作答")));
-    }
-
-    function PracticeSummaryView(props) {
-      const args = parseArgs(props.block);
-      const sessionId = props.sessionId || "global";
-      const resource = usePracticeData(sessionId, args);
-      const busyPair = react.useState("");
-      const busy = busyPair[0];
-      const setBusy = busyPair[1];
-      const noticePair = react.useState("");
-      const notice = noticePair[0];
-      const setNotice = noticePair[1];
-      if (resource.loading) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, "正在生成练习总结…"));
-      const practice = resource.data;
-      if (resource.error || !practice) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, resource.error || "找不到练习。"));
-      const scored = practice.questions.filter((item) => item.score !== null);
-      const reviewAll = practice.questions.filter((item) => item.score === null || Number(item.score) < 7).sort((a, b) => (a.score === null ? -1 : a.score) - (b.score === null ? -1 : b.score));
-      const review = reviewAll.slice(0, 4);
-      const strong = practice.questions.filter((item) => item.score !== null && Number(item.score) >= 8).sort((a, b) => b.score - a.score).slice(0, 3);
-      const metrics = [[practice.questionsCount, "题目"], [practice.answered, "已评分"], [practice.avg === null ? "—" : practice.avg, "平均分"], [reviewAll.length, "待复习"]];
-      const reviewContent = review.length
-        ? react.createElement("div", { className: "iv-review-list" }, review.map((question) =>
-            react.createElement("div", { className: "iv-review-row", key: question.id },
-              react.createElement("span", { className: "iv-attempt-label" }, "Q" + String(question.index).padStart(2, "0")),
-              react.createElement("span", { className: "iv-review-q" }, question.question),
-              react.createElement("span", { className: "iv-review-score" }, question.score === null ? "未答" : String(question.score) + "/10"))))
-        : react.createElement("div", { className: "ivq-wait" }, scored.length ? "本次练习没有明显薄弱题。" : "完成评价后会生成复习优先级。");
-      const strongContent = strong.length
-        ? react.createElement("div", { className: "iv-review-list" }, strong.map((question) =>
-            react.createElement("div", { className: "iv-review-row", key: question.id },
-              react.createElement("span", { className: "iv-attempt-label" }, "Q" + String(question.index).padStart(2, "0")),
-              react.createElement("span", { className: "iv-review-q" }, question.question),
-              react.createElement("span", { className: "iv-review-score" }, String(question.score) + "/10"))))
-        : react.createElement("div", { className: "ivq-wait" }, "达到 8 分的题目会显示在这里。");
-      const reopen = () => { setBusy("reopen"); control(sessionId, { action: "practice.reopen", practice_id: practice.id }).then((value) => { if (value && !value.error) { resource.setData(Object.assign({}, practice, { ended: false, endedAt: null })); setNotice("练习已重新打开。" ); } }).finally(() => setBusy("")); };
-      const exportPractice = () => { setBusy("export"); control(sessionId, { action: "export.create", practice_id: practice.id }).then((value) => { if (value && !value.error) setNotice("Markdown 已导出。" ); }).finally(() => setBusy("")); };
-      return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "练习总结" },
-        react.createElement("div", { className: "iv-report-head" },
-          react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, practice.ended ? "练习总结" : "练习概览"), react.createElement("div", { className: "iv-report-sub" }, practice.topic + " · " + practice.modeLabel)),
-          react.createElement("span", { className: "ivq-score " + (practice.avg === null ? "ivq-score-none" : practice.avg >= 8 ? "ivq-score-ok" : practice.avg >= 6 ? "ivq-score-mid" : "ivq-score-bad") }, practice.avg === null ? "未评分" : String(practice.avg) + " 分")),
-        react.createElement("div", { className: "iv-metric-grid" }, metrics.map((metric) => react.createElement("div", { className: "iv-metric", key: metric[1] }, react.createElement("strong", null, String(metric[0])), react.createElement("span", null, metric[1])))),
-        react.createElement("div", { className: "iv-report-body" },
-          react.createElement("div", { className: "iv-section-title" }, "掌握度"), react.createElement(ScoreRail, { score: practice.avg }),
-          react.createElement("div", { className: "iv-section-title", style: { marginTop: "16px" } }, "优先复习"),
-          reviewContent,
-          react.createElement("div", { className: "iv-section-title", style: { marginTop: "16px" } }, "掌握较好"),
-          strongContent),
-        react.createElement("div", { className: "iv-report-actions" },
-          practice.ended ? react.createElement("button", { className: "iv-inline-btn is-primary", onClick: reopen, disabled: Boolean(busy) }, icon("IconRefreshOutline14", 14), busy === "reopen" ? "正在打开…" : "重新打开") : null,
-          react.createElement("button", { className: "iv-inline-btn", onClick: exportPractice, disabled: Boolean(busy) }, icon("IconDownloadOutline16", 14), busy === "export" ? "正在导出…" : "导出 Markdown"),
-          notice ? react.createElement("span", { className: "iv-report-sub" }, notice) : null));
-    }
-
-    function ExportResultView(props) {
-      const sessionId = props.sessionId || "global";
-      const filesPair = react.useState([]);
-      const files = filesPair[0];
-      const setFiles = filesPair[1];
-      const loadingPair = react.useState(true);
-      const loading = loadingPair[0];
-      const setLoading = loadingPair[1];
-      const copiedPair = react.useState(-1);
-      const copied = copiedPair[0];
-      const setCopied = copiedPair[1];
-      react.useEffect(() => {
-        fetch("/interview/state?session=" + encodeURIComponent(sessionId)).then((response) => response.json()).then((state) => setFiles(Array.isArray(state.lastExportFiles) ? state.lastExportFiles : [])).catch(() => setFiles([])).finally(() => setLoading(false));
-      }, [sessionId]);
-      const copyPath = (path, index) => {
-        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") return;
-        navigator.clipboard.writeText(path).then(() => setCopied(index));
-      };
-      return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "导出结果" },
-        react.createElement("div", { className: "iv-report-head" }, react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, "Markdown 已导出"), react.createElement("div", { className: "iv-report-sub" }, loading ? "正在读取文件…" : String(files.length) + " 篇练习文档"))),
-        loading ? react.createElement("div", { className: "iv-report-body ivq-wait" }, "正在读取导出结果…")
-          : files.length ? react.createElement("div", { className: "iv-export-list" }, files.map((file, index) => react.createElement("div", { className: "iv-export-row", key: file.path },
-              react.createElement("div", null, react.createElement("div", { className: "iv-export-title" }, file.title), react.createElement("div", { className: "iv-export-path" }, file.path)),
-              react.createElement("div", { className: "iv-export-actions" },
-                react.createElement("button", { className: "iv-inline-btn", onClick: () => window.open("/interview/export?session=" + encodeURIComponent(sessionId) + "&index=" + String(index), "_blank") }, icon("IconLinkOutline14", 14), "打开"),
-                react.createElement("button", { className: "iv-inline-btn", onClick: () => copyPath(file.path, index) }, copied === index ? "已复制" : "复制路径")))))
-            : react.createElement("div", { className: "iv-report-body ivq-wait" }, "没有找到本次导出文件。"));
-    }
-
-    function PracticeDetailView(props) {
-      const args = parseArgs(props.block);
-      const sessionId = props.sessionId || "global";
-      const resource = usePracticeData(sessionId, args);
-      const openPair = react.useState(null);
-      const openQuestion = openPair[0];
-      const setOpenQuestion = openPair[1];
-      const busyPair = react.useState("");
-      const busy = busyPair[0];
-      const setBusy = busyPair[1];
-      const noticePair = react.useState("");
-      const notice = noticePair[0];
-      const setNotice = noticePair[1];
-      if (resource.loading) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, "正在加载练习详情…"));
-      const practice = resource.data;
-      if (resource.error || !practice) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, resource.error || "找不到练习。"));
-      const retry = (question) => {
-        if (practice.ended) return;
-        setBusy("retry:" + question.id);
-        control(sessionId, { action: "retry", practice_id: practice.id, question_id: question.id }).then((value) => {
-          if (!value || value.error) throw new Error("action failed");
-          setNotice("已聚焦第 " + String(question.index) + " 题，请继续回答。" );
-        }).catch(() => setNotice("无法重新打开这道题。" )).finally(() => setBusy(""));
-      };
-      const reopen = () => {
-        setBusy("reopen");
-        control(sessionId, { action: "practice.reopen", practice_id: practice.id }).then((value) => {
-          if (!value || value.error) throw new Error("action failed");
-          resource.setData(Object.assign({}, practice, { ended: false, endedAt: null }));
-          setNotice("练习已重新打开。" );
-        }).catch(() => setNotice("无法重新打开练习。" )).finally(() => setBusy(""));
-      };
-      const summaryClass = practice.avg === null ? "ivq-score-none" : practice.avg >= 8 ? "ivq-score-ok" : practice.avg >= 6 ? "ivq-score-mid" : "ivq-score-bad";
-      return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "练习详情" },
-        react.createElement("div", { className: "iv-report-head" },
-          react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, "练习详情"), react.createElement("div", { className: "iv-report-sub" }, practice.topic + " · " + practice.modeLabel + " · " + String(practice.questionsCount) + " 题")),
-          react.createElement("span", { className: "ivq-score " + summaryClass }, practice.avg === null ? "未评分" : String(practice.avg) + " 分")),
-        react.createElement("div", { className: "iv-report-body" },
-          react.createElement("div", { className: "iv-metric-grid" },
-            [[practice.questionsCount, "题目"], [practice.answered, "已评分"], [practice.avg === null ? "—" : practice.avg, "平均分"], [practice.ended ? "已结束" : "进行中", "状态"]].map((metric) => react.createElement("div", { className: "iv-metric", key: metric[1] }, react.createElement("strong", null, String(metric[0])), react.createElement("span", null, metric[1]))))),
-        react.createElement("div", { className: "iv-detail-table" },
-          react.createElement("div", { className: "iv-detail-columns" }, react.createElement("span", null, "题号"), react.createElement("span", null, "题目"), react.createElement("span", null, "得分"), react.createElement("span", null, "作答")),
-          practice.questions.map((question) => {
-            const isOpen = openQuestion === question.id;
-            return react.createElement("div", { className: "iv-detail-row" + (isOpen ? " is-open" : ""), key: question.id, onClick: () => setOpenQuestion(isOpen ? null : question.id) },
-              react.createElement("span", { className: "iv-detail-num" }, "Q" + String(question.index).padStart(2, "0")),
-              react.createElement("span", { className: "iv-detail-question", title: question.question }, question.question),
-              react.createElement("span", { className: "iv-detail-score" }, question.score === null ? "—" : String(question.score)),
-              react.createElement("span", { className: "iv-detail-attempts" }, String(question.attempts ? question.attempts.length : 0) + " 次"),
-              isOpen ? react.createElement("div", { className: "iv-detail-expanded", onClick: (event) => event.stopPropagation() },
-                question.attempts && question.attempts.length ? question.attempts.map((attempt) => react.createElement("div", { className: "iv-detail-attempt", key: attempt.id },
-                  react.createElement("div", { className: "iv-detail-attempt-head" }, react.createElement("span", { className: "iv-attempt-label" }, "第 " + String(attempt.index) + " 次作答"), react.createElement("span", { className: "iv-detail-score" }, attempt.score === null ? "未评分" : String(attempt.score) + "/10")),
-                  react.createElement("div", { className: "iv-detail-attempt-body" }, renderMd(attempt.answer || "暂无回答")),
-                  attempt.comment ? react.createElement("div", { className: "iv-detail-attempt-comment" }, renderMd(attempt.comment)) : null)) : react.createElement("div", { className: "iv-detail-attempt" }, react.createElement("div", { className: "ivq-wait" }, "还没有作答记录。")),
-                react.createElement("div", { className: "iva-retry-row" }, react.createElement("button", { className: "iv-inline-btn", disabled: practice.ended || Boolean(busy), onClick: () => retry(question) }, icon("IconRefreshOutline14", 14), practice.ended ? "练习已结束" : busy === "retry:" + question.id ? "正在打开…" : "重新作答"))) : null);
-          })),
-        react.createElement("div", { className: "iv-report-actions" },
-          practice.ended ? react.createElement("button", { className: "iv-inline-btn is-primary", disabled: Boolean(busy), onClick: reopen }, icon("IconRefreshOutline14", 14), busy === "reopen" ? "正在打开…" : "重新打开") : null,
-          notice ? react.createElement("span", { className: "iv-report-sub" }, notice) : null));
-    }
-
-    function QuestionResourceView(props) {
-      const args = parseArgs(props.block);
-      const action = typeof args.action === "string" ? args.action : "question.get";
-      const sessionId = props.sessionId || "global";
-      const resource = usePracticeData(sessionId, args);
-      const busyPair = react.useState("");
-      const busy = busyPair[0];
-      const setBusy = busyPair[1];
-      if (resource.loading) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, "正在加载题目…"));
-      const practice = resource.data;
-      const question = findQuestion(practice, args) || (practice && resource.session && resource.session.questionId ? practice.questions.find((item) => item.id === resource.session.questionId) || null : null);
-      if (resource.error || !practice || !question) return react.createElement("div", { className: "ivq-card iv-report" }, react.createElement("div", { className: "iv-report-body ivq-wait" }, resource.error || "找不到题目。"));
-      const retry = () => {
-        setBusy("retry");
-        control(sessionId, { action: "retry", practice_id: practice.id, question_id: question.id }).then((value) => { if (!value || value.error) setBusy(""); });
-      };
-      const reveal = () => {
-        setBusy("reveal");
-        control(sessionId, { action: "reveal", practice_id: practice.id, question_id: question.id }).then((value) => { if (!value || value.error) setBusy(""); });
-      };
-      const isExplanation = action === "explanation.get";
-      if (isExplanation) return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "参考答案" },
-        react.createElement("div", { className: "iv-report-head" }, react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, "参考答案"), react.createElement("div", { className: "iv-report-sub" }, "第 " + String(question.index) + " 题 · " + practice.topic))),
-        react.createElement("div", { className: "iv-report-body" },
-          question.explain ? react.createElement("div", { className: "ivq-sec" }, react.createElement("div", { className: "ivq-sec-label" }, "讲解"), react.createElement("div", { className: "ivq-sec-body" }, renderMd(question.explain))) : null,
-          question.memo ? react.createElement("div", { className: "ivq-sec", style: { marginTop: "12px" } }, react.createElement("div", { className: "ivq-sec-label" }, "直接背"), react.createElement("div", { className: "ivq-sec-body" }, renderMd(question.memo))) : null,
-          !question.explain && !question.memo ? react.createElement("div", { className: "iv-explanation-empty" }, "这道题还没有参考讲解。") : null));
-      return react.createElement("section", { className: "ivq-card iv-report", "aria-label": "题目详情" },
-        react.createElement("div", { className: "iv-report-head" },
-          react.createElement("div", null, react.createElement("div", { className: "iv-report-title" }, "题目详情"), react.createElement("div", { className: "iv-report-sub" }, practice.topic + " · 第 " + String(question.index) + " 题")),
-          react.createElement("span", { className: "ivq-score " + (question.score === null ? "ivq-score-none" : question.score >= 8 ? "ivq-score-ok" : question.score >= 6 ? "ivq-score-mid" : "ivq-score-bad") }, question.score === null ? "未评分" : String(question.score) + " 分")),
-        react.createElement("div", { className: "iv-report-body" },
-          react.createElement("div", { className: "ivq-text" }, renderMd(question.question)),
-          react.createElement("div", { className: "iv-question-meta", style: { marginTop: "10px" } }, String(question.attempts.length) + " 次作答", question.explain || question.memo ? "已有讲解" : "暂无讲解"),
-          question.attempts.map((attempt) => react.createElement("div", { className: "iv-detail-attempt", key: attempt.id },
-            react.createElement("div", { className: "iv-detail-attempt-head" }, react.createElement("span", { className: "iv-attempt-label" }, "第 " + String(attempt.index) + " 次作答"), react.createElement("span", { className: "iv-detail-score" }, attempt.score === null ? "未评分" : String(attempt.score) + "/10")),
-            react.createElement("div", { className: "iv-detail-attempt-body" }, renderMd(attempt.answer || "暂无回答")),
-            attempt.comment ? react.createElement("div", { className: "iv-detail-attempt-comment" }, renderMd(attempt.comment)) : null)),
-          react.createElement("div", { className: "iv-question-detail-actions" },
-            react.createElement("button", { className: "iv-inline-btn is-primary", disabled: practice.ended || Boolean(busy), onClick: retry }, icon("IconRefreshOutline14", 14), practice.ended ? "练习已结束" : busy === "retry" ? "正在打开…" : "重新作答"),
-            !question.explain && !question.memo ? react.createElement("button", { className: "iv-inline-btn", disabled: Boolean(busy), onClick: reveal }, icon("IconQuestionOutline14", 14), busy === "reveal" ? "正在生成…" : "看讲解") : null)));
-    }
-
-    function CompactStatusView(props) {
-      const config = props.config || {};
-      return react.createElement("div", { className: "iv-status" + (config.danger ? " is-danger" : ""), role: "status" },
-        react.createElement("span", { className: "iv-status-icon" }, icon(config.danger ? "IconWarningOutline16" : "IconCheckOutline16", 14)),
-        react.createElement("span", null, config.label || "操作完成"));
-    }
-
-    function PracticeDashboardView(props) {
-      const sessionId = props.sessionId || "global";
-      const dataPair = react.useState(null);
-      const data = dataPair[0];
-      const setData = dataPair[1];
-      const loadingPair = react.useState(true);
-      const loading = loadingPair[0];
-      const setLoading = loadingPair[1];
-      const errorPair = react.useState("");
-      const error = errorPair[0];
-      const setError = errorPair[1];
-      const queryPair = react.useState("");
-      const query = queryPair[0];
-      const setQuery = queryPair[1];
-      const modePair = react.useState("all");
-      const mode = modePair[0];
-      const setMode = modePair[1];
-      const detailPair = react.useState(null);
-      const detail = detailPair[0];
-      const setDetail = detailPair[1];
-      const openQuestionPair = react.useState(null);
-      const openQuestion = openQuestionPair[0];
-      const setOpenQuestion = openQuestionPair[1];
-      const busyPair = react.useState("");
-      const busy = busyPair[0];
-      const setBusy = busyPair[1];
-      const noticePair = react.useState("");
-      const notice = noticePair[0];
-      const setNotice = noticePair[1];
-      const confirmPair = react.useState(null);
-      const confirming = confirmPair[0];
-      const setConfirming = confirmPair[1];
-
-      const loadDashboard = () => {
-        setLoading(true);
-        return fetch("/interview/state?view=dashboard&session=" + encodeURIComponent(sessionId))
-          .then((response) => {
-            if (!response.ok) throw new Error("HTTP " + response.status);
-            return response.json();
-          })
-          .then((value) => { setData(value); setError(""); })
-          .catch(() => setError("档案加载失败，请稍后重试。"))
-          .finally(() => setLoading(false));
-      };
-
-      react.useEffect(() => { loadDashboard(); }, [sessionId]);
-
-      const openDetail = (practice) => {
-        setBusy("detail:" + practice.id);
-        fetch("/interview/practice?practice_id=" + encodeURIComponent(practice.id))
-          .then((response) => {
-            if (!response.ok) throw new Error("HTTP " + response.status);
-            return response.json();
-          })
-          .then((value) => {
-            setDetail(value);
-            setOpenQuestion(value.questions && value.questions[0] ? value.questions[0].id : null);
-            setError("");
-          })
-          .catch(() => setError("练习详情加载失败。"))
-          .finally(() => setBusy(""));
-      };
-
-      const runAction = (action, practice) => {
-        const busyKey = action + ":" + practice.id;
-        setBusy(busyKey);
-        setNotice("");
-        return control(sessionId, { action, practice_id: practice.id })
-          .then((value) => {
-            if (!value || value.error) throw new Error("action failed");
-            if (action === "export.create") setNotice(value.__exportText || "Markdown 已导出。");
-            else if (action === "session.select_practice" || action === "practice.reopen") setNotice("已切换到「" + practice.topic + "」，正在继续练习。" );
-            else if (action === "practice.delete") {
-              setNotice("已删除「" + practice.topic + "」。");
-              setConfirming(null);
-              if (detail && detail.id === practice.id) setDetail(null);
-            }
-            return loadDashboard();
-          })
-          .catch(() => setError("操作失败，请稍后重试。"))
-          .finally(() => setBusy(""));
-      };
-
-      const retryQuestion = (question) => {
-        if (!detail || detail.ended) return;
-        setBusy("retry:" + question.id);
-        setNotice("");
-        control(sessionId, { action: "retry", practice_id: detail.id, question_id: question.id })
-          .then((value) => {
-            if (!value || value.error) throw new Error("action failed");
-            setNotice("正在重新打开第 " + String(question.index) + " 题。" );
-          })
-          .catch(() => setError("无法重新打开这道题。"))
-          .finally(() => setBusy(""));
-      };
-
-      const practices = data && Array.isArray(data.practices) ? data.practices : [];
-      const normalizedQuery = query.trim().toLowerCase();
-      const filtered = practices.filter((practice) => {
-        if (mode !== "all" && practice.mode !== mode) return false;
-        if (normalizedQuery && !(practice.topic + " " + practice.modeLabel).toLowerCase().includes(normalizedQuery)) return false;
-        return true;
-      });
-
-      const stats = [
-        [data ? data.practicesCount : 0, "练习"],
-        [data ? data.questionsCount : 0, "题目"],
-        [data ? data.answered : 0, "已评分"],
-        [data && data.avg !== null ? data.avg : "—", "均分"],
-      ];
-
-      const renderQuestionBlock = (label, content) => content
-        ? react.createElement("div", { className: "iva-block" },
-            react.createElement("div", { className: "iva-block-label" }, label),
-            react.createElement("div", { className: "iva-block-body" }, renderMd(content)))
-        : null;
-
-      return react.createElement(
-        "section",
-        { className: "iva-ledger", "aria-label": "练习档案" },
-        react.createElement(
-          "header",
-          { className: "iva-head" },
-          react.createElement("div", null,
-            react.createElement("h2", { className: "iva-title" }, "练习档案"),
-            react.createElement("div", { className: "iva-kicker" }, "PRACTICE LEDGER")),
-          react.createElement("div", { className: "iva-stats" }, stats.map((stat) =>
-            react.createElement("div", { className: "iva-stat", key: stat[1] },
-              react.createElement("span", { className: "iva-stat-value" }, String(stat[0])),
-              react.createElement("span", { className: "iva-stat-label" }, stat[1]))))
-        ),
-        react.createElement(
-          "div",
-          { className: "iva-tools" },
-          react.createElement("label", { className: "iva-search" },
-            react.createElement("span", { className: "iva-search-icon" }, icon("IconSearchOutline16", 14)),
-            react.createElement("input", { value: query, onChange: (event) => setQuery(event.target.value), placeholder: "搜索主题或模式", "aria-label": "搜索练习" })),
-          react.createElement("select", { className: "iva-mode", value: mode, onChange: (event) => setMode(event.target.value), "aria-label": "筛选练习模式" },
-            react.createElement("option", { value: "all" }, "全部模式"),
-            react.createElement("option", { value: "baogu" }, "背八股"),
-            react.createElement("option", { value: "mock" }, "模拟面试"),
-            react.createElement("option", { value: "scenario" }, "场景题"),
-            react.createElement("option", { value: "resume" }, "简历出题"))
-        ),
-        react.createElement(
-          "div",
-          { className: "iva-main" + (detail ? " iva-has-detail" : "") },
-          react.createElement(
-            "div",
-            { className: "iva-list" },
-            react.createElement("div", { className: "iva-columns", "aria-hidden": "true" },
-              react.createElement("span", null, "日期"), react.createElement("span", null, "主题"), react.createElement("span", null, "进度"), react.createElement("span", null, "掌握度"), react.createElement("span", null, "操作")),
-            loading
-              ? react.createElement("div", { className: "iva-empty" }, icon("IconLoadingOutline16", 20), " 正在加载档案…")
-              : filtered.length === 0
-                ? react.createElement("div", { className: "iva-empty" }, practices.length ? "没有符合当前筛选的练习。" : "还没有练习记录。")
-                : filtered.map((practice) => {
-                    const date = ledgerDate(practice.createdAt);
-                    const score = practice.avg === null ? null : Number(practice.avg);
-                    const filled = score === null ? 0 : Math.max(0, Math.min(10, Math.round(score)));
-                    const tone = score === null ? "" : score >= 8 ? "iva-good" : score >= 6 ? "iva-mid" : "iva-low";
-                    const isBusy = busy.endsWith(":" + practice.id);
-                    return react.createElement(
-                      "div",
-                      { key: practice.id, className: "iva-row" + (detail && detail.id === practice.id ? " iva-selected" : ""), role: "button", tabIndex: 0, onClick: () => openDetail(practice), onKeyDown: (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetail(practice); } } },
-                      react.createElement("div", { className: "iva-date" }, react.createElement("span", { className: "iva-date-day" }, date.day), react.createElement("span", { className: "iva-date-year" }, date.year)),
-                      react.createElement("div", { className: "iva-topic" },
-                        react.createElement("div", { className: "iva-topic-name", title: practice.topic }, practice.topic),
-                        react.createElement("div", { className: "iva-topic-meta" }, react.createElement("span", { className: "iva-mode-tag" }, practice.modeLabel), practice.selected ? react.createElement("span", { className: "iva-current" }, "当前") : null, practice.ended ? react.createElement("span", null, "已结束") : null)),
-                      react.createElement("div", { className: "iva-count" }, react.createElement("strong", null, String(practice.answered) + "/" + String(practice.questionsCount)), react.createElement("span", null, "已评分 / 题目")),
-                      react.createElement("div", { className: "iva-scoreline" },
-                        react.createElement("span", { className: "iva-score-value" }, score === null ? "—" : String(score)),
-                        react.createElement("span", { className: "iva-rail", "aria-label": score === null ? "未评分" : "平均 " + String(score) + " 分" }, Array.from({ length: 10 }, (_, index) => react.createElement("span", { key: index, className: "iva-tick" + (index < filled ? " iva-tick-on " + tone : "") })))),
-                      react.createElement("div", { className: "iva-actions", onClick: (event) => event.stopPropagation() },
-                        react.createElement("button", { className: "iva-icon-btn", title: "导出 Markdown", "aria-label": "导出 Markdown", disabled: isBusy, onClick: () => runAction("export.create", practice) }, icon("IconDownloadOutline16", 15)),
-                        react.createElement("button", { className: "iva-icon-btn iva-delete", title: "删除", "aria-label": "删除", disabled: isBusy, onClick: () => setConfirming(practice.id) }, icon("IconWarningOutline16", 15)),
-                        react.createElement("button", { className: "iva-icon-btn", title: "继续练习", "aria-label": "继续练习", disabled: isBusy, onClick: () => runAction(practice.ended ? "practice.reopen" : "session.select_practice", practice) }, icon("IconChevronRightOutline14", 15))),
-                      confirming === practice.id
-                        ? react.createElement("div", { className: "iva-confirm", onClick: (event) => event.stopPropagation() },
-                            react.createElement("span", null, "删除后无法恢复"),
-                            react.createElement("button", { onClick: () => setConfirming(null) }, "取消"),
-                            react.createElement("button", { className: "iva-danger", onClick: () => runAction("practice.delete", practice) }, "确认删除"))
-                        : null
-                    );
-                  })
-          ),
-          detail
-            ? react.createElement("aside", { className: "iva-detail", "aria-label": "练习详情" },
-                react.createElement("div", { className: "iva-detail-head" },
-                  react.createElement("div", null, react.createElement("div", { className: "iva-detail-title" }, detail.topic), react.createElement("div", { className: "iva-detail-sub" }, detail.modeLabel + " · " + detail.questionsCount + " 题 · 均分 " + (detail.avg === null ? "—" : detail.avg))),
-                  react.createElement("button", { className: "iva-icon-btn", title: "返回档案", "aria-label": "返回档案", onClick: () => setDetail(null) }, icon("IconChevronLeftOutline14", 16))),
-                detail.questions.length
-                  ? detail.questions.map((question) => react.createElement("div", { className: "iva-question", key: question.id },
-                      react.createElement("button", { className: "iva-question-toggle", onClick: () => setOpenQuestion(openQuestion === question.id ? null : question.id), "aria-expanded": openQuestion === question.id },
-                        react.createElement("span", { className: "iva-qnum" }, "Q" + String(question.index).padStart(2, "0")),
-                        react.createElement("span", { className: "iva-qtext" }, question.question),
-                        react.createElement("span", { className: "iva-qscore" }, question.score === null ? "—" : String(question.score) + "/10")),
-                      openQuestion === question.id
-                        ? react.createElement("div", { className: "iva-question-body" },
-                            question.attempts && question.attempts.length
-                              ? question.attempts.map((attempt) => react.createElement("div", { className: "iva-block", key: attempt.id },
-                                  react.createElement("div", { className: "iva-block-label" }, "第 " + String(attempt.index) + " 次作答"),
-                                  react.createElement("div", { className: "iva-block-body" }, renderMd(attempt.answer || "暂无回答")),
-                                  attempt.score === null ? null : react.createElement("div", { className: "iva-block-body" }, renderMd(String(attempt.score) + "/10" + (attempt.comment ? " · " + attempt.comment : "")))))
-                              : renderQuestionBlock("作答", "暂无回答"),
-                            renderQuestionBlock("讲解", question.explain),
-                            renderQuestionBlock("直接背", question.memo),
-                            react.createElement("div", { className: "iva-retry-row" }, react.createElement("button", { className: "iv-inline-btn", disabled: detail.ended || busy === "retry:" + question.id, title: detail.ended ? "先继续这条练习" : "重新作答", onClick: () => retryQuestion(question) }, icon("IconRefreshOutline14", 14), detail.ended ? "练习已结束" : busy === "retry:" + question.id ? "正在打开…" : "重新作答")))
-                        : null))
-                  : react.createElement("div", { className: "iva-empty" }, "这次练习还没有题目。"))
-            : null
-        ),
-        error ? react.createElement("div", { className: "iva-notice iva-error" }, error) : notice ? react.createElement("div", { className: "iva-notice" }, notice) : null
-      );
-    }
-
-    function QuestionCard(props) {
-      return react.createElement("div", { className: "ivq-card" },
-        react.createElement("div", { className: "ivq-text" }, renderMd(props.question)),
-        react.createElement("div", { className: "ivq-row" },
-          react.createElement("button", { className: "ivq-btn" + (props.asked ? "" : " ivq-btn-primary"), onClick: props.onReveal, disabled: props.asked }, props.asked ? "已请求，正在讲解…" : "看答案")));
-    }
-
-    function ExistingQuestionView(props) {
-      const sessionId = props.sessionId;
-      const args = parseArgs(props.block);
-      const questionPair = react.useState(null);
-      const question = questionPair[0];
-      const setQuestion = questionPair[1];
-      const loadingPair = react.useState(true);
-      const loading = loadingPair[0];
-      const setLoading = loadingPair[1];
-      const askedPair = react.useState(false);
-      const asked = askedPair[0];
-      const setAsked = askedPair[1];
-      const practiceId = typeof args.practice_id === "string" ? args.practice_id : "";
-      const questionId = typeof args.question_id === "string" ? args.question_id : "";
-      const questionIndex = Number(args.question_index);
-      react.useEffect(() => {
-        const url = "/interview/practice?practice_id=" + encodeURIComponent(practiceId);
-        fetch(url).then((response) => response.json()).then((detail) => {
-          const questions = detail && Array.isArray(detail.questions) ? detail.questions : [];
-          const found = questionId ? questions.find((item) => item.id === questionId) : Number.isInteger(questionIndex) ? questions[questionIndex - 1] : null;
-          setQuestion(found || null);
-        }).catch(() => setQuestion(null)).finally(() => setLoading(false));
-      }, [practiceId, questionId, questionIndex]);
-      const target = { practice_id: practiceId, question_id: question ? question.id : questionId };
-      const onReveal = () => control(sessionId, Object.assign({ action: "reveal" }, target)).then(() => setAsked(true));
-      if (loading) return react.createElement("div", { className: "ivq-card" }, react.createElement("div", { className: "ivq-wait" }, "正在加载题目…"));
-      if (!question) return react.createElement("div", { className: "ivq-card" }, react.createElement("div", { className: "ivq-wait" }, "找不到这道题，可能已被删除。"));
-      return react.createElement(QuestionCard, { question: question.question, asked, onReveal });
-    }
-
-    // 题目卡片：渲染在对话流中 interview 工具调用（question.open）的位置。
-    function QuestionView(props) {
-      const sessionId = props.sessionId;
-      const askedPair = react.useState(false);
-      const asked = askedPair[0];
-      const setAsked = askedPair[1];
-      const nextPair = react.useState(false);
-      const nextAsked = nextPair[0];
-      const setNextAsked = nextPair[1];
-      const endPair = react.useState(false);
-      const endAsked = endPair[0];
-      const setEndAsked = endPair[1];
-      const args = parseArgs(props.block);
-      const action = typeof args.action === "string" ? args.action : "";
-      const presentation = ACTION_PRESENTATION[action];
-      const target = {
-        practice_id: typeof args.practice_id === "string" ? args.practice_id : undefined,
-        question_id: typeof args.question_id === "string" ? args.question_id : undefined,
-        question_index: Number.isInteger(Number(args.question_index)) ? Number(args.question_index) : undefined,
-        attempt_id: typeof args.attempt_id === "string" ? args.attempt_id : undefined,
-        question: typeof args.question === "string" ? args.question : undefined,
-      };
-
-      if (action === "practice.list" || action === "practice.dashboard") {
-        return react.createElement(PracticeDashboardView, { sessionId });
-      }
-      if (action === "practice.get") {
-        return react.createElement(PracticeDetailView, { sessionId, block: props.block });
-      }
-      if (action === "practice.timeline" || action === "question.list") {
-        return react.createElement(PracticeDetailView, { sessionId, block: props.block });
-      }
-      if (action === "question.get" || action === "explanation.get") {
-        return react.createElement(QuestionResourceView, { sessionId, block: props.block });
-      }
-      if (action === "attempt.list" || action === "attempt.get" || action === "evaluation.list" || action === "evaluation.get") {
-        return react.createElement(AttemptComparisonView, { sessionId, block: props.block });
-      }
-      if (action === "practice.finish" || action === "practice.summary") {
-        return react.createElement(PracticeSummaryView, { sessionId, block: props.block });
-      }
-      if (action === "export.create") {
-        return react.createElement(ExportResultView, { sessionId, block: props.block });
-      }
-      if (action === "question.open" && !args.question && (args.question_id || Number(args.question_index) >= 1)) {
-        return react.createElement(ExistingQuestionView, { sessionId, block: props.block });
-      }
-      const onReveal = () => {
-        control(sessionId, Object.assign({ action: "reveal" }, target)).then(() => setAsked(true));
-      };
-      const onNext = () => {
-        control(sessionId, Object.assign({ action: "next" }, target)).then(() => setNextAsked(true));
-      };
-      const onEnd = () => {
-        control(sessionId, Object.assign({ action: "end" }, target)).then(() => setEndAsked(true));
-      };
-
-      if (action === "question.open") {
-        const question = typeof args.question === "string" ? args.question.trim() : "";
-        return question ? react.createElement(QuestionCard, { question, asked, onReveal }) : react.createElement("div", { className: "ivq-card" }, react.createElement("div", { className: "ivq-wait" }, "正在加载题目…"));
-      }
-
-      // 答案卡片：讲解 + 直接背，两项流程操作为下一题和结束练习。
-      if (action === "explanation.create" || action === "explanation.update") {
-        const explain = typeof args.explain === "string" && args.explain.trim() ? args.explain.trim() : "";
-        const memo = typeof args.memo === "string" && args.memo.trim() ? args.memo.trim() : "";
-        if (!explain && !memo) {
-          return react.createElement("div", { className: "ivq-mini" }, "参考答案");
-        }
-        return react.createElement(
-          "div",
-          { className: "ivq-card" },
-          react.createElement("div", { className: "ivq-atitle" }, "参考答案"),
-          explain
-            ? react.createElement(
-                "div",
-                { className: "ivq-sec" },
-                react.createElement("div", { className: "ivq-sec-label" }, "讲解"),
-                react.createElement(
-                  "div",
-                  { className: "ivq-sec-body" },
-                  renderMd(explain)
-                )
-              )
-            : null,
-          memo
-            ? react.createElement(
-                "div",
-                { className: "ivq-sec" },
-                react.createElement("div", { className: "ivq-sec-label" }, "直接背"),
-                react.createElement(
-                  "div",
-                  { className: "ivq-sec-body" },
-                  renderMd(memo)
-                )
-              )
-            : null,
-          react.createElement(
-            "div",
-            { className: "ivq-row" },
-            react.createElement(
-              "button",
-              {
-                className: "ivq-btn ivq-btn-primary",
-                onClick: onNext,
-                disabled: nextAsked || endAsked,
-              },
-              nextAsked ? "已请求，正在出下一题…" : "下一题"
-            ),
-            react.createElement(
-              "button",
-              {
-                className: "ivq-btn",
-                onClick: onEnd,
-                disabled: endAsked,
-              },
-              endAsked ? "已结束，正在生成总结…" : "结束练习"
-            )
-          )
-        );
-      }
-
-      // 评分卡片：评分、点评和看讲解；下一题入口仅放在参考答案卡片。
-      if (action === "evaluation.create" || action === "evaluation.update") {
-        const jscore = Number(args.score);
-        const comment = typeof args.comment === "string" && args.comment.trim() ? args.comment.trim() : "";
-        if (!Number.isFinite(jscore) && !comment) {
-          return react.createElement("div", { className: "ivq-mini" }, "评分完成");
-        }
-        const jverdict = jscore >= 8 ? "优秀" : jscore >= 6 ? "合格" : "需加强";
-        const jclass = jscore >= 8 ? "ivq-score-ok" : jscore >= 6 ? "ivq-score-mid" : "ivq-score-bad";
-        return react.createElement(
-          "div",
-          { className: "ivq-card" },
-          react.createElement(
-            "div",
-            { className: "ivq-jrow" },
-            Number.isFinite(jscore)
-              ? react.createElement(
-                  "span",
-                  { className: "ivq-score " + jclass },
-                  String(jscore) + " 分"
-                )
-              : null,
-            Number.isFinite(jscore)
-              ? react.createElement("span", { className: "ivq-jverdict" }, jverdict)
-              : null
-          ),
-          comment
-            ? react.createElement(
-                "div",
-                { className: "ivq-sec-body" },
-                renderMd(comment)
-              )
-            : null,
-          react.createElement("div", { className: "ivq-row" },
-            react.createElement("button", { className: "iv-inline-btn", onClick: onReveal, disabled: asked }, icon("IconQuestionOutline14", 14), asked ? "正在生成讲解…" : "看讲解"))
-        );
-      }
-
-      if (!presentation || presentation.kind === "silent") return null;
-      return presentation.kind === "status" ? react.createElement(CompactStatusView, { config: presentation }) : null;
-    }
-
-    // 右侧题目时间轴：从当前选中练习的持久化数据恢复，不依赖当前聊天历史。
-    function TimelinePanel(props) {
-      const openPair = react.useState(true);
-      const open = openPair[0];
-      const setOpen = openPair[1];
-      const detailPair = react.useState(null); // { kind, label, num, content }
-      const detail = detailPair[0];
-      const setDetail = detailPair[1];
-      const practicePair = react.useState(null);
-      const practice = practicePair[0];
-      const setPractice = practicePair[1];
-      const focusPair = react.useState(null);
-      const focusedQuestionId = focusPair[0];
-      const setFocusedQuestionId = focusPair[1];
-      const requestRef = react.useRef(0);
-      const useSession = props.useSession;
-      const chatRevision = typeof useSession === "function" ? useSession((snap) => {
-        const chat = snap && snap.chat;
-        const order = chat && Array.isArray(chat.order) ? chat.order : [];
-        return String(order.length) + ":" + String(order.length ? order[order.length - 1] : "");
-      }) : "";
-      const sessionId = props.sessionId || "global";
-      const loadTimeline = () => {
-        const requestId = ++requestRef.current;
-        fetch("/interview/state?session=" + encodeURIComponent(sessionId))
-          .then((response) => {
-            if (!response.ok) throw new Error("HTTP " + response.status);
-            return response.json();
-          })
-          .then((state) => {
-            if (!state || !state.practiceId) return null;
-            return fetch("/interview/practice?practice_id=" + encodeURIComponent(state.practiceId)).then((response) => {
-              if (!response.ok) throw new Error("HTTP " + response.status);
-              return response.json();
-            }).then((practice) => ({ practice, focusedQuestionId: state.questionId || null }));
-          })
-          .then((value) => {
-            if (requestId !== requestRef.current) return;
-            const nextPractice = value ? value.practice : null;
-            setPractice(nextPractice);
-            setFocusedQuestionId(value ? value.focusedQuestionId : null);
-            setDetail((current) => !nextPractice || !nextPractice.questions || !nextPractice.questions.some((question) => current && current.questionId === question.id) ? null : current);
-          })
-          .catch(() => { if (requestId === requestRef.current) { setPractice(null); setFocusedQuestionId(null); setDetail(null); } });
-      };
-      react.useEffect(() => {
-        loadTimeline();
-        const timer = setTimeout(loadTimeline, 300);
-        return () => clearTimeout(timer);
-      }, [sessionId, chatRevision]);
-      react.useEffect(() => {
-        const onChange = (event) => { if (!event.detail || event.detail.sessionId === sessionId) loadTimeline(); };
-        const onFocus = () => loadTimeline();
-        window.addEventListener("dsh-interview-state-change", onChange);
-        window.addEventListener("focus", onFocus);
-        return () => { window.removeEventListener("dsh-interview-state-change", onChange); window.removeEventListener("focus", onFocus); };
-      }, [sessionId]);
-      const entries = practice && Array.isArray(practice.questions) ? practice.questions.map((question) => ({
-        id: question.id,
-        question: question.question || "",
-        answer: question.userAnswer || "",
-        score: question.score === null ? null : Number(question.score),
-        comment: question.comment || "",
-        attempts: Array.isArray(question.attempts) ? question.attempts : [],
-        explain: question.explain || "",
-        memo: question.memo || "",
-      })) : [];
-      const count = entries.length;
-
-      if (count === 0) return null;
-
-      const openDetail = (entry, index, kind, label) => {
-        let content = "";
-        if (kind === "question") content = entry.question;
-        else if (kind === "answer") content = entry.attempts.length
-          ? entry.attempts.map((attempt) => "第 " + String(attempt.index) + " 次作答：\n" + (attempt.answer || "（暂无回答）")).join("\n\n")
-          : "（暂无回答）";
-        else if (kind === "comment") {
-          const evaluated = entry.attempts.filter((attempt) => attempt.score !== null);
-          content = evaluated.length
-            ? evaluated.map((attempt) => "第 " + String(attempt.index) + " 次评价：" + String(attempt.score) + " 分\n\n" + (attempt.comment || "（无点评）")).join("\n\n")
-            : "（暂无点评）";
-        } else if (kind === "answer_card") {
-          content = (entry.explain ? "讲解：\n" + entry.explain + "\n\n" : "") + (entry.memo ? "直接背：\n" + entry.memo : "") || "（暂无答案）";
-        }
-        setDetail({ kind, questionId: entry.id, label: label + " · 第 " + String(index + 1) + " 题", content: content });
-      };
-
-      if (!open) {
-        return react.createElement(
-          "button",
-          {
-            className: "ivt-toggle",
-            onClick: () => setOpen(true),
-            title: "展开题目时间轴",
-          },
-          "题目",
-          react.createElement("span", null, String(count))
-        );
-      }
-
-      return react.createElement(
-        react.Fragment,
-        null,
-        react.createElement(
-          "div",
-          { className: "ivt-panel" },
-          react.createElement(
-            "div",
-            { className: "ivt-head" },
-            react.createElement("span", null, "题目时间轴", practice && practice.topic ? " · " + practice.topic : ""),
-            react.createElement(
-              "button",
-              { className: "ivt-btn", onClick: () => setOpen(false) },
-              "收起"
-            )
-          ),
-          react.createElement(
-            "div",
-            { className: "ivt-body" },
-            react.createElement(
-              "ol",
-              { className: "ivt-list" },
-              entries.map((entry, i) =>
-                react.createElement(
-                  "li",
-                  {
-                    key: entry.id,
-                    className: "ivt-item" + (!practice.ended && entry.id === focusedQuestionId ? " ivt-item-current" : ""),
-                  },
-                  react.createElement("div", { className: "ivt-num" }, "第 " + String(i + 1) + " 题" + (!practice.ended && entry.id === focusedQuestionId ? " · 当前" : "")),
-                  react.createElement("div", { className: "ivt-q" }, entry.question),
-                  react.createElement(
-                    "div",
-                    { className: "ivt-actions" },
-                    react.createElement(
-                      "button",
-                      { className: "ivt-act", onClick: () => openDetail(entry, i, "question", "问题") },
-                      "问题"
-                    ),
-                    react.createElement(
-                      "button",
-                      { className: "ivt-act", onClick: () => openDetail(entry, i, "answer", "回答") },
-                      "回答"
-                    ),
-                    react.createElement(
-                      "button",
-                      { className: "ivt-act", onClick: () => openDetail(entry, i, "comment", "点评") },
-                      "点评"
-                    ),
-                    react.createElement(
-                      "button",
-                      { className: "ivt-act", onClick: () => openDetail(entry, i, "answer_card", "答案") },
-                      "答案"
-                    )
-                  )
-                )
-              )
-            )
-          )
-        ),
-        // 详情抽屉：从时间轴左侧展开，markdown 渲染
-        detail
-          ? react.createElement(
-              "div",
-              { className: "ivt-drawer" },
-              react.createElement(
-                "div",
-                { className: "ivt-dhead" },
-                detail.label,
-                react.createElement(
-                  "button",
-                  { className: "ivt-btn", onClick: () => setDetail(null) },
-                  "关闭"
-                )
-              ),
-              react.createElement("div", { className: "ivt-dbody" }, renderMd(detail.content))
-            )
-          : null
-      );
-    }
-
-    const slots = ctx.get("slots");
-    if (slots === undefined) return;
-
-    // keyed by 工具名：interview 工具的调用在聊天流中渲染为题目卡片
-    slots.inject("tool.call.toolview", () =>
-      slots.register(
-        { name: "tool.call.toolview", key: "interview" },
-        (props) => react.createElement(QuestionView, { sessionId: props.sessionId, block: props.block })
-      )
-    );
-
-    // 右侧题目时间轴（通过 dock 槽位挂载，fixed 浮层不占布局）
-    slots.inject("conversation.input.dock", () =>
-      slots.register(
-        { name: "conversation.input.dock", id: "interview-timeline", order: 25 },
-        (props) => react.createElement(TimelinePanel, { sessionId: props.sessionId, useSession: props.useSession })
-      )
-    );
   }
+  return {};
+}
+function PhaseBadge({ phase }) {
+  const labels = {
+    awaiting_question: "\u51C6\u5907\u51FA\u9898",
+    awaiting_answer: "\u7B49\u5F85\u56DE\u7B54",
+    awaiting_evaluation: "\u6B63\u5728\u8BC4\u4EF7",
+    ready_for_explanation: "\u53EF\u67E5\u770B\u8BB2\u89E3",
+    generating_explanation: "\u6B63\u5728\u751F\u6210\u8BB2\u89E3",
+    awaiting_next: "\u672C\u9898\u5B8C\u6210",
+    completed: "\u7EC3\u4E60\u5DF2\u7ED3\u675F",
+    idle: "\u672A\u9009\u62E9\u7EC3\u4E60"
+  };
+  return h("span", { className: `di-phase di-phase-${phase || "idle"}` }, labels[phase] || phase);
+}
+function ScoreRail({ score, compact = false }) {
+  const normalized = Number.isFinite(Number(score)) ? Math.max(0, Math.min(10, Number(score))) : null;
+  const tone = normalized === null ? "empty" : normalized >= 8 ? "good" : normalized >= 6 ? "mid" : "low";
+  return h(
+    "span",
+    { className: `di-score-rail ${compact ? "is-compact" : ""}`, "aria-label": normalized === null ? "\u672A\u8BC4\u5206" : `${normalized} \u5206` },
+    Array.from({ length: 10 }, (_, index) => h("i", { key: index, className: index < Math.round(normalized || 0) ? `is-on is-${tone}` : "" }))
+  );
+}
+function Loading({ label = "\u6B63\u5728\u8BFB\u53D6\u9762\u8BD5\u6863\u6848\u2026" }) {
+  return h("div", { className: "di-state" }, h("span", { className: "di-spinner" }), label);
+}
+function ErrorNotice({ children }) {
+  return children ? h("div", { className: "di-notice is-error", role: "alert" }, children) : null;
+}
+function Empty({ title, detail }) {
+  return h("div", { className: "di-empty" }, h("strong", null, title), detail ? h("span", null, detail) : null);
+}
+function Button({ children, tone = "quiet", busy = false, ...props }) {
+  return h("button", { ...props, className: `di-button is-${tone}${props.className ? ` ${props.className}` : ""}`, disabled: props.disabled || busy }, busy ? "\u5904\u7406\u4E2D\u2026" : children);
+}
 
-  exports.name = name;
-  exports.inject = inject;
-  exports.apply = apply;
-  return module.exports;
-}});
+// src/client/features/live-interview.js
+function Evaluation({ attempt }) {
+  if (!attempt?.evaluation) return null;
+  const evaluation = attempt.evaluation;
+  return h(
+    "div",
+    { className: "di-section" },
+    h("div", { className: "di-section-label" }, "\u672C\u6B21\u8BC4\u4EF7"),
+    h(
+      "div",
+      { className: "di-score-row" },
+      h("span", { className: "di-score-number" }, evaluation.score),
+      h(ScoreRail, { score: evaluation.score })
+    ),
+    h("div", { style: { marginTop: "12px" } }, h(Markdown, null, evaluation.feedback)),
+    Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-attempt" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("div", { className: "di-attempt-head", key: name2 }, h("span", null, name2), h("strong", null, `${score}/10`)))) : null
+  );
+}
+function Explanation({ explanation }) {
+  if (!explanation) return null;
+  return h(
+    "div",
+    { className: "di-section" },
+    h("div", { className: "di-section-label" }, "\u53C2\u8003\u8BB2\u89E3"),
+    h(Markdown, null, explanation.detail),
+    explanation.memorizationPoints ? h(
+      "div",
+      { className: "di-attempt" },
+      h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"),
+      h(Markdown, null, explanation.memorizationPoints)
+    ) : null
+  );
+}
+function LiveInterviewCard({ sessionId }) {
+  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId]);
+  const command = useCommand(sessionId);
+  if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
+  if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
+  const session = query.data?.resource?.data;
+  if (!session?.selected) return h("div", { className: "di-card" }, h(Empty, { title: "\u8FD8\u6CA1\u6709\u5F00\u59CB\u7EC3\u4E60", detail: "\u7528\u81EA\u7136\u8BED\u8A00\u63CF\u8FF0\u9762\u8BD5\u6A21\u5F0F\u548C\u4E3B\u9898\u5373\u53EF\u5F00\u59CB\u3002" }));
+  const question = session.currentQuestion;
+  const latestAttempt = question?.attempts?.at(-1) || null;
+  const run = (name2, payload) => command.run(name2, payload).catch(() => {
+  });
+  return h(
+    "article",
+    { className: "di-card", "aria-label": "\u5F53\u524D\u9762\u8BD5\u9898" },
+    h(
+      "header",
+      { className: "di-card-head" },
+      h(
+        "div",
+        null,
+        h("div", { className: "di-eyebrow" }, `${session.practice.modeLabel} \xB7 Q${String(question?.sequence || 0).padStart(2, "0")}`),
+        h("div", { className: "di-title" }, session.practice.topic),
+        h("div", { className: "di-subtitle" }, `${session.practice.questionCount} \u9898 \xB7 ${session.practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7`)
+      ),
+      h(PhaseBadge, { phase: session.phase })
+    ),
+    h(
+      "div",
+      { className: "di-card-body" },
+      question ? h(
+        import_react3.default.Fragment,
+        null,
+        h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt)),
+        latestAttempt ? h(
+          "div",
+          { className: "di-attempt" },
+          h("div", { className: "di-attempt-head" }, h("span", null, `\u7B2C ${latestAttempt.sequence} \u6B21\u4F5C\u7B54`), h("span", null, latestAttempt.evaluation ? `${latestAttempt.evaluation.score}/10` : "\u7B49\u5F85\u8BC4\u4EF7")),
+          h(Markdown, null, latestAttempt.answer)
+        ) : null,
+        h(Evaluation, { attempt: latestAttempt }),
+        h(Explanation, { explanation: question.explanation })
+      ) : h(Empty, { title: "\u9762\u8BD5\u5B98\u6B63\u5728\u51C6\u5907\u4E0B\u4E00\u9898", detail: "\u9898\u76EE\u751F\u6210\u540E\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" }),
+      h(ErrorNotice, null, command.error),
+      h(
+        "div",
+        { className: "di-actions" },
+        session.phase === "ready_for_explanation" ? h(Button, { tone: "primary", busy: command.busy === "question.request_explanation", onClick: () => run("question.request_explanation") }, "\u67E5\u770B\u8BB2\u89E3") : null,
+        session.phase === "awaiting_next" || session.phase === "ready_for_explanation" ? h(Button, { tone: session.phase === "awaiting_next" ? "primary" : "quiet", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898") : null,
+        question && ["ready_for_explanation", "awaiting_next"].includes(session.phase) ? h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
+        session.phase !== "completed" ? h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
+      )
+    )
+  );
+}
+function CompactResultCard({ title, detail, tone = "quiet" }) {
+  return h(
+    "div",
+    { className: "di-card" },
+    h(
+      "div",
+      { className: "di-card-head" },
+      h("div", null, h("div", { className: "di-eyebrow" }, "INTERVIEW WORKSPACE"), h("div", { className: "di-title" }, title)),
+      h(PhaseBadge, { phase: tone === "completed" ? "completed" : "awaiting_next" })
+    ),
+    detail ? h("div", { className: "di-card-body" }, detail) : null
+  );
+}
+
+// src/client/features/practice-library.js
+var import_react4 = __toESM(require("react"), 1);
+function PracticeDetail({ practice, sessionId, onDeleted }) {
+  const command = useCommand(sessionId);
+  const [confirming, setConfirming] = import_react4.default.useState(false);
+  const [downloads, setDownloads] = import_react4.default.useState([]);
+  if (!practice) return h(Empty, { title: "\u9009\u62E9\u4E00\u6761\u7EC3\u4E60", detail: "\u53F3\u4FA7\u4F1A\u5C55\u793A\u9898\u76EE\u3001\u5386\u6B21\u4F5C\u7B54\u548C\u8BB2\u89E3\u3002" });
+  const run = (name2, payload) => command.run(name2, payload).catch(() => null);
+  const activate = async () => {
+    await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+  };
+  const exportOne = async () => {
+    const result = await run("library.export", { practiceIds: [practice.id] });
+    if (result) setDownloads(result.resource.data || []);
+  };
+  const remove = async () => {
+    const result = await run("library.delete", { practiceId: practice.id });
+    if (result) onDeleted();
+  };
+  return h(
+    "section",
+    { className: "di-detail" },
+    h("div", { className: "di-eyebrow" }, practice.modeLabel),
+    h("h3", { className: "di-ledger-title", style: { margin: "5px 0 0" } }, practice.topic),
+    h("div", { className: "di-subtitle" }, `${practice.questionCount} \u9898 \xB7 ${practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7 \xB7 \u5747\u5206 ${practice.averageScore ?? "\u2014"}`),
+    h(
+      "div",
+      { className: "di-actions" },
+      h(Button, { tone: "primary", busy: Boolean(command.busy?.startsWith("session.")), onClick: activate }, practice.status === "completed" ? "\u91CD\u65B0\u6253\u5F00" : "\u5207\u6362\u5230\u7EC3\u4E60"),
+      h(Button, { busy: command.busy === "library.export", onClick: exportOne }, "\u5BFC\u51FA Markdown"),
+      h(Button, { tone: "danger", onClick: () => setConfirming(true) }, "\u5220\u9664")
+    ),
+    downloads.length ? h("div", { className: "di-notice" }, downloads.map((file) => h("a", { className: "di-link", href: interviewApi.downloadUrl(file.token), key: file.token }, `\u4E0B\u8F7D ${file.name}`))) : null,
+    confirming ? h(
+      "div",
+      { className: "di-confirm" },
+      h("div", null, "\u5220\u9664\u540E\u65E0\u6CD5\u6062\u590D\u8FD9\u6761\u7EC3\u4E60\u53CA\u5168\u90E8\u4F5C\u7B54\u3002"),
+      h(
+        "div",
+        { className: "di-actions" },
+        h(Button, { onClick: () => setConfirming(false) }, "\u53D6\u6D88"),
+        h(Button, { tone: "danger", busy: command.busy === "library.delete", onClick: remove }, "\u786E\u8BA4\u5220\u9664")
+      )
+    ) : null,
+    h(ErrorNotice, null, command.error),
+    practice.questions.length ? practice.questions.map((question) => {
+      const latest = question.attempts.at(-1);
+      return h(
+        "article",
+        { className: "di-detail-question", key: question.id },
+        h(
+          "div",
+          { className: "di-detail-question-head" },
+          h("span", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
+          h("div", { className: "di-detail-question-text" }, h(Markdown, null, question.prompt)),
+          h(ScoreRail, { score: question.latestScore, compact: true })
+        ),
+        question.attempts.map((attempt) => h(
+          "div",
+          { className: "di-attempt", key: attempt.id },
+          h("div", { className: "di-attempt-head" }, h("span", null, `\u7B2C ${attempt.sequence} \u6B21\u4F5C\u7B54`), h("strong", null, attempt.evaluation ? `${attempt.evaluation.score}/10` : "\u672A\u8BC4\u4EF7")),
+          h(Markdown, null, attempt.answer),
+          attempt.evaluation ? h("div", { className: "di-section" }, h(Markdown, null, attempt.evaluation.feedback)) : null
+        )),
+        question.explanation ? h(
+          "div",
+          { className: "di-section" },
+          h("div", { className: "di-section-label" }, "\u53C2\u8003\u8BB2\u89E3"),
+          h(Markdown, null, question.explanation.detail)
+        ) : null,
+        h(
+          "div",
+          { className: "di-detail-actions" },
+          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null
+        )
+      );
+    }) : h(Empty, { title: "\u8FD9\u6761\u7EC3\u4E60\u8FD8\u6CA1\u6709\u9898\u76EE" })
+  );
+}
+function PracticeLibrary({ sessionId, initialPracticeId = null }) {
+  const [queryText, setQueryText] = import_react4.default.useState("");
+  const [mode, setMode] = import_react4.default.useState("");
+  const [status, setStatus] = import_react4.default.useState("");
+  const [selectedId, setSelectedId] = import_react4.default.useState(initialPracticeId);
+  const filters = { query: queryText, mode, status };
+  const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status]);
+  const practices = list.data?.resource?.data || [];
+  import_react4.default.useEffect(() => {
+    if (!selectedId && practices[0]) setSelectedId(practices[0].id);
+  }, [practices.length, selectedId]);
+  const detail = useInterviewQuery(`practice:${selectedId || "none"}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId]);
+  const selected = detail.data?.resource?.data || null;
+  return h(
+    "section",
+    { className: "di-ledger", "aria-label": "\u7EC3\u4E60\u6863\u6848" },
+    h(
+      "header",
+      { className: "di-ledger-head" },
+      h("div", null, h("div", { className: "di-eyebrow" }, "PRACTICE LEDGER"), h("div", { className: "di-ledger-title" }, "\u7EC3\u4E60\u6863\u6848"), h("div", { className: "di-subtitle" }, "\u6BCF\u4E00\u6B21\u56DE\u7B54\u90FD\u4FDD\u7559\uFF0C\u8FDB\u6B65\u6709\u8FF9\u53EF\u5FAA\u3002")),
+      h("div", { className: "di-score-row" }, h("span", { className: "di-score-number" }, practices.length), h("span", { className: "di-subtitle" }, "\u6761\u7EC3\u4E60"))
+    ),
+    h(
+      "div",
+      { className: "di-ledger-tools" },
+      h("input", { className: "di-input", value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: "\u641C\u7D22\u7EC3\u4E60\u4E3B\u9898", "aria-label": "\u641C\u7D22\u7EC3\u4E60\u4E3B\u9898" }),
+      h(
+        "select",
+        { className: "di-select", value: mode, onChange: (event) => setMode(event.target.value), "aria-label": "\u7B5B\u9009\u6A21\u5F0F" },
+        h("option", { value: "" }, "\u5168\u90E8\u6A21\u5F0F"),
+        h("option", { value: "baogu" }, "\u80CC\u516B\u80A1"),
+        h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
+        h("option", { value: "scenario" }, "\u573A\u666F\u9898"),
+        h("option", { value: "resume" }, "\u7B80\u5386\u51FA\u9898")
+      ),
+      h(
+        "select",
+        { className: "di-select", value: status, onChange: (event) => setStatus(event.target.value), "aria-label": "\u7B5B\u9009\u72B6\u6001" },
+        h("option", { value: "" }, "\u5168\u90E8\u72B6\u6001"),
+        h("option", { value: "active" }, "\u8FDB\u884C\u4E2D"),
+        h("option", { value: "completed" }, "\u5DF2\u7ED3\u675F")
+      )
+    ),
+    h(ErrorNotice, null, list.error),
+    h(
+      "div",
+      { className: "di-ledger-grid" },
+      h(
+        "div",
+        { className: "di-practice-list" },
+        list.loading && !list.data ? h(Loading) : practices.length ? practices.map((practice, index) => h(
+          "button",
+          { className: `di-practice-row${selectedId === practice.id ? " is-selected" : ""}`, key: practice.id, onClick: () => setSelectedId(practice.id) },
+          h("span", { className: "di-sequence" }, String(index + 1).padStart(2, "0")),
+          h("span", null, h("span", { className: "di-row-title" }, practice.topic), h("span", { className: "di-row-meta", style: { display: "block" } }, `${practice.modeLabel} \xB7 ${practice.status === "completed" ? "\u5DF2\u7ED3\u675F" : "\u8FDB\u884C\u4E2D"} \xB7 ${practice.questionCount} \u9898`)),
+          h("span", null, h("strong", null, practice.averageScore ?? "\u2014"), h(ScoreRail, { score: practice.averageScore, compact: true }))
+        )) : h(Empty, { title: "\u8FD8\u6CA1\u6709\u7B26\u5408\u6761\u4EF6\u7684\u7EC3\u4E60", detail: "\u5F00\u59CB\u4E00\u6B21\u9762\u8BD5\u540E\uFF0C\u6863\u6848\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" })
+      ),
+      detail.loading && selectedId ? h(Loading, { label: "\u6B63\u5728\u8BFB\u53D6\u7EC3\u4E60\u8BE6\u60C5\u2026" }) : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => {
+        setSelectedId(null);
+        interviewApi.invalidate();
+      } })
+    )
+  );
+}
+function InsightsCard() {
+  const query = useInterviewQuery("insights", () => interviewApi.insights(), []);
+  if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
+  if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
+  const insight = query.data?.resource?.data;
+  return h(
+    "article",
+    { className: "di-card" },
+    h("header", { className: "di-card-head" }, h("div", null, h("div", { className: "di-eyebrow" }, "CAPABILITY REVIEW"), h("div", { className: "di-title" }, "\u80FD\u529B\u590D\u76D8"))),
+    h(
+      "div",
+      { className: "di-card-body" },
+      h("div", { className: "di-score-row" }, h("span", { className: "di-score-number" }, insight.averageScore ?? "\u2014"), h(ScoreRail, { score: insight.averageScore })),
+      h("div", { className: "di-subtitle", style: { marginTop: "8px" } }, `${insight.practiceCount} \u6B21\u7EC3\u4E60 \xB7 ${insight.questionCount} \u9053\u9898 \xB7 ${insight.evaluatedCount} \u6B21\u8BC4\u4EF7`),
+      insight.topics.length ? h(
+        "div",
+        { className: "di-section" },
+        insight.topics.map((topic) => h("div", { className: "di-attempt-head", key: topic.topic }, h("span", null, `${topic.topic} \xB7 ${topic.evaluatedCount} \u9898`), h("span", { className: "di-score-row" }, h("strong", null, topic.averageScore), h(ScoreRail, { score: topic.averageScore, compact: true }))))
+      ) : h(Empty, { title: "\u5B8C\u6210\u8BC4\u4EF7\u540E\u751F\u6210\u80FD\u529B\u590D\u76D8" })
+    )
+  );
+}
+
+// src/client/features/timeline.js
+var import_react5 = __toESM(require("react"), 1);
+function TimelinePanel({ sessionId, revisionSignal }) {
+  const [open, setOpen] = import_react5.default.useState(true);
+  const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal]);
+  const session = sessionQuery.data?.resource?.data;
+  const practiceId = session?.practice?.id || null;
+  const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || "none"}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal]);
+  const practice = detailQuery.data?.resource?.data;
+  if (!session?.selected || !practice?.questions?.length) return null;
+  if (!open) return h("button", { className: "di-button", style: { position: "fixed", right: "16px", top: "112px", zIndex: 40 }, onClick: () => setOpen(true) }, `\u9898\u76EE ${practice.questions.length}`);
+  return h(
+    "aside",
+    { className: "di-timeline", "aria-label": "\u9898\u76EE\u65F6\u95F4\u8F74" },
+    h(
+      "div",
+      { className: "di-timeline-head" },
+      h("div", null, h("div", { className: "di-eyebrow" }, "QUESTION TRACK"), h("strong", null, practice.topic)),
+      h("button", { className: "di-button", onClick: () => setOpen(false), "aria-label": "\u6536\u8D77\u9898\u76EE\u65F6\u95F4\u8F74" }, "\u6536\u8D77")
+    ),
+    h(
+      "div",
+      { className: "di-timeline-body" },
+      h(PhaseBadge, { phase: session.phase }),
+      practice.questions.map((question) => h(
+        "div",
+        { className: `di-time-item${session.questionId === question.id ? " is-current" : ""}`, key: question.id },
+        h("div", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
+        h("div", { className: "di-time-q", title: question.prompt }, question.prompt),
+        h("div", { className: "di-time-meta" }, h(ScoreRail, { score: question.latestScore, compact: true }), h("span", null, `${question.attempts.length} \u6B21\u4F5C\u7B54`))
+      ))
+    )
+  );
+}
+
+// src/client/shared/styles.js
+var STYLE_TEXT = `
+:root{--di-ink:#172033;--di-muted:#667085;--di-paper:#f7f8fc;--di-line:#d9dfeb;--di-cobalt:#315be8;--di-amber:#d8932b;--di-green:#2e8b72;--di-red:#c94b56;--di-white:#fff}
+.di-card,.di-ledger,.di-timeline{font-family:"Segoe UI","Microsoft YaHei",sans-serif;color:var(--color-text-primary,var(--di-ink));box-sizing:border-box}
+.di-card *,.di-ledger *,.di-timeline *{box-sizing:border-box}.di-preline{white-space:pre-wrap}.di-card{width:min(680px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden;box-shadow:0 8px 28px rgba(23,32,51,.08)}
+.di-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-eyebrow{font:600 11px/1.2 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.13em;text-transform:uppercase;color:var(--di-cobalt)}.di-title{font-size:16px;font-weight:680}.di-subtitle{margin-top:3px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-card-body{padding:18px}.di-question-text{font-size:16px;line-height:1.75}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.di-button{appearance:none;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 12px;background:var(--color-bg-primary,var(--di-white));color:inherit;font:600 13px/1 "Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--di-cobalt)}.di-button:focus-visible{outline:3px solid rgba(49,91,232,.25);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-cobalt);border-color:var(--di-cobalt);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:rgba(201,75,86,.4)}
+.di-phase{display:inline-flex;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:999px;padding:4px 8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--color-text-secondary,var(--di-muted));white-space:nowrap}.di-phase-awaiting_answer{border-color:rgba(49,91,232,.45);color:var(--di-cobalt)}.di-phase-ready_for_explanation,.di-phase-generating_explanation{border-color:rgba(216,147,43,.5);color:var(--di-amber)}.di-phase-awaiting_next{border-color:rgba(46,139,114,.45);color:var(--di-green)}.di-phase-completed{border-color:rgba(102,112,133,.35)}
+.di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font:700 26px/1 Bahnschrift,"Segoe UI",sans-serif}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,9px);gap:3px}.di-score-rail i{display:block;height:16px;border-radius:2px;background:var(--color-bg-tertiary,#e8ebf2)}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:10px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
+.di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border-secondary,var(--di-line))}.di-section-label{margin-bottom:8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-secondary,var(--di-muted))}.di-attempt{margin-top:12px;padding:12px;border-left:3px solid var(--di-cobalt);background:var(--color-bg-secondary,var(--di-paper));border-radius:0 6px 6px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}
+.di-state,.di-empty{padding:28px;text-align:center;color:var(--color-text-secondary,var(--di-muted))}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-cobalt);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 0;padding:10px 12px;border-radius:6px;background:rgba(49,91,232,.08);font-size:13px}.di-notice.is-error{background:rgba(201,75,86,.1);color:var(--di-red)}
+.di-ledger{width:min(980px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden}.di-ledger-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-ledger-title{font-size:21px;font-weight:720}.di-ledger-tools{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-input,.di-select{min-width:0;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 10px;background:var(--color-bg-primary,var(--di-white));color:inherit}.di-input{flex:1}.di-ledger-grid{display:grid;grid-template-columns:minmax(320px,1fr) minmax(330px,.95fr);min-height:360px}.di-practice-list{border-right:1px solid var(--color-border-secondary,var(--di-line));padding:8px}.di-practice-row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;width:100%;padding:12px;border:0;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:transparent;color:inherit;text-align:left;cursor:pointer}.di-practice-row:hover,.di-practice-row.is-selected{background:rgba(49,91,232,.06)}.di-sequence{font:700 13px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--di-cobalt)}.di-row-title{font-weight:650}.di-row-meta{margin-top:4px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-detail{padding:18px;max-height:620px;overflow:auto}.di-detail-question{padding:14px 0;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.55}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-link{color:var(--di-cobalt);text-decoration:none}.di-confirm{margin-top:10px;padding:10px;border:1px solid rgba(201,75,86,.35);border-radius:6px}
+.di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--color-border-secondary,var(--di-line))}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--color-bg-primary,var(--di-white));border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-cobalt);background:var(--di-cobalt)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--color-text-secondary,var(--di-muted))}
+@keyframes di-spin{to{transform:rotate(360deg)}}
+@media(max-width:900px){.di-timeline{display:none}.di-ledger-grid{grid-template-columns:1fr}.di-practice-list{border-right:0;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}}
+@media(max-width:560px){.di-ledger-head{align-items:flex-start;flex-direction:column}.di-ledger-tools{flex-wrap:wrap}.di-select{flex:1}.di-card-body{padding:15px}.di-score-rail{grid-template-columns:repeat(10,7px)}}
+@media(prefers-reduced-motion:reduce){.di-button{transition:none}.di-spinner{animation-duration:1.5s}}
+`;
+function installStyles() {
+  if (document.getElementById("dsh-interview-styles")) return;
+  const style = document.createElement("style");
+  style.id = "dsh-interview-styles";
+  style.textContent = STYLE_TEXT;
+  document.head.appendChild(style);
+}
+
+// src/client/index.js
+var name = "dsh-interview";
+var inject = ["slots"];
+function ToolResourceView({ toolName, sessionId, block }) {
+  const args = parseToolArgs(block);
+  if (toolName === "interview_library") {
+    if (args.command === "list") return h(PracticeLibrary, { sessionId });
+    if (args.command === "get") return h(PracticeLibrary, { sessionId, initialPracticeId: args.practice_id });
+    if (args.command === "insights") return h(InsightsCard);
+    if (args.command === "delete") return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u5220\u9664", detail: "\u6863\u6848\u548C\u5BF9\u5E94\u4F1A\u8BDD\u6E38\u6807\u5DF2\u7ECF\u6E05\u7406\u3002", tone: "completed" });
+    if (args.command === "export") return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
+  }
+  return h(LiveInterviewCard, { sessionId });
+}
+function apply(ctx) {
+  installStyles();
+  const slots = ctx.get("slots");
+  if (!slots) return;
+  for (const toolName of ["interview_session", "interview_question", "interview_answer", "interview_library"]) {
+    slots.inject("tool.call.toolview", () => slots.register(
+      { name: "tool.call.toolview", key: toolName },
+      (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId || "global", block: props.block })
+    ));
+  }
+  slots.inject("conversation.input.dock", () => slots.register(
+    { name: "conversation.input.dock", id: "interview-timeline", order: 25 },
+    (props) => {
+      const revisionSignal = typeof props.useSession === "function" ? props.useSession((snapshot) => {
+        const order = snapshot?.chat?.order || [];
+        return `${order.length}:${order.at(-1) || ""}`;
+      }) : "";
+      return h(TimelinePanel, { sessionId: props.sessionId || "global", revisionSignal });
+    }
+  ));
+}
+return module.exports; }});
