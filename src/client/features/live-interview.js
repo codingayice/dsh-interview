@@ -97,37 +97,16 @@ export function QuestionResultCard({ sessionId, question }) {
 export function ReviewResultCard({ sessionId, question, attempt }) {
   if (!question || !question.explanation || (attempt && !attempt.evaluation)) return null
   const command = useCommand(sessionId)
-  const [copied, setCopied] = React.useState(false)
   const run = (name, payload) => command.run(name, payload).catch(() => {})
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation
-  const copyMemorization = async () => {
-    try {
-      if (globalThis.navigator?.clipboard?.writeText) {
-        await globalThis.navigator.clipboard.writeText(explanation.memorizationPoints)
-      } else {
-        const textarea = globalThis.document?.createElement?.('textarea')
-        if (!textarea) return
-        textarea.value = explanation.memorizationPoints
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        globalThis.document.body.appendChild(textarea)
-        textarea.select()
-        globalThis.document.execCommand?.('copy')
-        textarea.remove()
-      }
-      setCopied(true)
-      globalThis.setTimeout?.(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-  return h('article', { id: `di-review-${question.id}`, className: `di-card di-review-card${evaluation ? '' : ' is-answer-only'}`, 'aria-label': '本题复盘' },
-    evaluation ? h('aside', { className: 'di-review-score' },
+  return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': '点评讲解' },
+    evaluation ? h('header', { className: 'di-review-score' },
       h('span', { className: 'di-review-check' }, h(Icon, { name: 'check', size: 22 })),
-      h('div', { className: 'di-review-score-label' }, '评分'),
-      h('div', { className: 'di-review-score-value' },
-        h('strong', null, Number(evaluation.score).toFixed(1)), h('span', null, '/ 10')),
+      h('div', { className: 'di-review-score-summary' },
+        h('div', { className: 'di-review-score-label' }, '评分'),
+        h('div', { className: 'di-review-score-value' },
+          h('strong', null, Number(evaluation.score).toFixed(1)), h('span', null, '/ 10'))),
       h(StarRating, { score: evaluation.score })) : null,
     h('div', { className: 'di-review-content' },
       evaluation ? h('section', { className: 'di-review-section' },
@@ -143,11 +122,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
       h('section', { className: 'di-memorize-box' },
         h('div', { className: 'di-memorize-copy' },
           h('div', { className: 'di-memorize-label' }, '直接背'),
-          h(Markdown, null, explanation.memorizationPoints)),
-        h(Button, { className: 'di-copy-button', onClick: copyMemorization }, h(Icon, { name: 'copy' }), copied ? '已复制' : '复制')),
-      attempt ? h('div', { className: 'di-review-answer' },
-        h('span', null, `第 ${attempt.sequence} 次作答`),
-        h(Markdown, null, attempt.answer)) : null,
+          h(Markdown, null, explanation.memorizationPoints))),
       h(ErrorNotice, null, command.error),
       h('div', { className: 'di-review-actions' },
         h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
@@ -190,7 +165,7 @@ export function ReviewResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
-  return h(PresentedState, { query, missing: '找不到完整复盘卡片数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
+  return h(PresentedState, { query, missing: '找不到点评讲解数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
 }
 
 export function PracticeSummaryCard({ presentation, revision }) {

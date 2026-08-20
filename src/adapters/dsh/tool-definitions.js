@@ -225,7 +225,7 @@ const tools = [
   atomicTool({
     name: 'interview_complete_review',
     action: INTERVIEW_ACTIONS.COMPLETE_REVIEW,
-    description: '保存完整参考讲解和直接背要点，并通过 UI 展示包含评价、讲解和背诵要点的本题复盘。',
+    description: '保存完整参考讲解和直接背要点，并通过 UI 展示包含评价、讲解和背诵要点的点评讲解。',
     parameters: {
       type: 'object',
       properties: {

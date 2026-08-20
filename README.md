@@ -8,7 +8,7 @@ dsh-interview 是面向 DeepSeek Harness Web 的本地 AI 面试训练工作区�
 ## 功能
 
 - 三种练习模式：背八股、模拟面试和场景题。
-- 显式面试流程：单题出题、回答或直接看答案、完整复盘、下一题和练习总结。
+- 显式面试流程：单题出题、回答或直接看答案、点评讲解、下一题和练习总结。
 - 历次作答永久保留，重新回答不会覆盖已评价记录。
 - 练习档案支持新建、搜索、筛选、详情、修改、继续、重新打开、删除和导出，题目支持查询、修改和删除。
 - 能力复盘提供平均分、主题掌握度和薄弱主题。
@@ -56,9 +56,9 @@ dsh plugin --profile web update dsh-interview
 
 创建后，Agent 每次只生成一道简单、明确、简短的问题，并在聊天流中展示题目卡片。
 
-### 回答和完整复盘
+### 回答和点评讲解
 
-可以直接在正常聊天输入框回答，也可以点击题目卡的“看答案”。作答后 Agent 会保存回答，并自动完成一份结构化本题复盘：
+可以直接在正常聊天输入框回答，也可以点击题目卡的“看答案”。作答后 Agent 会保存回答，并自动生成结构化点评讲解：
 
 - 0–10 分总分
 - 文字反馈
@@ -70,9 +70,9 @@ dsh plugin --profile web update dsh-interview
 
 直接看答案不会创建虚假的作答和评价，只展示详细知识点讲解与“直接背”。
 
-### 复盘后的操作
+### 点评讲解后的操作
 
-完整复盘卡片生成后，可以直接点击卡片按钮或使用自然语言：
+点评讲解卡片生成后，可以直接点击卡片按钮或使用自然语言：
 
 ```text
 下一题
@@ -80,7 +80,7 @@ dsh plugin --profile web update dsh-interview
 结束练习
 ```
 
-评价是内部中间结果，不单独生成半成品卡片。参考讲解和“直接背”保存完成后，题目、作答、评价与讲解会统一展示。
+评价是内部中间结果，不单独生成半成品卡片。点评讲解卡片采用上下结构，只展示评分、评价、详细讲解和“直接背”，不重复展示用户作答，也不提供复制按钮。
 
 结束练习后，Agent 会读取本次练习的全部题目、历次作答、评价和讲解，生成并保存总体总结、表现亮点和改进建议。
 
@@ -121,10 +121,10 @@ dsh plugin --profile web update dsh-interview
 | --- | --- |
 | 练习生命周期 | `interview_start_practice`、`interview_update_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice`、`interview_complete_summary` |
 | 题目流程 | `interview_present_question`、`interview_get_question`、`interview_update_question`、`interview_delete_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question`、`interview_reveal_answer` |
-| 回答与复盘 | `interview_submit_answer`、`interview_save_evaluation`、`interview_complete_review` |
+| 回答与点评讲解 | `interview_submit_answer`、`interview_save_evaluation`、`interview_complete_review` |
 | 档案与复盘 | `interview_list_practices`、`interview_read_practice_context`、`interview_get_practice`、`interview_get_insights`、`interview_export_practices`、`interview_delete_practice` |
 
-工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。评价保存后必须继续完成复盘；参考讲解和“直接背”均由 Schema 设置为非空必填，无效调用不会进入领域写入。
+工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。评价保存后必须继续完成点评讲解；参考讲解和“直接背”均由 Schema 设置为非空必填，无效调用不会进入领域写入。
 
 UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具先进入同一个 `InterviewCoordinator`，再调用 `InterviewApplication`。
 

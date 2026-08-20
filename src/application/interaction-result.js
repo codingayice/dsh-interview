@@ -100,7 +100,7 @@ function descriptor(action, result) {
             state: 'awaiting_next',
             nextAction: 'wait_for_user',
             presentation: { kind: 'review', ...references },
-            assistantResponse: exact('本题复盘已生成，请查看卡片。'),
+            assistantResponse: exact('点评讲解已生成，请查看卡片。'),
           }
         : {
             state: 'generating_explanation',
@@ -115,7 +115,7 @@ function descriptor(action, result) {
         state: 'awaiting_next',
         nextAction: 'wait_for_user',
         presentation: { kind: 'review', ...referencesOf(result, 'practiceId', 'questionId'), ...optionalReference(result, 'attemptId') },
-        assistantResponse: exact('本题复盘已生成，请查看卡片。'),
+        assistantResponse: exact('点评讲解已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:
       return { state: 'awaiting_question', nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
@@ -139,7 +139,7 @@ function descriptor(action, result) {
         state: 'completed',
         nextAction: 'wait_for_user',
         presentation: { kind: 'finished', ...referencesOf(result, 'practiceId') },
-        assistantResponse: exact('本次练习已结束，复盘已归档。'),
+        assistantResponse: exact('本次练习已结束，总结已归档。'),
       }
     case INTERVIEW_ACTIONS.LIST_PRACTICES:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library' }, assistantResponse: exact('练习档案已打开。') }

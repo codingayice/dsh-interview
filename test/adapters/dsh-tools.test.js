@@ -107,7 +107,7 @@ test('看答案工具直接驱动讲解且复盘不要求作答引用', async ()
   assert.equal(revealed.nextAction, 'generate_explanation')
   assert.equal(review.presentation.kind, 'review')
   assert.equal(review.presentation.attemptId, undefined)
-  assert.equal(review.assistantResponse.text, '本题复盘已生成，请查看卡片。')
+  assert.equal(review.assistantResponse.text, '点评讲解已生成，请查看卡片。')
 })
 
 test('模拟面试不会自行补全缺失配置', async () => {
