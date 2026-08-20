@@ -131,7 +131,9 @@ export function markPracticeCompleted(cursor, now) {
 
 export function cursorForQuestion(cursor, question, now) {
   const latestAttempt = question.attempts.at(-1) || null
-  let phase = WORKFLOW_PHASES.AWAITING_ANSWER
+  let phase = question.explanation
+    ? WORKFLOW_PHASES.AWAITING_NEXT
+    : WORKFLOW_PHASES.AWAITING_ANSWER
   let attemptId = null
   if (latestAttempt) {
     attemptId = latestAttempt.id

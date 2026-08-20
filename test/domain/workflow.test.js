@@ -13,6 +13,7 @@ import {
   markPracticeFinishRequested,
   markQuestionAsked,
   markQuestionRetried,
+  cursorForQuestion,
   WORKFLOW_PHASES,
 } from '../../src/domain/workflow.js'
 
@@ -61,6 +62,18 @@ test('直接看答案从待回答进入讲解且不创建作答', () => {
   assert.equal(cursor.phase, WORKFLOW_PHASES.GENERATING_EXPLANATION)
   assert.equal(cursor.attemptId, null)
   assert.equal(markExplanationSaved(cursor, 4).phase, WORKFLOW_PHASES.AWAITING_NEXT)
+})
+
+test('切换练习时直接看过答案的无作答题恢复为本题已完成', () => {
+  const cursor = createCursor({ sessionId: 'session-1', practiceId: 'practice-1', now: 1 })
+  const restored = cursorForQuestion(cursor, {
+    id: 'question-1',
+    attempts: [],
+    explanation: { detail: '参考讲解', memorizationPoints: '直接背' },
+  }, 2)
+  assert.equal(restored.phase, WORKFLOW_PHASES.AWAITING_NEXT)
+  assert.equal(restored.questionId, 'question-1')
+  assert.equal(restored.attemptId, null)
 })
 
 test('已评价题目可以重新作答并创建新的回答流程', () => {
