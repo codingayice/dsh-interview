@@ -7,7 +7,8 @@ dsh-interview 是面向 DeepSeek Harness Web 的本地 AI 面试训练工作区�
 
 ## 功能
 
-- 三种练习模式：背八股、模拟面试和场景题。
+- 四种练习模式：背八股、模拟面试、场景题和刷力扣。
+- 内置[力扣热题 100](https://leetcode.cn/studyplan/top-100-liked/)固定题库快照，按官方题型展示 100 道题的地址、难度和本地完成状态。
 - 显式面试流程：单题出题、回答或直接看答案、点评讲解、下一题和练习总结。
 - 历次作答永久保留，重新回答不会覆盖已评价记录。
 - 支持用“继续练习”从权威工作流阶段恢复，不会把继续一律解释为下一题。
@@ -44,6 +45,7 @@ dsh plugin --profile web update dsh-interview
 - 背八股：主题
 - 场景题：主题
 - 模拟面试：简历、面试官风格、是否手撕代码、面试难度（初级、中级或高级）
+- 刷力扣：无需额外配置，由插件从固定的热题 100 中随机抽题
 
 模式没有明确时，Agent 只询问模式；模式明确后，只询问该模式缺少的字段。Agent 不得沿用历史配置、把缺少的布尔值当作 `false`，也不得增加题数、追问策略或面试时长等配置。
 
@@ -53,9 +55,12 @@ dsh plugin --profile web update dsh-interview
 开始 JVM 八股练习
 开始 Redis 高可用场景题练习
 根据下面这份简历进行高级模拟面试，面试官风格是深挖项目，需要手撕代码：……
+开始刷力扣
 ```
 
 创建后，Agent 每次只生成一道简单、明确、简短的问题，并在聊天流中展示题目卡片。
+
+刷力扣模式例外：题目不由 Agent 生成，而是由插件从本地固定题库随机抽取。抽题优先选择本次练习尚未出现且尚未完成的题；当前候选池用尽后再逐级回退。题目卡可以打开力扣原题、标记完成或未完成、随机下一题、查看完整题目列表和结束练习。完成状态独立于单次练习，保存在本地 SQLite 中。
 
 ### 回答和点评讲解
 
@@ -118,13 +123,14 @@ dsh plugin --profile web update dsh-interview
 
 插件使用无 `command` 联合的原子工具。每个工具只执行一个业务动作，并通过 JSON Schema 硬性声明必填参数：
 
-练习模式标识为 `bagu`（背八股）、`mock`（模拟面试）和 `scenario`（场景题）。
+练习模式标识为 `bagu`（背八股）、`mock`（模拟面试）、`scenario`（场景题）和 `leetcode`（刷力扣）。
 
 | 范围 | 工具 |
 | --- | --- |
 | 练习生命周期 | `interview_start_practice`、`interview_update_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice`、`interview_complete_summary` |
 | 题目流程 | `interview_present_question`、`interview_get_question`、`interview_update_question`、`interview_delete_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question`、`interview_reveal_answer` |
 | 回答与点评讲解 | `interview_submit_answer`、`interview_save_evaluation`、`interview_complete_review` |
+| 力扣题库 | `interview_get_leetcode_catalog`、`interview_set_leetcode_completion` |
 | 档案与复盘 | `interview_list_practices`、`interview_read_practice_context`、`interview_get_practice`、`interview_get_insights`、`interview_export_practices`、`interview_delete_practice` |
 
 工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。评价保存后必须继续完成点评讲解；参考讲解和“直接背”均由 Schema 设置为非空必填，无效调用不会进入领域写入。
