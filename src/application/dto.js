@@ -17,6 +17,7 @@ export function toQuestionDto(question) {
     })),
     latestScore: latestAttempt?.evaluation?.score ?? null,
     explanation: question.explanation ? { ...question.explanation } : null,
+    ...(question.leetcode ? { leetcode: { ...question.leetcode } } : {}),
   }
 }
 

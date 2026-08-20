@@ -84,3 +84,17 @@ test('SQLite 保存并更新力扣热题完成状态', async () => {
     context.cleanup()
   }
 })
+
+test('SQLite 保存并恢复力扣题库元数据', async () => {
+  const context = fixture()
+  try {
+    let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: {}, now: 1 })
+    practice = askQuestion(practice, {
+      id: 'question-1', prompt: '1. 两数之和', leetcode: { slug: 'two-sum' }, now: 2,
+    }).practice
+    await context.repository.commit({ practice })
+    assert.deepEqual((await context.repository.getPractice(practice.id)).questions[0].leetcode, practice.questions[0].leetcode)
+  } finally {
+    context.cleanup()
+  }
+})

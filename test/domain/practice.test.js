@@ -129,6 +129,31 @@ test('题目必须保持简单扼要', () => {
   }), (error) => error instanceof DomainError && error.code === 'MULTI_PART_QUESTION')
 })
 
+test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
+  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: {}, now: 1 })
+  const asked = askQuestion(practice, {
+    id: 'question-1',
+    prompt: '1. 两数之和',
+    leetcode: { slug: 'two-sum' },
+    now: 2,
+  })
+  practice = asked.practice
+  assert.deepEqual(asked.question.leetcode, {
+    id: '1',
+    title: '两数之和',
+    slug: 'two-sum',
+    difficulty: 'easy',
+    category: '哈希',
+    url: 'https://leetcode.cn/problems/two-sum/',
+  })
+  assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '未知题目', now: 3 }), {
+    code: 'LEETCODE_PROBLEM_REQUIRED',
+  })
+  assert.throws(() => updateQuestion(practice, { questionId: 'question-1', prompt: '篡改题目', now: 3 }), {
+    code: 'LEETCODE_QUESTION_IMMUTABLE',
+  })
+})
+
 test('练习和题目修改经过领域校验，删除题目后连续重排', () => {
   let practice = createPractice({ id: 'practice-1', mode: 'bagu', config: { topic: 'JVM' }, now: 1 })
   practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice

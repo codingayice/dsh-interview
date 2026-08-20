@@ -1,5 +1,5 @@
 import { assertDomain } from './errors.js'
-import { LEETCODE_TOP_100_SOURCE } from './leetcode-top-100.js'
+import { LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from './leetcode-top-100.js'
 import { modeDefinition } from './modes.js'
 
 const DIFFICULTIES = new Set(['junior', 'intermediate', 'senior'])
@@ -96,10 +96,18 @@ export function findAttempt(question, attemptId) {
   return attempt
 }
 
-export function askQuestion(practice, { id, prompt, now }) {
+function normalizeLeetcodeProblem(practice, input) {
+  if (practice.mode !== 'leetcode') return null
+  const problem = leetcodeTop100Problem(input?.slug)
+  assertDomain(problem, 'LEETCODE_PROBLEM_REQUIRED', '刷力扣模式必须从固定题库中选择题目')
+  return { ...problem }
+}
+
+export function askQuestion(practice, { id, prompt, leetcode, now }) {
   activePractice(practice)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
   const normalizedPrompt = normalizeQuestionPrompt(prompt)
+  const normalizedLeetcode = normalizeLeetcodeProblem(practice, leetcode)
   assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
   const question = {
     id: questionId,
@@ -108,6 +116,7 @@ export function askQuestion(practice, { id, prompt, now }) {
     createdAt: now,
     attempts: [],
     explanation: null,
+    ...(normalizedLeetcode ? { leetcode: normalizedLeetcode } : {}),
   }
   return {
     practice: withUpdatedAt(practice, now, { questions: [...practice.questions, question] }),
@@ -117,6 +126,7 @@ export function askQuestion(practice, { id, prompt, now }) {
 
 export function updateQuestion(practice, { questionId, prompt, now }) {
   const target = findQuestion(practice, questionId)
+  assertDomain(!target.leetcode, 'LEETCODE_QUESTION_IMMUTABLE', '固定题库中的力扣题目不允许修改')
   const questions = practice.questions.map((question) => question.id === target.id
     ? { ...question, prompt: normalizeQuestionPrompt(prompt) }
     : question)

@@ -39,6 +39,7 @@ export class SqliteInterviewRepository {
         sequence INTEGER NOT NULL,
         prompt TEXT NOT NULL,
         created_at INTEGER NOT NULL,
+        leetcode_json TEXT,
         explanation_detail TEXT,
         explanation_memo TEXT,
         explained_at INTEGER,
@@ -84,12 +85,17 @@ export class SqliteInterviewRepository {
     if (!practiceColumns.some((column) => column.name === 'summary_json')) {
       this.database.exec('ALTER TABLE practices ADD COLUMN summary_json TEXT')
     }
+    const questionColumns = this.database.prepare('PRAGMA table_info(questions)').all()
+    if (!questionColumns.some((column) => column.name === 'leetcode_json')) {
+      this.database.exec('ALTER TABLE questions ADD COLUMN leetcode_json TEXT')
+    }
   }
 
   #readQuestion(row) {
     const attemptRows = this.database.prepare(`
       SELECT * FROM attempts WHERE question_id = ? ORDER BY sequence ASC
     `).all(row.id)
+    const leetcode = parseJson(row.leetcode_json, null)
     return {
       id: row.id,
       sequence: row.sequence,
@@ -112,6 +118,7 @@ export class SqliteInterviewRepository {
         memorizationPoints: row.explanation_memo || '',
         createdAt: row.explained_at,
       },
+      ...(leetcode ? { leetcode } : {}),
     }
   }
 
@@ -197,8 +204,8 @@ export class SqliteInterviewRepository {
     const insertQuestion = this.database.prepare(`
       INSERT INTO questions (
         id, practice_id, sequence, prompt, created_at,
-        explanation_detail, explanation_memo, explained_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        leetcode_json, explanation_detail, explanation_memo, explained_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const insertAttempt = this.database.prepare(`
       INSERT INTO attempts (
@@ -213,6 +220,7 @@ export class SqliteInterviewRepository {
         question.sequence,
         question.prompt,
         question.createdAt,
+        question.leetcode ? JSON.stringify(question.leetcode) : null,
         question.explanation?.detail ?? null,
         question.explanation?.memorizationPoints ?? null,
         question.explanation?.createdAt ?? null,
