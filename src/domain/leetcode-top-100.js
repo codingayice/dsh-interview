@@ -3,6 +3,12 @@ export const LEETCODE_TOP_100_SOURCE = Object.freeze({
   url: 'https://leetcode.cn/studyplan/top-100-liked/',
 })
 
+const DIFFICULTY_LABELS = Object.freeze({ easy: '简单', medium: '中等', hard: '困难' })
+
+export function leetcodeDifficultyLabel(difficulty) {
+  return DIFFICULTY_LABELS[difficulty] || String(difficulty || '')
+}
+
 const GROUPS = [
   { category: '哈希', problems: [
     ['1', '两数之和', 'two-sum', 'easy'],

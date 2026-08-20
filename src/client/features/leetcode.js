@@ -2,6 +2,7 @@ import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, ErrorNotice, h, Loading } from '../shared/ui.js'
+import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 
 const DIFFICULTY = Object.freeze({
   easy: { label: '简单', tone: 'easy' },
@@ -14,7 +15,7 @@ function catalogProblem(catalog, slug) {
 }
 
 function DifficultyBadge({ difficulty }) {
-  const value = DIFFICULTY[difficulty] || { label: difficulty, tone: 'unknown' }
+  const value = DIFFICULTY[difficulty] || { label: leetcodeDifficultyLabel(difficulty), tone: 'unknown' }
   return h('span', { className: `di-lc-difficulty is-${value.tone}` }, value.label)
 }
 
@@ -122,4 +123,3 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
       h(ErrorNotice, null, command.error)),
     showCatalog ? h(LeetcodeCatalog, { sessionId }) : null)
 }
-

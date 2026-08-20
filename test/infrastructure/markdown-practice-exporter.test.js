@@ -29,6 +29,17 @@ test('Markdown 导出支持内容筛选', () => {
   assert.doesNotMatch(result.markdown, /参考讲解/)
 })
 
+test('Markdown 导出力扣题目地址、题型和难度', () => {
+  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: {}, now: 1 })
+  practice = askQuestion(practice, {
+    id: 'question-1', prompt: '1. 两数之和', leetcode: { slug: 'two-sum' }, now: 2,
+  }).practice
+  const markdown = renderPracticeMarkdown(practice).markdown
+  assert.match(markdown, /官方题库：https:\/\/leetcode\.cn\/studyplan\/top-100-liked\//)
+  assert.match(markdown, /\[1\. 两数之和\]\(https:\/\/leetcode\.cn\/problems\/two-sum\/\) · 哈希 · 简单/)
+  assert.doesNotMatch(markdown, /平均分：未评分/)
+})
+
 test('导出器返回受控下载令牌并清理非法文件名字符', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-interview-export-'))
   try {

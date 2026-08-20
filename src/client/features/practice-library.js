@@ -2,6 +2,7 @@ import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail } from '../shared/ui.js'
+import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 
 function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const [mode, setMode] = React.useState(initial?.mode || '')
@@ -121,7 +122,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
             ? h('input', { className: 'di-input', value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) })
             : h(Markdown, null, question.prompt)),
           question.leetcode
-            ? h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, `${question.leetcode.category} · ${question.leetcode.difficulty}`)
+            ? h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, `${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`)
             : h(ScoreRail, { score: question.latestScore, compact: true })),
         question.attempts.map((attempt) => h('div', { className: 'di-attempt', key: attempt.id },
           h('div', { className: 'di-attempt-head' }, h('span', null, `第 ${attempt.sequence} 次作答`), h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '未评价')),

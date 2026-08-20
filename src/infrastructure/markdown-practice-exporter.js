@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { INTERVIEW_MODES } from '../domain/modes.js'
+import { leetcodeDifficultyLabel } from '../domain/leetcode-top-100.js'
 import { summarizePractice } from '../domain/practice.js'
 import { defaultDataDirectory } from './paths.js'
 
@@ -61,6 +62,7 @@ export function renderPracticeMarkdown(practice, include) {
         `- 面试难度：${practice.config.difficulty}`,
       )
     }
+    if (practice.mode === 'leetcode') lines.push(`- 官方题库：${practice.source.content}`)
   }
 
   if (sections.has('summary')) {
@@ -69,10 +71,14 @@ export function renderPracticeMarkdown(practice, include) {
       '## 练习总结',
       '',
       `- 题目数：${summary.questionCount}`,
-      `- 作答数：${summary.attemptCount}`,
-      `- 已评价：${summary.evaluatedCount}`,
-      `- 平均分：${summary.averageScore ?? '未评分'}`,
-      `- 结论：${summary.verdict}`,
+      ...(practice.mode === 'leetcode' ? [
+        '- 记录说明：完成状态以本地“热题 100”题目列表为准',
+      ] : [
+        `- 作答数：${summary.attemptCount}`,
+        `- 已评价：${summary.evaluatedCount}`,
+        `- 平均分：${summary.averageScore ?? '未评分'}`,
+        `- 结论：${summary.verdict}`,
+      ]),
     )
     if (practice.summary) {
       lines.push(
@@ -93,7 +99,11 @@ export function renderPracticeMarkdown(practice, include) {
   for (const question of practice.questions) {
     if (!['questions', 'answers', 'evaluations', 'explanations'].some((section) => sections.has(section))) break
     lines.push('', `## 第 ${question.sequence} 题`)
-    if (sections.has('questions')) lines.push('', question.prompt)
+    if (sections.has('questions')) {
+      lines.push('', question.leetcode
+        ? `[${question.prompt}](${question.leetcode.url}) · ${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`
+        : question.prompt)
+    }
     for (const attempt of question.attempts) {
       if (!sections.has('answers') && !sections.has('evaluations')) continue
       lines.push('', `### 第 ${attempt.sequence} 次作答`)

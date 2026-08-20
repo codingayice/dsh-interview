@@ -14,6 +14,8 @@ function instructionFor(event) {
   switch (event.type) {
     case 'question.generation_requested':
       return `面试工作流事件：需要生成题目。practice_id=${event.practiceId}，reason=${event.reason}。先调用 interview_get_status，再必须调用 interview_read_practice_context 读取已保存的模式专属配置和全部历史。你必须严格按配置自行生成题目，然后把非空题目作为 prompt 调用 interview_present_question；该工具只保存和展示，不会替你生成题目。${QUESTION_GENERATION_POLICY}${ASSISTANT_RESPONSE_PROTOCOL}`
+    case 'leetcode.problem_drawn':
+      return `刷力扣工作流事件：插件已经从固定的力扣热题 100 题库随机抽题。practice_id=${event.practiceId}，question_id=${event.questionId}。立即调用 interview_open_question，question_id 必须使用上述 ID，通过题目卡展示插件已经保存的题目。禁止自行生成、改写或替换题目。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'answer.evaluation_requested':
       return `面试工作流事件：需要恢复评价。practice_id=${event.practiceId}，question_id=${event.questionId}，attempt_id=${event.attemptId}。必须调用 interview_read_practice_context，找到上述作答的原始回答，生成评分与点评并调用 interview_save_evaluation；如果工具要求生成讲解，必须继续调用 interview_complete_review。不得创建新作答或新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'review.generation_requested':

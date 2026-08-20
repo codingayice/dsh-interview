@@ -241,6 +241,167 @@ function Button({ children, tone = "quiet", busy = false, ...props }) {
 
 // src/client/features/leetcode.js
 var import_react3 = __toESM(require("react"), 1);
+
+// src/domain/leetcode-top-100.js
+var LEETCODE_TOP_100_SOURCE = Object.freeze({
+  name: "LeetCode \u70ED\u9898 100",
+  url: "https://leetcode.cn/studyplan/top-100-liked/"
+});
+var DIFFICULTY_LABELS = Object.freeze({ easy: "\u7B80\u5355", medium: "\u4E2D\u7B49", hard: "\u56F0\u96BE" });
+function leetcodeDifficultyLabel(difficulty) {
+  return DIFFICULTY_LABELS[difficulty] || String(difficulty || "");
+}
+var GROUPS = [
+  { category: "\u54C8\u5E0C", problems: [
+    ["1", "\u4E24\u6570\u4E4B\u548C", "two-sum", "easy"],
+    ["49", "\u5B57\u6BCD\u5F02\u4F4D\u8BCD\u5206\u7EC4", "group-anagrams", "medium"],
+    ["128", "\u6700\u957F\u8FDE\u7EED\u5E8F\u5217", "longest-consecutive-sequence", "medium"]
+  ] },
+  { category: "\u53CC\u6307\u9488", problems: [
+    ["283", "\u79FB\u52A8\u96F6", "move-zeroes", "easy"],
+    ["11", "\u76DB\u6700\u591A\u6C34\u7684\u5BB9\u5668", "container-with-most-water", "medium"],
+    ["15", "\u4E09\u6570\u4E4B\u548C", "3sum", "medium"],
+    ["42", "\u63A5\u96E8\u6C34", "trapping-rain-water", "hard"]
+  ] },
+  { category: "\u6ED1\u52A8\u7A97\u53E3", problems: [
+    ["3", "\u65E0\u91CD\u590D\u5B57\u7B26\u7684\u6700\u957F\u5B50\u4E32", "longest-substring-without-repeating-characters", "medium"],
+    ["438", "\u627E\u5230\u5B57\u7B26\u4E32\u4E2D\u6240\u6709\u5B57\u6BCD\u5F02\u4F4D\u8BCD", "find-all-anagrams-in-a-string", "medium"]
+  ] },
+  { category: "\u5B50\u4E32", problems: [
+    ["560", "\u548C\u4E3A K \u7684\u5B50\u6570\u7EC4", "subarray-sum-equals-k", "medium"],
+    ["239", "\u6ED1\u52A8\u7A97\u53E3\u6700\u5927\u503C", "sliding-window-maximum", "hard"],
+    ["76", "\u6700\u5C0F\u8986\u76D6\u5B50\u4E32", "minimum-window-substring", "hard"]
+  ] },
+  { category: "\u666E\u901A\u6570\u7EC4", problems: [
+    ["53", "\u6700\u5927\u5B50\u6570\u7EC4\u548C", "maximum-subarray", "medium"],
+    ["56", "\u5408\u5E76\u533A\u95F4", "merge-intervals", "medium"],
+    ["189", "\u8F6E\u8F6C\u6570\u7EC4", "rotate-array", "medium"],
+    ["238", "\u9664\u4E86\u81EA\u8EAB\u4EE5\u5916\u6570\u7EC4\u7684\u4E58\u79EF", "product-of-array-except-self", "medium"],
+    ["41", "\u7F3A\u5931\u7684\u7B2C\u4E00\u4E2A\u6B63\u6570", "first-missing-positive", "hard"]
+  ] },
+  { category: "\u77E9\u9635", problems: [
+    ["73", "\u77E9\u9635\u7F6E\u96F6", "set-matrix-zeroes", "medium"],
+    ["54", "\u87BA\u65CB\u77E9\u9635", "spiral-matrix", "medium"],
+    ["48", "\u65CB\u8F6C\u56FE\u50CF", "rotate-image", "medium"],
+    ["240", "\u641C\u7D22\u4E8C\u7EF4\u77E9\u9635 II", "search-a-2d-matrix-ii", "medium"]
+  ] },
+  { category: "\u94FE\u8868", problems: [
+    ["160", "\u76F8\u4EA4\u94FE\u8868", "intersection-of-two-linked-lists", "easy"],
+    ["206", "\u53CD\u8F6C\u94FE\u8868", "reverse-linked-list", "easy"],
+    ["234", "\u56DE\u6587\u94FE\u8868", "palindrome-linked-list", "easy"],
+    ["141", "\u73AF\u5F62\u94FE\u8868", "linked-list-cycle", "easy"],
+    ["142", "\u73AF\u5F62\u94FE\u8868 II", "linked-list-cycle-ii", "medium"],
+    ["21", "\u5408\u5E76\u4E24\u4E2A\u6709\u5E8F\u94FE\u8868", "merge-two-sorted-lists", "easy"],
+    ["2", "\u4E24\u6570\u76F8\u52A0", "add-two-numbers", "medium"],
+    ["19", "\u5220\u9664\u94FE\u8868\u7684\u5012\u6570\u7B2C N \u4E2A\u7ED3\u70B9", "remove-nth-node-from-end-of-list", "medium"],
+    ["24", "\u4E24\u4E24\u4EA4\u6362\u94FE\u8868\u4E2D\u7684\u8282\u70B9", "swap-nodes-in-pairs", "medium"],
+    ["25", "K \u4E2A\u4E00\u7EC4\u7FFB\u8F6C\u94FE\u8868", "reverse-nodes-in-k-group", "hard"],
+    ["138", "\u968F\u673A\u94FE\u8868\u7684\u590D\u5236", "copy-list-with-random-pointer", "medium"],
+    ["148", "\u6392\u5E8F\u94FE\u8868", "sort-list", "medium"],
+    ["23", "\u5408\u5E76 K \u4E2A\u5347\u5E8F\u94FE\u8868", "merge-k-sorted-lists", "hard"],
+    ["146", "LRU \u7F13\u5B58", "lru-cache", "medium"]
+  ] },
+  { category: "\u4E8C\u53C9\u6811", problems: [
+    ["94", "\u4E8C\u53C9\u6811\u7684\u4E2D\u5E8F\u904D\u5386", "binary-tree-inorder-traversal", "easy"],
+    ["104", "\u4E8C\u53C9\u6811\u7684\u6700\u5927\u6DF1\u5EA6", "maximum-depth-of-binary-tree", "easy"],
+    ["226", "\u7FFB\u8F6C\u4E8C\u53C9\u6811", "invert-binary-tree", "easy"],
+    ["101", "\u5BF9\u79F0\u4E8C\u53C9\u6811", "symmetric-tree", "easy"],
+    ["543", "\u4E8C\u53C9\u6811\u7684\u76F4\u5F84", "diameter-of-binary-tree", "easy"],
+    ["102", "\u4E8C\u53C9\u6811\u7684\u5C42\u5E8F\u904D\u5386", "binary-tree-level-order-traversal", "medium"],
+    ["108", "\u5C06\u6709\u5E8F\u6570\u7EC4\u8F6C\u6362\u4E3A\u4E8C\u53C9\u641C\u7D22\u6811", "convert-sorted-array-to-binary-search-tree", "easy"],
+    ["98", "\u9A8C\u8BC1\u4E8C\u53C9\u641C\u7D22\u6811", "validate-binary-search-tree", "medium"],
+    ["230", "\u4E8C\u53C9\u641C\u7D22\u6811\u4E2D\u7B2C K \u5C0F\u7684\u5143\u7D20", "kth-smallest-element-in-a-bst", "medium"],
+    ["199", "\u4E8C\u53C9\u6811\u7684\u53F3\u89C6\u56FE", "binary-tree-right-side-view", "medium"],
+    ["114", "\u4E8C\u53C9\u6811\u5C55\u5F00\u4E3A\u94FE\u8868", "flatten-binary-tree-to-linked-list", "medium"],
+    ["105", "\u4ECE\u524D\u5E8F\u4E0E\u4E2D\u5E8F\u904D\u5386\u5E8F\u5217\u6784\u9020\u4E8C\u53C9\u6811", "construct-binary-tree-from-preorder-and-inorder-traversal", "medium"],
+    ["437", "\u8DEF\u5F84\u603B\u548C III", "path-sum-iii", "medium"],
+    ["236", "\u4E8C\u53C9\u6811\u7684\u6700\u8FD1\u516C\u5171\u7956\u5148", "lowest-common-ancestor-of-a-binary-tree", "medium"],
+    ["124", "\u4E8C\u53C9\u6811\u4E2D\u7684\u6700\u5927\u8DEF\u5F84\u548C", "binary-tree-maximum-path-sum", "hard"]
+  ] },
+  { category: "\u56FE\u8BBA", problems: [
+    ["200", "\u5C9B\u5C7F\u6570\u91CF", "number-of-islands", "medium"],
+    ["994", "\u8150\u70C2\u7684\u6A58\u5B50", "rotting-oranges", "medium"],
+    ["207", "\u8BFE\u7A0B\u8868", "course-schedule", "medium"],
+    ["208", "\u5B9E\u73B0 Trie (\u524D\u7F00\u6811)", "implement-trie-prefix-tree", "medium"]
+  ] },
+  { category: "\u56DE\u6EAF", problems: [
+    ["46", "\u5168\u6392\u5217", "permutations", "medium"],
+    ["78", "\u5B50\u96C6", "subsets", "medium"],
+    ["17", "\u7535\u8BDD\u53F7\u7801\u7684\u5B57\u6BCD\u7EC4\u5408", "letter-combinations-of-a-phone-number", "medium"],
+    ["39", "\u7EC4\u5408\u603B\u548C", "combination-sum", "medium"],
+    ["22", "\u62EC\u53F7\u751F\u6210", "generate-parentheses", "medium"],
+    ["79", "\u5355\u8BCD\u641C\u7D22", "word-search", "medium"],
+    ["131", "\u5206\u5272\u56DE\u6587\u4E32", "palindrome-partitioning", "medium"],
+    ["51", "N \u7687\u540E", "n-queens", "hard"]
+  ] },
+  { category: "\u4E8C\u5206\u67E5\u627E", problems: [
+    ["35", "\u641C\u7D22\u63D2\u5165\u4F4D\u7F6E", "search-insert-position", "easy"],
+    ["74", "\u641C\u7D22\u4E8C\u7EF4\u77E9\u9635", "search-a-2d-matrix", "medium"],
+    ["34", "\u5728\u6392\u5E8F\u6570\u7EC4\u4E2D\u67E5\u627E\u5143\u7D20\u7684\u7B2C\u4E00\u4E2A\u548C\u6700\u540E\u4E00\u4E2A\u4F4D\u7F6E", "find-first-and-last-position-of-element-in-sorted-array", "medium"],
+    ["33", "\u641C\u7D22\u65CB\u8F6C\u6392\u5E8F\u6570\u7EC4", "search-in-rotated-sorted-array", "medium"],
+    ["153", "\u5BFB\u627E\u65CB\u8F6C\u6392\u5E8F\u6570\u7EC4\u4E2D\u7684\u6700\u5C0F\u503C", "find-minimum-in-rotated-sorted-array", "medium"],
+    ["4", "\u5BFB\u627E\u4E24\u4E2A\u6B63\u5E8F\u6570\u7EC4\u7684\u4E2D\u4F4D\u6570", "median-of-two-sorted-arrays", "hard"]
+  ] },
+  { category: "\u6808", problems: [
+    ["20", "\u6709\u6548\u7684\u62EC\u53F7", "valid-parentheses", "easy"],
+    ["155", "\u6700\u5C0F\u6808", "min-stack", "medium"],
+    ["394", "\u5B57\u7B26\u4E32\u89E3\u7801", "decode-string", "medium"],
+    ["739", "\u6BCF\u65E5\u6E29\u5EA6", "daily-temperatures", "medium"],
+    ["84", "\u67F1\u72B6\u56FE\u4E2D\u6700\u5927\u7684\u77E9\u5F62", "largest-rectangle-in-histogram", "hard"]
+  ] },
+  { category: "\u5806", problems: [
+    ["215", "\u6570\u7EC4\u4E2D\u7684\u7B2CK\u4E2A\u6700\u5927\u5143\u7D20", "kth-largest-element-in-an-array", "medium"],
+    ["347", "\u524D K \u4E2A\u9AD8\u9891\u5143\u7D20", "top-k-frequent-elements", "medium"],
+    ["295", "\u6570\u636E\u6D41\u7684\u4E2D\u4F4D\u6570", "find-median-from-data-stream", "hard"]
+  ] },
+  { category: "\u8D2A\u5FC3\u7B97\u6CD5", problems: [
+    ["121", "\u4E70\u5356\u80A1\u7968\u7684\u6700\u4F73\u65F6\u673A", "best-time-to-buy-and-sell-stock", "easy"],
+    ["55", "\u8DF3\u8DC3\u6E38\u620F", "jump-game", "medium"],
+    ["45", "\u8DF3\u8DC3\u6E38\u620F II", "jump-game-ii", "medium"],
+    ["763", "\u5212\u5206\u5B57\u6BCD\u533A\u95F4", "partition-labels", "medium"]
+  ] },
+  { category: "\u52A8\u6001\u89C4\u5212", problems: [
+    ["70", "\u722C\u697C\u68AF", "climbing-stairs", "easy"],
+    ["118", "\u6768\u8F89\u4E09\u89D2", "pascals-triangle", "easy"],
+    ["198", "\u6253\u5BB6\u52AB\u820D", "house-robber", "medium"],
+    ["279", "\u5B8C\u5168\u5E73\u65B9\u6570", "perfect-squares", "medium"],
+    ["322", "\u96F6\u94B1\u5151\u6362", "coin-change", "medium"],
+    ["139", "\u5355\u8BCD\u62C6\u5206", "word-break", "medium"],
+    ["300", "\u6700\u957F\u9012\u589E\u5B50\u5E8F\u5217", "longest-increasing-subsequence", "medium"],
+    ["152", "\u4E58\u79EF\u6700\u5927\u5B50\u6570\u7EC4", "maximum-product-subarray", "medium"],
+    ["416", "\u5206\u5272\u7B49\u548C\u5B50\u96C6", "partition-equal-subset-sum", "medium"],
+    ["32", "\u6700\u957F\u6709\u6548\u62EC\u53F7", "longest-valid-parentheses", "hard"]
+  ] },
+  { category: "\u591A\u7EF4\u52A8\u6001\u89C4\u5212", problems: [
+    ["62", "\u4E0D\u540C\u8DEF\u5F84", "unique-paths", "medium"],
+    ["64", "\u6700\u5C0F\u8DEF\u5F84\u548C", "minimum-path-sum", "medium"],
+    ["5", "\u6700\u957F\u56DE\u6587\u5B50\u4E32", "longest-palindromic-substring", "medium"],
+    ["1143", "\u6700\u957F\u516C\u5171\u5B50\u5E8F\u5217", "longest-common-subsequence", "medium"],
+    ["72", "\u7F16\u8F91\u8DDD\u79BB", "edit-distance", "medium"]
+  ] },
+  { category: "\u6280\u5DE7", problems: [
+    ["136", "\u53EA\u51FA\u73B0\u4E00\u6B21\u7684\u6570\u5B57", "single-number", "easy"],
+    ["169", "\u591A\u6570\u5143\u7D20", "majority-element", "easy"],
+    ["75", "\u989C\u8272\u5206\u7C7B", "sort-colors", "medium"],
+    ["31", "\u4E0B\u4E00\u4E2A\u6392\u5217", "next-permutation", "medium"],
+    ["287", "\u5BFB\u627E\u91CD\u590D\u6570", "find-the-duplicate-number", "medium"]
+  ] }
+];
+var LEETCODE_TOP_100_GROUPS = Object.freeze(GROUPS.map((group) => Object.freeze({
+  category: group.category,
+  problems: Object.freeze(group.problems.map(([id, title, slug, difficulty]) => Object.freeze({
+    id,
+    title,
+    slug,
+    difficulty,
+    category: group.category,
+    url: `https://leetcode.cn/problems/${slug}/`
+  })))
+})));
+var LEETCODE_TOP_100 = Object.freeze(LEETCODE_TOP_100_GROUPS.flatMap((group) => group.problems));
+var PROBLEM_BY_SLUG = new Map(LEETCODE_TOP_100.map((problem) => [problem.slug, problem]));
+
+// src/client/features/leetcode.js
 var DIFFICULTY = Object.freeze({
   easy: { label: "\u7B80\u5355", tone: "easy" },
   medium: { label: "\u4E2D\u7B49", tone: "medium" },
@@ -250,7 +411,7 @@ function catalogProblem(catalog, slug) {
   return catalog?.groups?.flatMap((group) => group.problems).find((problem) => problem.slug === slug) || null;
 }
 function DifficultyBadge({ difficulty }) {
-  const value = DIFFICULTY[difficulty] || { label: difficulty, tone: "unknown" };
+  const value = DIFFICULTY[difficulty] || { label: leetcodeDifficultyLabel(difficulty), tone: "unknown" };
   return h("span", { className: `di-lc-difficulty is-${value.tone}` }, value.label);
 }
 function CompletionButton({ problem, pending, onToggle }) {
@@ -834,7 +995,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           { className: "di-detail-question-head" },
           h("span", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
           h("div", { className: "di-detail-question-text" }, editingQuestionId === question.id ? h("input", { className: "di-input", value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) }) : h(Markdown, null, question.prompt)),
-          question.leetcode ? h("a", { className: "di-link", href: question.leetcode.url, target: "_blank", rel: "noreferrer" }, `${question.leetcode.category} \xB7 ${question.leetcode.difficulty}`) : h(ScoreRail, { score: question.latestScore, compact: true })
+          question.leetcode ? h("a", { className: "di-link", href: question.leetcode.url, target: "_blank", rel: "noreferrer" }, `${question.leetcode.category} \xB7 ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`) : h(ScoreRail, { score: question.latestScore, compact: true })
         ),
         question.attempts.map((attempt) => h(
           "div",
@@ -1051,7 +1212,12 @@ function EmptyTimelineContent({ children }) {
   return h("div", { className: "di-time-empty" }, children);
 }
 function TimelineContent({ question, view }) {
-  if (view === "question") return h(Markdown, null, question.prompt);
+  if (view === "question") return question.leetcode ? h(
+    "div",
+    { className: "di-time-lc-question" },
+    h("a", { className: "di-link", href: question.leetcode.url, target: "_blank", rel: "noreferrer" }, question.prompt, " \u2197"),
+    h("div", { className: "di-subtitle" }, `${question.leetcode.category} \xB7 ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`)
+  ) : h(Markdown, null, question.prompt);
   if (view === "attempts") {
     if (!question.attempts.length) return h(EmptyTimelineContent, null, "\u5C1A\u672A\u4F5C\u7B54");
     return h("div", { className: "di-time-records" }, question.attempts.map((attempt) => h(
@@ -1105,8 +1271,9 @@ function TimelinePanel({ sessionId, revisionSignal }) {
       if (event.key === "Escape") setSelection(null);
     }
   }, practice.questions.map((question) => {
+    const views = question.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS;
     const activeView = selection?.questionId === question.id ? selection.view : null;
-    const activeLabel = TIMELINE_VIEWS.find((item) => item.id === activeView)?.label;
+    const activeLabel = views.find((item) => item.id === activeView)?.label;
     return h(
       "div",
       {
@@ -1133,7 +1300,7 @@ function TimelinePanel({ sessionId, revisionSignal }) {
           h(
             "div",
             { className: "di-time-tabs", role: "tablist", "aria-label": `\u7B2C ${question.sequence} \u9898\u8BE6\u60C5` },
-            TIMELINE_VIEWS.map((item) => h("button", {
+            views.map((item) => h("button", {
               className: `di-time-tab${activeView === item.id ? " is-active" : ""}`,
               type: "button",
               role: "tab",

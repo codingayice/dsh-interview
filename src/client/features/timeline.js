@@ -2,6 +2,7 @@ import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useInterviewQuery } from '../shared/hooks.js'
 import { h, Markdown } from '../shared/ui.js'
+import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 
 const TIMELINE_VIEWS = [
   { id: 'question', label: '题目' },
@@ -14,7 +15,11 @@ function EmptyTimelineContent({ children }) {
 }
 
 function TimelineContent({ question, view }) {
-  if (view === 'question') return h(Markdown, null, question.prompt)
+  if (view === 'question') return question.leetcode
+    ? h('div', { className: 'di-time-lc-question' },
+        h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, question.prompt, ' ↗'),
+        h('div', { className: 'di-subtitle' }, `${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`))
+    : h(Markdown, null, question.prompt)
 
   if (view === 'attempts') {
     if (!question.attempts.length) return h(EmptyTimelineContent, null, '尚未作答')
@@ -57,8 +62,9 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
       if (event.key === 'Escape') setSelection(null)
     },
   }, practice.questions.map((question) => {
+    const views = question.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS
     const activeView = selection?.questionId === question.id ? selection.view : null
-    const activeLabel = TIMELINE_VIEWS.find((item) => item.id === activeView)?.label
+    const activeLabel = views.find((item) => item.id === activeView)?.label
     return h('div', {
       className: `di-time-item${session.questionId === question.id ? ' is-current' : ''}${activeView ? ' has-view' : ''}`,
       key: question.id,
@@ -74,7 +80,7 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
     activeView ? h('section', { className: 'di-time-flyout', 'aria-label': `${activeLabel}内容` },
       h('header', { className: 'di-time-flyout-head' },
         h('div', { className: 'di-time-tabs', role: 'tablist', 'aria-label': `第 ${question.sequence} 题详情` },
-          TIMELINE_VIEWS.map((item) => h('button', {
+          views.map((item) => h('button', {
             className: `di-time-tab${activeView === item.id ? ' is-active' : ''}`,
             type: 'button',
             role: 'tab',
