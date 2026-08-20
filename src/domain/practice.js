@@ -1,4 +1,5 @@
 import { assertDomain } from './errors.js'
+import { LEETCODE_TOP_100_SOURCE } from './leetcode-top-100.js'
 import { modeDefinition } from './modes.js'
 
 const DIFFICULTIES = new Set(['junior', 'intermediate', 'senior'])
@@ -30,6 +31,7 @@ function normalizeConfiguration(definition, config) {
   if (definition.configuration === 'topic') {
     return { topic: requiredText(config.topic, 'INVALID_TOPIC', '必须明确提供练习主题') }
   }
+  if (definition.configuration === 'catalog') return {}
 
   const resume = requiredText(config.resume, 'RESUME_REQUIRED', '模拟面试必须明确提供简历内容')
   const interviewerStyle = requiredText(config.interviewerStyle, 'INTERVIEWER_STYLE_REQUIRED', '模拟面试必须明确选择面试官风格')
@@ -39,18 +41,26 @@ function normalizeConfiguration(definition, config) {
   return { resume, interviewerStyle, coding: config.coding, difficulty }
 }
 
+function practiceIdentity(definition, config) {
+  if (definition.configuration === 'topic') {
+    return { topic: config.topic, source: { kind: 'topic', content: config.topic } }
+  }
+  if (definition.configuration === 'catalog') {
+    return { topic: LEETCODE_TOP_100_SOURCE.name, source: { kind: 'catalog', content: LEETCODE_TOP_100_SOURCE.url } }
+  }
+  return { topic: definition.label, source: { kind: 'resume', content: config.resume } }
+}
+
 export function createPractice({ id, mode, config, now }) {
   const definition = modeDefinition(mode)
   const normalizedConfig = normalizeConfiguration(definition, config)
-  const topic = definition.configuration === 'topic' ? normalizedConfig.topic : definition.label
+  const identity = practiceIdentity(definition, normalizedConfig)
 
   return {
     id: requiredText(id, 'INVALID_PRACTICE_ID', '练习 ID 不能为空'),
     mode,
-    topic,
-    source: definition.configuration === 'topic'
-      ? { kind: 'topic', content: normalizedConfig.topic }
-      : { kind: 'resume', content: normalizedConfig.resume },
+    topic: identity.topic,
+    source: identity.source,
     config: normalizedConfig,
     status: 'active',
     createdAt: now,
@@ -65,13 +75,11 @@ export function updatePractice(practice, { mode, config, now }) {
   assertDomain(practice && typeof practice === 'object', 'PRACTICE_REQUIRED', '练习不能为空')
   const definition = modeDefinition(mode)
   const normalizedConfig = normalizeConfiguration(definition, config)
-  const topic = definition.configuration === 'topic' ? normalizedConfig.topic : definition.label
+  const identity = practiceIdentity(definition, normalizedConfig)
   return withUpdatedAt(practice, now, {
     mode,
-    topic,
-    source: definition.configuration === 'topic'
-      ? { kind: 'topic', content: normalizedConfig.topic }
-      : { kind: 'resume', content: normalizedConfig.resume },
+    topic: identity.topic,
+    source: identity.source,
     config: normalizedConfig,
   })
 }

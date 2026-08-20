@@ -19,6 +19,12 @@ export const INTERVIEW_MODES = Object.freeze({
     questionStyle: 'scenario',
     configuration: 'topic',
   }),
+  leetcode: Object.freeze({
+    id: 'leetcode',
+    label: '刷力扣',
+    questionStyle: 'catalog',
+    configuration: 'catalog',
+  }),
 })
 
 export function modeDefinition(mode) {

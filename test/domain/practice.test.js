@@ -34,6 +34,10 @@ test('不同模式只接受各自的显式配置', () => {
     code: 'INVALID_TOPIC',
   })
   assert.deepEqual(createPractice({ id: 'practice-3', mode: 'scenario', config: { topic: '高并发' }, now: 1 }).config, { topic: '高并发' })
+  const leetcode = createPractice({ id: 'practice-4', mode: 'leetcode', config: {}, now: 1 })
+  assert.equal(leetcode.topic, 'LeetCode 热题 100')
+  assert.deepEqual(leetcode.config, {})
+  assert.deepEqual(leetcode.source, { kind: 'catalog', content: 'https://leetcode.cn/studyplan/top-100-liked/' })
 })
 
 test('八股模式只接受 bagu 标识', () => {
