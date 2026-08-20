@@ -1,4 +1,5 @@
 import { DomainError, assertDomain } from '../domain/errors.js'
+import { LEETCODE_TOP_100_GROUPS, LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from '../domain/leetcode-top-100.js'
 import {
   askQuestion as addQuestion,
   completePractice,
@@ -379,6 +380,36 @@ export class InterviewApplication {
   async getInsights() {
     const practices = await this.repository.listPractices({})
     return this.#result('insights', buildInsights(practices), null)
+  }
+
+  async getLeetcodeCatalog() {
+    const progress = new Map((await this.repository.listLeetcodeProgress()).map((item) => [item.slug, item]))
+    let completedCount = 0
+    const groups = LEETCODE_TOP_100_GROUPS.map((group) => ({
+      category: group.category,
+      problems: group.problems.map((problem) => {
+        const saved = progress.get(problem.slug)
+        const completed = saved?.completed === true
+        if (completed) completedCount += 1
+        return { ...problem, completed, completedAt: completed ? saved.completedAt : null }
+      }),
+    }))
+    return this.#result('leetcode-catalog', {
+      source: LEETCODE_TOP_100_SOURCE,
+      total: 100,
+      completedCount,
+      groups,
+    }, null)
+  }
+
+  async setLeetcodeProblemCompletion(slug, completed) {
+    const problem = leetcodeTop100Problem(requiredId(slug, 'slug'))
+    assertDomain(Boolean(problem), 'LEETCODE_PROBLEM_NOT_FOUND', `力扣热题 100 中不存在题目：${String(slug)}`)
+    assertDomain(typeof completed === 'boolean', 'LEETCODE_COMPLETION_REQUIRED', '必须明确提供是否完成')
+    const now = this.clock.now()
+    const progress = { slug: problem.slug, completed, completedAt: completed ? now : null, updatedAt: now }
+    await this.repository.saveLeetcodeProgress(progress)
+    return this.#result('leetcode-progress', { ...problem, ...progress }, null, [], { problemSlug: problem.slug })
   }
 
   async deletePractice(practiceId, sessionId = null) {

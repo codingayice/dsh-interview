@@ -5,6 +5,8 @@ const REQUIRED_REPOSITORY_METHODS = [
   'commit',
   'deletePractice',
   'clearCursor',
+  'listLeetcodeProgress',
+  'saveLeetcodeProgress',
 ]
 
 export function validateApplicationPorts(ports) {

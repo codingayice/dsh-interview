@@ -191,3 +191,21 @@ test('继续练习根据权威阶段恢复且不重复创建当前题', async ()
   assert.equal(resumed.resource.data.resumeAction, 'confirm_reopen')
   assert.equal(resumed.events.length, 0)
 })
+
+test('力扣热题目录按官方题型分组并持久化完成状态', async () => {
+  const fixture = applicationFixture()
+  let catalog = await fixture.application.getLeetcodeCatalog()
+  assert.equal(catalog.resource.data.total, 100)
+  assert.equal(catalog.resource.data.groups.length, 17)
+  assert.equal(catalog.resource.data.completedCount, 0)
+
+  const completed = await fixture.application.setLeetcodeProblemCompletion('two-sum', true)
+  assert.equal(completed.resource.data.completed, true)
+  catalog = await fixture.application.getLeetcodeCatalog()
+  assert.equal(catalog.resource.data.completedCount, 1)
+  assert.equal(catalog.resource.data.groups[0].problems[0].completed, true)
+
+  await fixture.application.setLeetcodeProblemCompletion('two-sum', false)
+  assert.equal((await fixture.application.getLeetcodeCatalog()).resource.data.completedCount, 0)
+  await assert.rejects(() => fixture.application.setLeetcodeProblemCompletion('not-in-plan', true), { code: 'LEETCODE_PROBLEM_NOT_FOUND' })
+})

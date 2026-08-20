@@ -68,3 +68,19 @@ test('删除练习通过外键级联清理题目、作答和游标', async () =>
     context.cleanup()
   }
 })
+
+test('SQLite 保存并更新力扣热题完成状态', async () => {
+  const context = fixture()
+  try {
+    await context.repository.saveLeetcodeProgress({ slug: 'two-sum', completed: true, completedAt: 10, updatedAt: 10 })
+    assert.deepEqual(await context.repository.listLeetcodeProgress(), [
+      { slug: 'two-sum', completed: true, completedAt: 10, updatedAt: 10 },
+    ])
+    await context.repository.saveLeetcodeProgress({ slug: 'two-sum', completed: false, completedAt: null, updatedAt: 11 })
+    assert.deepEqual(await context.repository.listLeetcodeProgress(), [
+      { slug: 'two-sum', completed: false, completedAt: null, updatedAt: 11 },
+    ])
+  } finally {
+    context.cleanup()
+  }
+})

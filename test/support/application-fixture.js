@@ -8,6 +8,7 @@ export class InMemoryInterviewRepository {
   constructor() {
     this.practices = new Map()
     this.cursors = new Map()
+    this.leetcodeProgress = new Map()
   }
 
   async getPractice(id) { return clone(this.practices.get(id) || null) }
@@ -34,6 +35,10 @@ export class InMemoryInterviewRepository {
   }
 
   async clearCursor(sessionId) { this.cursors.delete(sessionId) }
+
+  async listLeetcodeProgress() { return [...this.leetcodeProgress.values()].map(clone) }
+
+  async saveLeetcodeProgress(progress) { this.leetcodeProgress.set(progress.slug, clone(progress)) }
 }
 
 export function applicationFixture() {

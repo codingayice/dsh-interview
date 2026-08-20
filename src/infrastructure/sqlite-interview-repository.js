@@ -68,6 +68,13 @@ export class SqliteInterviewRepository {
         updated_at INTEGER NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS leetcode_progress (
+        slug TEXT PRIMARY KEY,
+        completed INTEGER NOT NULL CHECK (completed IN (0, 1)),
+        completed_at INTEGER,
+        updated_at INTEGER NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_practices_updated_at ON practices(updated_at DESC);
       CREATE INDEX IF NOT EXISTS idx_practices_mode_status ON practices(mode, status);
       CREATE INDEX IF NOT EXISTS idx_questions_practice ON questions(practice_id, sequence);
@@ -267,6 +274,26 @@ export class SqliteInterviewRepository {
 
   async clearCursor(sessionId) {
     this.database.prepare('DELETE FROM session_cursors WHERE session_id = ?').run(sessionId)
+  }
+
+  async listLeetcodeProgress() {
+    return this.database.prepare('SELECT * FROM leetcode_progress ORDER BY slug ASC').all().map((row) => ({
+      slug: row.slug,
+      completed: Boolean(row.completed),
+      completedAt: row.completed_at,
+      updatedAt: row.updated_at,
+    }))
+  }
+
+  async saveLeetcodeProgress(progress) {
+    this.database.prepare(`
+      INSERT INTO leetcode_progress (slug, completed, completed_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET
+        completed = excluded.completed,
+        completed_at = excluded.completed_at,
+        updated_at = excluded.updated_at
+    `).run(progress.slug, progress.completed ? 1 : 0, progress.completedAt, progress.updatedAt)
   }
 
   close() {
