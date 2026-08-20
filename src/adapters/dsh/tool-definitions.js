@@ -156,7 +156,15 @@ const libraryTool = (application) => ({
       case 'list': return application.listPractices({ query: args.query, mode: args.mode, status: args.status })
       case 'get': return application.getPractice(args.practice_id)
       case 'insights': return application.getInsights()
-      case 'export': return application.exportPractices({ practiceIds: args.practice_ids || (args.practice_id ? [args.practice_id] : undefined), scope: args.scope, include: args.include })
+      case 'export': {
+        let practiceIds = args.practice_ids || (args.practice_id ? [args.practice_id] : undefined)
+        if (!practiceIds?.length && args.scope !== 'all') {
+          const session = await application.getSession(sessionId)
+          const selectedId = session.resource.data.practice?.id
+          practiceIds = selectedId ? [selectedId] : undefined
+        }
+        return application.exportPractices({ practiceIds, scope: args.scope, include: args.include })
+      }
       case 'delete': return application.deletePractice(args.practice_id, sessionId)
       default: throw new TypeError(`不支持的 library command：${String(args.command)}`)
     }

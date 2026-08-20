@@ -58,3 +58,13 @@ test('HTTP 错误响应包含稳定错误码', () => {
   })
   assert.equal(errorResponse(new Error('secret')).body.error.code, 'INTERNAL_ERROR')
 })
+
+test('未指定范围时只导出当前选择的练习', async () => {
+  const fixture = applicationFixture()
+  const tools = Object.fromEntries(createToolDefinitions(fixture.application).map((tool) => [tool.name, tool]))
+  await tools.interview_session.execute({ command: 'start', mode: 'baogu', topic: 'JVM' }, exec())
+  await tools.interview_session.execute({ command: 'start', mode: 'scenario', topic: 'Redis' }, exec())
+  const result = await tools.interview_library.execute({ command: 'export' }, exec())
+  assert.equal(result.resource.data.length, 1)
+  assert.match(result.resource.data[0].name, /Redis/)
+})

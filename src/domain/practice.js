@@ -67,6 +67,7 @@ export function findAttempt(question, attemptId) {
 
 export function askQuestion(practice, { id, prompt, now }) {
   activePractice(practice)
+  assertDomain(practice.questions.length < practice.config.targetQuestionCount, 'QUESTION_LIMIT_REACHED', `练习已达到目标题数 ${practice.config.targetQuestionCount}`)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
   assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
   const question = {

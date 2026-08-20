@@ -183,6 +183,7 @@ export class InterviewApplication {
   async retryQuestion(sessionId, questionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
+    assertDomain(practice.status === 'active', 'PRACTICE_NOT_ACTIVE', '已结束练习必须先重新打开')
     findQuestion(practice, questionId)
     const nextCursor = markQuestionRetried(cursor, questionId, now)
     const events = [{ type: 'question.retry_requested', sessionId, practiceId: practice.id, questionId }]

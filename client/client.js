@@ -310,6 +310,11 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     const result = await run("library.delete", { practiceId: practice.id });
     if (result) onDeleted();
   };
+  const retry = async (questionId) => {
+    if (practice.status !== "active") return;
+    await run("session.select", { practiceId: practice.id });
+    await run("question.retry", { questionId });
+  };
   return h(
     "section",
     { className: "di-detail" },
@@ -364,7 +369,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(
           "div",
           { className: "di-detail-actions" },
-          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null
+          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => retry(question.id) }, "\u91CD\u65B0\u4F5C\u7B54") : null
         )
       );
     }) : h(Empty, { title: "\u8FD9\u6761\u7EC3\u4E60\u8FD8\u6CA1\u6709\u9898\u76EE" })

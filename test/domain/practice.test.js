@@ -83,3 +83,11 @@ test('结束后的练习禁止继续出题，重新打开后恢复写入', () =>
   const reopened = reopenPractice(completed, 4)
   assert.equal(askQuestion(reopened, { id: 'question-1', prompt: '问题', now: 5 }).practice.questions.length, 1)
 })
+
+test('达到配置的目标题数后禁止继续出题', () => {
+  let practice = createPractice({ id: 'practice-1', mode: 'baogu', topic: 'JVM', config: { targetQuestionCount: 1 }, now: 1 })
+  practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice
+  assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 3 }), {
+    code: 'QUESTION_LIMIT_REACHED',
+  })
+})

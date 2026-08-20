@@ -86,11 +86,7 @@ export function markNextRequested(cursor, now) {
 }
 
 export function markQuestionRetried(cursor, questionId, now) {
-  requirePhase(cursor, [
-    WORKFLOW_PHASES.READY_FOR_EXPLANATION,
-    WORKFLOW_PHASES.AWAITING_NEXT,
-    WORKFLOW_PHASES.COMPLETED,
-  ])
+  assertDomain(cursor.phase !== WORKFLOW_PHASES.COMPLETED, 'PRACTICE_ALREADY_COMPLETED', '已结束练习必须先重新打开')
   return advance(cursor, {
     questionId,
     attemptId: null,

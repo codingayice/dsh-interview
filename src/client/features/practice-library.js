@@ -20,6 +20,11 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     const result = await run('library.delete', { practiceId: practice.id })
     if (result) onDeleted()
   }
+  const retry = async (questionId) => {
+    if (practice.status !== 'active') return
+    await run('session.select', { practiceId: practice.id })
+    await run('question.retry', { questionId })
+  }
   return h('section', { className: 'di-detail' },
     h('div', { className: 'di-eyebrow' }, practice.modeLabel),
     h('h3', { className: 'di-ledger-title', style: { margin: '5px 0 0' } }, practice.topic),
@@ -52,7 +57,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           h(Markdown, null, question.explanation.detail)) : null,
         h('div', { className: 'di-detail-actions' },
           practice.status === 'active' && latest?.evaluation
-            ? h(Button, { onClick: () => run('question.retry', { questionId: question.id }) }, '重新作答')
+            ? h(Button, { onClick: () => retry(question.id) }, '重新作答')
             : null))
     }) : h(Empty, { title: '这条练习还没有题目' }))
 }

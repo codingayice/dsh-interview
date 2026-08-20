@@ -1,11 +1,12 @@
 {
   "name": "dsh-interview",
-  "version": "0.1.1",
-  "description": "DeepSeek Harness Web 本地面试复习插件：支持八股、模拟面试、场景题和简历出题，结构化保存题目、作答、评价、讲解与 Markdown 导出。",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness Web 本地优先的 AI 面试训练工作区，支持自然语言与可视化 UI 双入口。",
   "type": "module",
   "main": "lib/index.js",
   "scripts": {
     "build": "node scripts/build-client.mjs",
+    "prepack": "npm run build",
     "test": "node --test test/**/*.test.js",
     "test:domain": "node --test test/domain/*.test.js",
     "test:application": "node --test test/application/*.test.js",
@@ -15,6 +16,9 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.9"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   },
   "exports": {
     ".": "./lib/index.js",
@@ -38,6 +42,7 @@
   },
   "files": [
     "lib",
+    "src",
     "client",
     "cordis.patch.yml",
     "README.md",

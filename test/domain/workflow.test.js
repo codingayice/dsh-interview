@@ -52,4 +52,5 @@ test('练习结束后游标进入 completed', () => {
     2,
   )
   assert.equal(cursor.phase, WORKFLOW_PHASES.COMPLETED)
+  assert.throws(() => markQuestionRetried(cursor, 'question-1', 3), { code: 'PRACTICE_ALREADY_COMPLETED' })
 })
