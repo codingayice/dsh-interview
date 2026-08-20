@@ -51,8 +51,13 @@ test('原子工具驱动开始、出题、回答和评价流程', async () => {
 
   assert.equal(started.nextAction, 'generate_question')
   assert.equal(question.presentation.kind, 'question')
+  assert.equal(question.presentation.practiceId, started.resource.data.practice.id)
+  assert.equal(question.presentation.questionId, question.resource.data.id)
   assert.equal(attempt.nextAction, 'evaluate_answer')
   assert.equal(evaluation.presentation.kind, 'evaluation')
+  assert.equal(evaluation.presentation.practiceId, started.resource.data.practice.id)
+  assert.equal(evaluation.presentation.questionId, question.resource.data.id)
+  assert.equal(evaluation.presentation.attemptId, attempt.resource.data.id)
   assert.equal(context.presentation, null)
   assert.equal(context.assistantResponse.mode, 'continue')
   assert.match(modelText(context)[0].text, /什么是 JMM/)

@@ -5,21 +5,16 @@ const PROTOCOL = 'dsh-interview/interaction-v1'
 const exact = (text) => ({ mode: 'exact', text, mustNotRepeatResource: true })
 const continueSilently = () => ({ mode: 'continue', text: null, mustNotRepeatResource: true })
 
-function eventOf(result, type) {
-  return result.events?.find((event) => event.type === type) || null
-}
-
-function practiceIdOf(result) {
-  return result.resource?.data?.practice?.id
-    || result.resource?.data?.id
-    || result.resource?.data?.practiceId
-    || result.events?.find((event) => event.practiceId)?.practiceId
-    || null
+function referencesOf(result, ...names) {
+  return Object.fromEntries(names.map((name) => {
+    const value = result.references?.[name]
+    if (typeof value !== 'string' || !value.trim()) throw new TypeError(`面试动作结果缺少 ${name} 引用`)
+    return [name, value]
+  }))
 }
 
 function descriptor(action, result) {
   const data = result.resource?.data
-  const practiceId = practiceIdOf(result)
   switch (action) {
     case INTERVIEW_ACTIONS.START_PRACTICE:
       return { state: data.phase, nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
@@ -49,7 +44,7 @@ function descriptor(action, result) {
       return {
         state: 'awaiting_answer',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'question', practiceId, questionId: data.id },
+        presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
         assistantResponse: exact('已出题，请开始作答。'),
       }
     case INTERVIEW_ACTIONS.SUBMIT_ANSWER:
@@ -58,30 +53,28 @@ function descriptor(action, result) {
         nextAction: 'evaluate_answer',
         presentation: null,
         assistantResponse: continueSilently(),
-        context: { practiceId, questionId: data.questionId, attemptId: data.id, answer: data.answer },
+        context: { ...referencesOf(result, 'practiceId', 'questionId', 'attemptId'), answer: data.answer },
       }
     case INTERVIEW_ACTIONS.PRESENT_EVALUATION:
       return {
         state: 'ready_for_explanation',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'evaluation', practiceId, questionId: data.questionId, attemptId: data.attemptId },
+        presentation: { kind: 'evaluation', ...referencesOf(result, 'practiceId', 'questionId', 'attemptId') },
         assistantResponse: exact('评价已完成，请查看卡片。你可以查看讲解、重新作答或进入下一题。'),
       }
-    case INTERVIEW_ACTIONS.REQUEST_EXPLANATION: {
-      const event = eventOf(result, 'explanation.generation_requested')
+    case INTERVIEW_ACTIONS.REQUEST_EXPLANATION:
       return {
         state: 'generating_explanation',
         nextAction: 'generate_explanation',
         presentation: null,
         assistantResponse: continueSilently(),
-        context: { practiceId, questionId: event?.questionId || data.questionId },
+        context: referencesOf(result, 'practiceId', 'questionId'),
       }
-    }
     case INTERVIEW_ACTIONS.PRESENT_EXPLANATION:
       return {
         state: 'awaiting_next',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'explanation', practiceId, questionId: data.questionId },
+        presentation: { kind: 'explanation', ...referencesOf(result, 'practiceId', 'questionId') },
         assistantResponse: exact('讲解已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:
@@ -90,14 +83,14 @@ function descriptor(action, result) {
       return {
         state: 'awaiting_answer',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'question', practiceId, questionId: data.currentQuestion?.id || data.questionId },
+        presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
         assistantResponse: exact('已切换到这道题，请重新作答。'),
       }
     case INTERVIEW_ACTIONS.FINISH_PRACTICE:
       return {
         state: 'completed',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'finished', practiceId },
+        presentation: { kind: 'finished', ...referencesOf(result, 'practiceId') },
         assistantResponse: exact('本次练习已结束，复盘已归档。'),
       }
     case INTERVIEW_ACTIONS.LIST_PRACTICES:
@@ -105,7 +98,7 @@ function descriptor(action, result) {
     case INTERVIEW_ACTIONS.READ_PRACTICE_CONTEXT:
       return { state: 'reading_context', nextAction: 'continue_workflow', presentation: null, assistantResponse: continueSilently(), context: data }
     case INTERVIEW_ACTIONS.GET_PRACTICE:
-      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', practiceId }, assistantResponse: exact('练习档案已打开。') }
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('练习档案已打开。') }
     case INTERVIEW_ACTIONS.GET_INSIGHTS:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'insights' }, assistantResponse: exact('能力复盘已生成，请查看卡片。') }
     case INTERVIEW_ACTIONS.EXPORT_PRACTICES:

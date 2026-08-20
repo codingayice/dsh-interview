@@ -57,8 +57,14 @@ export class InterviewApplication {
     if (events.length) await this.events.publish(events)
   }
 
-  #result(kind, data, cursor, events = []) {
-    return { resource: { kind, data }, events, revision: cursor?.revision ?? 0 }
+  #result(kind, data, cursor, events = [], explicitReferences = {}) {
+    const references = {
+      ...(cursor?.practiceId ? { practiceId: cursor.practiceId } : {}),
+      ...(cursor?.questionId ? { questionId: cursor.questionId } : {}),
+      ...(cursor?.attemptId ? { attemptId: cursor.attemptId } : {}),
+      ...explicitReferences,
+    }
+    return { resource: { kind, data }, references, events, revision: cursor?.revision ?? 0 }
   }
 
   async startPractice(sessionId, input) {
@@ -221,7 +227,8 @@ export class InterviewApplication {
   }
 
   async getPractice(practiceId) {
-    return this.#result('practice-detail', toPracticeDetailDto(await this.#practice(practiceId)), null)
+    const practice = await this.#practice(practiceId)
+    return this.#result('practice-detail', toPracticeDetailDto(practice), null, [], { practiceId: practice.id })
   }
 
   async getInsights() {
@@ -230,10 +237,10 @@ export class InterviewApplication {
   }
 
   async deletePractice(practiceId, sessionId = null) {
-    await this.#practice(practiceId)
-    await this.repository.deletePractice(practiceId)
+    const practice = await this.#practice(practiceId)
+    await this.repository.deletePractice(practice.id)
     if (sessionId) await this.repository.clearCursor(sessionId)
-    return this.#result('practice-deleted', { practiceId }, null)
+    return this.#result('practice-deleted', { practiceId: practice.id }, null, [], { practiceId: practice.id })
   }
 
   async exportPractices(input = {}) {

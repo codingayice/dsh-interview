@@ -13,6 +13,7 @@
 - `interview_present_question.prompt` 现在是 `required + minLength: 1`，空题目调用在执行前被拒绝。
 - Agent 参数和工作流错误被标记为可恢复内部错误，不再生成用户可见错误卡片。
 - Assistant Text 由结构化响应契约控制，只做状态确认，不再复述 UI 内容。
+- 展示协议使用应用层提供的强类型资源引用，避免把题目 ID 误作练习 ID 查询。
 
 ### 改进
 
