@@ -87,10 +87,7 @@ export function QuestionResultCard({ question }) {
   const showReview = () => globalThis.document?.getElementById(reviewId)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
   return h('article', { className: 'di-card di-question-card', 'aria-label': '面试题' },
     h('div', { className: 'di-question-main' },
-      h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt)),
-      h('ul', { className: 'di-question-guide' },
-        h('li', null, '说明核心原理与适用场景'),
-        h('li', null, '结合项目实践说明选择依据'))),
+      h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt))),
     h(Button, {
       className: 'di-answer-button', onClick: showReview, 'aria-label': '查看本题答案与复盘',
     }, h(Icon, { name: 'eye' }), '查看答案'))
