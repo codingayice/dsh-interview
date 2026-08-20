@@ -10,11 +10,11 @@ function pluginMessage(text) {
 function instructionFor(event) {
   switch (event.type) {
     case 'question.generation_requested':
-      return `面试工作流事件：需要生成题目。practice_id=${event.practiceId}，reason=${event.reason}。先调用 interview_session.status；需要历史上下文时调用 interview_library.get；然后调用 interview_question.ask 保存且展示一道符合模式和进度的新题。不要在普通文本中重复题目。`
+      return `面试工作流事件：需要生成题目。practice_id=${event.practiceId}，reason=${event.reason}。先调用 interview_session.status；需要历史上下文时调用 interview_library.get；然后调用 interview_question.ask 保存且展示一道符合模式和进度的新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'explanation.generation_requested':
-      return `面试工作流事件：用户明确请求当前题讲解。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_library.get 获取题目和作答，再调用 interview_question.save_explanation 保存完整讲解与直接背要点。不要在普通文本中重复讲解。`
+      return `面试工作流事件：用户明确请求当前题讲解。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_library.get 获取题目和作答，再调用 interview_question.save_explanation 保存完整讲解与直接背要点。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'question.retry_requested':
-      return `面试工作流事件：用户要重新回答历史题。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_question.open 展示该题并等待用户回答，不要创建新题。`
+      return `面试工作流事件：用户要重新回答历史题。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_question.open 展示该题并等待用户回答，不要创建新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     default:
       return null
   }
@@ -42,3 +42,4 @@ export class AgentEventBridge {
 }
 
 export { instructionFor }
+import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'

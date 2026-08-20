@@ -177,8 +177,9 @@ function parseToolResult(block) {
   const start = text.indexOf(marker);
   if (start < 0) return { kind, revision, data: null };
   const dataStart = start + marker.length;
-  const eventsStart = text.indexOf("\nevents:\n", dataStart);
-  const raw = text.slice(dataStart, eventsStart < 0 ? text.length : eventsStart).trim();
+  const sectionStarts = ["\nevents:\n", "\nassistant_response:\n"].map((section) => text.indexOf(section, dataStart)).filter((index) => index >= 0);
+  const dataEnd = sectionStarts.length ? Math.min(...sectionStarts) : text.length;
+  const raw = text.slice(dataStart, dataEnd).trim();
   try {
     return { kind, revision, data: JSON.parse(raw) };
   } catch {

@@ -87,4 +87,17 @@ test('工具视图只为用户可见结果生成对应卡片', () => {
   )
   assert.equal(plugin.resolveToolView('interview_answer', settled('evaluate', 'evaluation', { score: 8 })).kind, 'evaluation')
   assert.equal(plugin.resolveToolView('interview_question', settled('ask', 'unknown', null, { isError: true })).kind, 'error')
+
+  const questionWithResponseContract = {
+    kind: 'tool-result',
+    call: { argsRaw: JSON.stringify({ command: 'ask' }) },
+    content: [{
+      type: 'text',
+      text: `resource_kind: question\nrevision: 3\nresource_data:\n${JSON.stringify(question)}\nassistant_response:\n{"mode":"exact","text":"已出题，请开始作答。"}`,
+    }],
+  }
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(plugin.resolveToolView('interview_question', questionWithResponseContract).data)),
+    question,
+  )
 })

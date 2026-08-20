@@ -1,8 +1,14 @@
+import {
+  ASSISTANT_RESPONSE_PROTOCOL,
+  assistantResponseFor,
+  assistantResponseInstruction,
+} from './assistant-response-policy.js'
+
 function sessionIdOf(exec) {
   return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || 'global'
 }
 
-function modelText(value) {
+function modelText(value, context = {}) {
   const resource = value?.resource || { kind: 'unknown', data: null }
   const lines = [`resource_kind: ${resource.kind}`, `revision: ${value?.revision ?? 0}`]
   const data = resource.data
@@ -10,17 +16,24 @@ function modelText(value) {
   if (Array.isArray(value?.events) && value.events.length) {
     lines.push(`events:\n${JSON.stringify(value.events, null, 2)}`)
   }
+  const assistantResponse = assistantResponseFor({
+    toolName: context.toolName,
+    command: context.command,
+    data: resource.data,
+  })
+  lines.push(`assistant_response:\n${JSON.stringify(assistantResponse, null, 2)}`)
+  lines.push(`assistant_instruction: ${assistantResponseInstruction(assistantResponse)}`)
   return [{ type: 'text', text: lines.join('\n') }]
 }
 
-const baseOutput = {
+const outputFor = (toolName) => ({
   schema: { type: 'object', additionalProperties: true },
-  render: (_args, value) => modelText(value),
-}
+  render: (args, value) => modelText(value, { toolName, command: args?.command }),
+})
 
 const sessionTool = (application) => ({
   name: 'interview_session',
-  description: '管理面试练习生命周期。开始练习后会进入 awaiting_question；随后必须调用 interview_question.ask 保存并展示第一题。status 返回权威会话状态。完成练习用 finish；已结束练习必须显式 reopen 后才能继续。',
+  description: `管理面试练习生命周期。开始练习后会进入 awaiting_question；随后必须调用 interview_question.ask 保存并展示第一题。status 返回权威会话状态。完成练习用 finish；已结束练习必须显式 reopen 后才能继续。${ASSISTANT_RESPONSE_PROTOCOL}`,
   parameters: {
     type: 'object',
     properties: {
@@ -36,7 +49,7 @@ const sessionTool = (application) => ({
     },
     required: ['command'],
   },
-  output: baseOutput,
+  output: outputFor('interview_session'),
   async execute(args, exec) {
     const sessionId = sessionIdOf(exec)
     switch (args.command) {
@@ -62,7 +75,7 @@ const sessionTool = (application) => ({
 
 const questionTool = (application) => ({
   name: 'interview_question',
-  description: '管理当前题目工作流。ask 只能在 awaiting_question 阶段调用；用户明确要求讲解后先 request_explanation，再用 save_explanation 保存完整讲解；next 会请求生成下一题，随后再调用 ask。重新回答旧题使用 retry，不创建重复题目。',
+  description: `管理当前题目工作流。ask 只能在 awaiting_question 阶段调用；用户明确要求讲解后先 request_explanation，再用 save_explanation 保存完整讲解；next 会请求生成下一题，随后再调用 ask。重新回答旧题使用 retry，不创建重复题目。${ASSISTANT_RESPONSE_PROTOCOL}`,
   parameters: {
     type: 'object',
     properties: {
@@ -74,7 +87,7 @@ const questionTool = (application) => ({
     },
     required: ['command'],
   },
-  output: baseOutput,
+  output: outputFor('interview_question'),
   async execute(args, exec) {
     const sessionId = sessionIdOf(exec)
     switch (args.command) {
@@ -95,7 +108,7 @@ const questionTool = (application) => ({
 
 const answerTool = (application) => ({
   name: 'interview_answer',
-  description: '提交和评价当前回答。用户发送回答后调用 submit，必须原样保存用户回答；随后调用 evaluate 结构化保存评分和反馈。每次重新回答会生成新的 attempt，禁止覆盖已评价记录。',
+  description: `提交和评价当前回答。用户发送回答后调用 submit，必须原样保存用户回答；随后调用 evaluate 结构化保存评分和反馈。每次重新回答会生成新的 attempt，禁止覆盖已评价记录。${ASSISTANT_RESPONSE_PROTOCOL}`,
   parameters: {
     type: 'object',
     properties: {
@@ -112,7 +125,7 @@ const answerTool = (application) => ({
     },
     required: ['command'],
   },
-  output: baseOutput,
+  output: outputFor('interview_answer'),
   async execute(args, exec) {
     const sessionId = sessionIdOf(exec)
     switch (args.command) {
@@ -131,7 +144,7 @@ const answerTool = (application) => ({
 
 const libraryTool = (application) => ({
   name: 'interview_library',
-  description: '查询和管理本地练习档案。list/get/insights 返回结构化读模型；export 返回受控下载令牌；delete 仅在用户明确确认删除后调用。读取操作不会隐式切换当前练习。',
+  description: `查询和管理本地练习档案。list/get/insights 返回结构化读模型；export 返回受控下载令牌；delete 仅在用户明确确认删除后调用。读取操作不会隐式切换当前练习。${ASSISTANT_RESPONSE_PROTOCOL}`,
   parameters: {
     type: 'object',
     properties: {
@@ -149,7 +162,7 @@ const libraryTool = (application) => ({
     },
     required: ['command'],
   },
-  output: baseOutput,
+  output: outputFor('interview_library'),
   async execute(args, exec) {
     const sessionId = sessionIdOf(exec)
     switch (args.command) {

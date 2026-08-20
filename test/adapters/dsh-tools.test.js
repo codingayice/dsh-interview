@@ -52,7 +52,12 @@ test('工具协议驱动完整的开始、出题、回答和评价流程', async
 
   assert.equal(question.resource.kind, 'question')
   assert.equal(evaluation.resource.kind, 'evaluation')
-  assert.match(modelText(evaluation)[0].text, /resource_kind: evaluation/)
+  assert.match(modelText(evaluation, { toolName: 'interview_answer', command: 'evaluate' })[0].text, /resource_kind: evaluation/)
+  assert.match(tools.interview_question.output.render({ command: 'ask' }, question)[0].text, /"text": "已出题，请开始作答。"/)
+  assert.match(tools.interview_answer.output.render({ command: 'evaluate' }, evaluation)[0].text, /最终回复必须且只能是/)
+  const started = await tools.interview_session.execute({ command: 'start', mode: 'bagu', topic: 'JVM' }, exec('session-2'))
+  assert.match(tools.interview_session.output.render({ command: 'start' }, started)[0].text, /"mode": "continue"/)
+  assert.match(tools.interview_session.output.render({ command: 'start' }, started)[0].text, /不要向用户输出普通文本/)
 })
 
 test('UI 命令分发与 Agent 工具复用同一应用用例', async () => {
@@ -67,6 +72,7 @@ test('UI 命令分发与 Agent 工具复用同一应用用例', async () => {
 
 test('事件桥接只为需要 Agent 继续生成的事件创建指令', () => {
   assert.match(instructionFor({ type: 'question.generation_requested', practiceId: 'p1', reason: 'next_requested' }), /interview_question\.ask/)
+  assert.match(instructionFor({ type: 'question.generation_requested', practiceId: 'p1', reason: 'next_requested' }), /assistant_response/)
   assert.match(instructionFor({ type: 'explanation.generation_requested', practiceId: 'p1', questionId: 'q1' }), /save_explanation/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
