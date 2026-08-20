@@ -1,0 +1,14 @@
+node_modules/
+*.tgz
+
+# Local DSH data and exports
+data.json
+archive.json
+exports/
+
+# Logs and OS/editor noise
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

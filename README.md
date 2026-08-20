@@ -1,5 +1,8 @@
 # dsh-interview
 
+[![npm](https://img.shields.io/npm/v/dsh-interview)](https://www.npmjs.com/package/dsh-interview)
+[![license](https://img.shields.io/github/license/codingayice/dsh-interview)](./LICENSE)
+
 dsh-interview 是一个面向 DeepSeek Harness Web 的本地面试复习插件。
 
 它把“刷面试题”做成可持久化的练习工作区：每次练习、每道题、每次作答、每条评价和参考讲解都会保存到本机。你可以同时维护多条练习，随时切换、继续、重新作答、查看历史，并把练习记录导出为 Markdown。
@@ -57,25 +60,37 @@ dsh-interview 是一个面向 DeepSeek Harness Web 的本地面试复习插件�
 - Node.js 支持原生 ESM 和 `crypto.randomUUID()`
 - 当前实现按 DSH `0.1.0-rc.6` 插件接口开发
 
-在仓库根目录执行：
+从 npm 安装：
 
 ```powershell
-dsh plugin --profile web add .
+dsh plugin --profile web add dsh-interview
 ```
 
-如果是从其他目录安装本地副本，传入仓库路径即可：
+安装完成后重启 `dsh web`。
 
-```powershell
-dsh plugin --profile web add "D:\path\to\dsh-interview"
-```
-
-安装完成后重启 `dsh web`。如果后续更新插件代码，执行：
+更新插件：
 
 ```powershell
 dsh plugin --profile web update dsh-interview
 ```
 
-然后再次重启 `dsh web` 使 Host 和 Client 的改动生效。
+更新后再次重启 `dsh web`。
+
+## 卸载
+
+卸载插件：
+
+```powershell
+dsh plugin --profile web remove dsh-interview
+```
+
+卸载只会从当前 DSH profile 移除插件，不会同步删除本地练习数据和已导出的 Markdown。
+
+如需彻底清理数据，请手动删除：
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.dsh\profiles\web\data\dsh-interview"
+```
 
 ## 基本用法
 

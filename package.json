@@ -1,7 +1,7 @@
 {
   "name": "dsh-interview",
   "version": "0.1.0",
-  "description": "面试助手：背八股 / 模拟面试 / 场景题 / 简历出题，题目与答案以卡片形式嵌在对话流中。DeepSeek Harness 插件。",
+  "description": "DeepSeek Harness Web 本地面试复习插件：支持八股、模拟面试、场景题和简历出题，结构化保存题目、作答、评价、讲解与 Markdown 导出。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -29,7 +29,27 @@
     "client",
     "cordis.patch.yml",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codingayice/dsh-interview.git"
+  },
+  "homepage": "https://github.com/codingayice/dsh-interview",
+  "bugs": {
+    "url": "https://github.com/codingayice/dsh-interview/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "interview",
+    "interview-practice"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "license": "MIT"
 }
