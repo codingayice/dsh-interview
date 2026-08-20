@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+### 重大变更
+
+- 将四个多命令工具替换为具备硬 Schema 的原子工具，不再保留旧工具名和 `command` 调用方式。
+- 新增统一 `InterviewCoordinator`，Agent 与 UI 入口共享动作执行、事件派发和交互结果生成。
+- 工具结果切换为 `dsh-interview/interaction-v1`，Client 不再解析旧的资源文本格式。
+
+### 修复
+
+- `interview_present_question.prompt` 现在是 `required + minLength: 1`，空题目调用在执行前被拒绝。
+- Agent 参数和工作流错误被标记为可恢复内部错误，不再生成用户可见错误卡片。
+- Assistant Text 由结构化响应契约控制，只做状态确认，不再复述 UI 内容。
+
+### 改进
+
+- Client 通过练习、题目和作答 ID 查询权威读模型，历史题目、评价和讲解卡片不依赖工具参数。
+- 原子工具使用 `additionalProperties: false` 和字段级说明，降低模型误用概率。
+
 ## 0.2.0
 
 ### 重大变更

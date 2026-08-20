@@ -1,6 +1,6 @@
 {
   "name": "dsh-interview",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "DeepSeek Harness Web 本地优先的 AI 面试训练工作区，支持自然语言与可视化 UI 双入口。",
   "type": "module",
   "main": "lib/index.js",

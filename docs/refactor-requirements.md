@@ -87,14 +87,14 @@ awaiting_question
 
 ### A5 工具协议
 
-对 Agent 暴露四个小工具：
+对 Agent 暴露一个动作一个工具的原子协议，禁止使用 `command` 联合承载多种参数形状。
 
-- `interview_session`：开始、状态、选择、完成、恢复。
-- `interview_question`：出题、打开、请求讲解、保存讲解、下一题、重答。
-- `interview_answer`：提交回答、评价。
-- `interview_library`：列表、详情、洞察、导出、删除。
-
-工具返回统一的资源类型、领域事件和数据修订号，Client 根据资源类型读取权威读模型。
+- 每个工具通过 `required`、`minLength`、数值范围和 `additionalProperties: false` 硬性约束参数。
+- `interview_present_question` 只保存并展示模型已经生成完成的非空题目，不承担题目生成。
+- 回答、评价和讲解分别使用独立工具，正文与评分字段必须在 Schema 层必填。
+- 工具返回统一的交互状态、下一步动作、UI 展示资源、Assistant Text 契约和数据修订号。
+- Client 根据结构化展示资源 ID 读取权威读模型，不解析工具文本或复制工具参数。
+- Agent 协议错误标记为可恢复且不产生 UI，用户错误和系统错误进入独立可见通道。
 
 ### A6 持久化
 

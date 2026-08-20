@@ -101,35 +101,39 @@ dsh plugin --profile web update dsh-interview
 
 ## Agent 工具协议
 
-插件使用四个面向业务场景的工具，而不是公开数据库 CRUD：
+插件使用无 `command` 联合的原子工具。每个工具只执行一个业务动作，并通过 JSON Schema 硬性声明必填参数：
 
 练习模式标识为 `bagu`（八股）、`mock`（模拟面试）、`scenario`（场景题）和 `resume`（简历出题）。
 
-| 工具 | 职责 | Commands |
-| --- | --- | --- |
-| `interview_session` | 练习生命周期 | `start`、`status`、`select`、`finish`、`reopen` |
-| `interview_question` | 题目和讲解流程 | `ask`、`open`、`request_explanation`、`save_explanation`、`next`、`retry` |
-| `interview_answer` | 回答和评价 | `submit`、`evaluate` |
-| `interview_library` | 档案与复盘 | `list`、`get`、`insights`、`export`、`delete` |
+| 范围 | 工具 |
+| --- | --- |
+| 练习生命周期 | `interview_start_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice` |
+| 题目流程 | `interview_present_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question` |
+| 回答与评价 | `interview_submit_answer`、`interview_present_evaluation` |
+| 讲解流程 | `interview_request_explanation`、`interview_present_explanation` |
+| 档案与复盘 | `interview_list_practices`、`interview_read_practice_context`、`interview_get_practice`、`interview_get_insights`、`interview_export_practices`、`interview_delete_practice` |
 
-UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具最终调用同一个 `InterviewApplication`。
+工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。题目、回答、评价和讲解的正文参数均设置 `minLength` 与 `required`，无效的 Agent 调用不会进入领域写入。
+
+UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具先进入同一个 `InterviewCoordinator`，再调用 `InterviewApplication`。
 
 ## 架构
 
 ```text
 DSH Agent ─┐
-           ├─ adapters ─→ application ─→ domain
-React UI ──┘                    │
-                               └─ ports ← infrastructure
+           ├─ adapters ─→ coordinator ─→ application ─→ domain
+React UI ──┘                                      │
+                                                 └─ ports ← infrastructure
 ```
 
 ```text
 src/
 ├── domain/          实体、值对象和工作流状态机
-├── application/     命令、查询、DTO 和端口
+├── application/     协调器、交互协议、命令、查询、DTO 和端口
 ├── infrastructure/  SQLite、Markdown 导出和系统能力
 ├── adapters/        DSH 工具、HTTP API 和 Agent 事件桥接
-└── client/          React 功能模块、共享 API 和设计系统
+├── client/          React 功能模块、共享 API 和设计系统
+└── protocol/        Agent 与 Client 共享的稳定协议常量
 ```
 
 详细边界参见 [目标架构](./docs/architecture.md) 和 [重构需求基线](./docs/refactor-requirements.md)。
