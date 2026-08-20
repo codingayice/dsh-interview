@@ -22,6 +22,14 @@ function descriptor(action, result) {
   const data = result.resource?.data
   switch (action) {
     case INTERVIEW_ACTIONS.START_PRACTICE:
+      if (data.leetcode) {
+        return {
+          state: 'awaiting_solution',
+          nextAction: 'wait_for_user',
+          presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
+          assistantResponse: exact('已随机抽取一道力扣题，请开始刷题。'),
+        }
+      }
       return { state: data.phase, nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
     case INTERVIEW_ACTIONS.UPDATE_PRACTICE:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('练习配置已更新。'), context: data }
@@ -52,11 +60,12 @@ function descriptor(action, result) {
         }
       }
       if (nextAction === 'show_current_question') {
+        const leetcode = Boolean(data.question?.leetcode)
         return {
           state: data.phase,
           nextAction: 'wait_for_user',
           presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
-          assistantResponse: exact('已恢复当前题，请继续作答。'),
+          assistantResponse: exact(leetcode ? '已恢复当前力扣题，请继续刷题。' : '已恢复当前题，请继续作答。'),
         }
       }
       if (nextAction === 'confirm_reopen') {
@@ -106,10 +115,10 @@ function descriptor(action, result) {
     case INTERVIEW_ACTIONS.PRESENT_QUESTION:
     case INTERVIEW_ACTIONS.OPEN_QUESTION:
       return {
-        state: 'awaiting_answer',
+        state: data.leetcode ? 'awaiting_solution' : 'awaiting_answer',
         nextAction: 'wait_for_user',
         presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
-        assistantResponse: exact('已出题，请开始作答。'),
+        assistantResponse: exact(data.leetcode ? '力扣题目已打开，请开始刷题。' : '已出题，请开始作答。'),
       }
     case INTERVIEW_ACTIONS.GET_QUESTION:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('题目详情已打开。'), context: data }
@@ -167,6 +176,14 @@ function descriptor(action, result) {
         assistantResponse: exact('点评讲解已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:
+      if (data.leetcode) {
+        return {
+          state: 'awaiting_solution',
+          nextAction: 'wait_for_user',
+          presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
+          assistantResponse: exact('已随机抽取下一道力扣题，请开始刷题。'),
+        }
+      }
       return { state: 'awaiting_question', nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
     case INTERVIEW_ACTIONS.RETRY_QUESTION:
       return {
@@ -198,6 +215,10 @@ function descriptor(action, result) {
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('练习档案已打开。') }
     case INTERVIEW_ACTIONS.GET_INSIGHTS:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'insights' }, assistantResponse: exact('能力复盘已生成，请查看卡片。') }
+    case INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG:
+      return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'leetcode-catalog' }, assistantResponse: exact('力扣热题 100 题目列表已打开。') }
+    case INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION:
+      return { state: data.completed ? 'completed' : 'incomplete', nextAction: 'wait_for_user', presentation: { kind: 'leetcode-catalog' }, assistantResponse: exact(data.completed ? '已标记为完成。' : '已标记为未完成。') }
     case INTERVIEW_ACTIONS.EXPORT_PRACTICES:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'exported' }, assistantResponse: exact('复盘文档已生成，请通过卡片下载。') }
     case INTERVIEW_ACTIONS.DELETE_PRACTICE:

@@ -13,6 +13,7 @@ const UI_ACTIONS = Object.freeze({
   'question.next': INTERVIEW_ACTIONS.REQUEST_NEXT,
   'question.retry': INTERVIEW_ACTIONS.RETRY_QUESTION,
   'question.reveal': INTERVIEW_ACTIONS.REVEAL_ANSWER,
+  'leetcode.set-completion': INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION,
   'library.delete': INTERVIEW_ACTIONS.DELETE_PRACTICE,
   'library.export': INTERVIEW_ACTIONS.EXPORT_PRACTICES,
 })

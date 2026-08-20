@@ -84,6 +84,15 @@ export function registerApiRoutes(hostCtx, { application, coordinator, exporter 
     }
   })
 
+  register('/interview/api/leetcode', async (request, response) => {
+    if (request.method !== 'GET') return sendJson(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持 GET' } })
+    try {
+      sendJson(response, 200, await application.getLeetcodeCatalog())
+    } catch (error) {
+      const output = errorResponse(error); sendJson(response, output.status, output.body)
+    }
+  })
+
   register('/interview/api/command', async (request, response) => {
     if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持 POST' } })
     try {

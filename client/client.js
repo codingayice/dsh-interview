@@ -73,6 +73,9 @@ var interviewApi = {
   insights() {
     return jsonRequest("/interview/api/insights");
   },
+  leetcodeCatalog() {
+    return jsonRequest("/interview/api/leetcode");
+  },
   async command(sessionId, command, payload = {}) {
     const value = await jsonRequest("/interview/api/command", {
       method: "POST",
@@ -1014,6 +1017,8 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_read_practice_context",
   "interview_get_practice",
   "interview_get_insights",
+  "interview_get_leetcode_catalog",
+  "interview_set_leetcode_completion",
   "interview_export_practices",
   "interview_delete_practice"
 ]);

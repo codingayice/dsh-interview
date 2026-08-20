@@ -29,6 +29,8 @@ const AGENT_RECOVERABLE_CODES = new Set([
   'INVALID_SUMMARY_IMPROVEMENTS',
   'INVALID_SCORE',
   'INVALID_DIMENSION_SCORE',
+  'LEETCODE_PROBLEM_NOT_FOUND',
+  'LEETCODE_COMPLETION_REQUIRED',
 ])
 
 async function executeApplicationAction(application, sessionId, action, payload) {
@@ -68,6 +70,8 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.READ_PRACTICE_CONTEXT: return application.getPractice(payload.practiceId)
     case INTERVIEW_ACTIONS.GET_PRACTICE: return application.getPractice(payload.practiceId)
     case INTERVIEW_ACTIONS.GET_INSIGHTS: return application.getInsights()
+    case INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG: return application.getLeetcodeCatalog()
+    case INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION: return application.setLeetcodeProblemCompletion(payload.slug, payload.completed, sessionId)
     case INTERVIEW_ACTIONS.EXPORT_PRACTICES: {
       if (payload.practiceIds?.length || payload.scope === 'all') return application.exportPractices(payload)
       const session = await application.getSession(sessionId)

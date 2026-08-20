@@ -31,6 +31,9 @@ export const interviewApi = {
   insights() {
     return jsonRequest('/interview/api/insights')
   },
+  leetcodeCatalog() {
+    return jsonRequest('/interview/api/leetcode')
+  },
   async command(sessionId, command, payload = {}) {
     const value = await jsonRequest('/interview/api/command', {
       method: 'POST',

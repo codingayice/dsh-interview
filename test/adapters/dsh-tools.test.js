@@ -46,6 +46,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.deepEqual(startVariants.map((schema) => schema.required), [
     ['mode', 'topic'],
     ['mode', 'topic'],
+    ['mode'],
     ['mode', 'resume', 'interviewer_style', 'coding', 'difficulty'],
   ])
   assert.match(fixture.tools.interview_start_practice.description, /禁止根据上下文、历史练习或常识推断、补全和采用默认值/)
@@ -57,6 +58,30 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
   assert.deepEqual(fixture.tools.interview_complete_summary.parameters.required, ['overall', 'strengths', 'improvements'])
+  assert.deepEqual(fixture.tools.interview_set_leetcode_completion.parameters.required, ['slug', 'completed'])
+})
+
+test('力扣工具直接抽题、展示目录并保存显式完成状态', async () => {
+  const fixture = toolFixture()
+  const started = await fixture.tools.interview_start_practice.execute({ mode: 'leetcode' }, exec('leetcode-session'))
+  assert.equal(started.state, 'awaiting_solution')
+  assert.equal(started.nextAction, 'wait_for_user')
+  assert.equal(started.presentation.kind, 'question')
+  assert.equal(started.resource.data.leetcode.slug, 'two-sum')
+  assert.equal(started.assistantResponse.text, '已随机抽取一道力扣题，请开始刷题。')
+
+  const completed = await fixture.tools.interview_set_leetcode_completion.execute({ slug: 'two-sum', completed: true }, exec('leetcode-session'))
+  assert.equal(completed.resource.data.completed, true)
+  assert.equal(completed.presentation.kind, 'leetcode-catalog')
+  const catalog = await fixture.tools.interview_get_leetcode_catalog.execute({}, exec('leetcode-session'))
+  assert.equal(catalog.resource.data.total, 100)
+  assert.equal(catalog.resource.data.completedCount, 1)
+  assert.equal(catalog.presentation.kind, 'leetcode-catalog')
+
+  const next = await fixture.tools.interview_request_next.execute({}, exec('leetcode-session'))
+  assert.equal(next.resource.data.leetcode.slug, 'group-anagrams')
+  assert.equal(next.nextAction, 'wait_for_user')
+  assert.equal(next.presentation.kind, 'question')
 })
 
 test('原子工具驱动开始、出题、回答和完整复盘流程', async () => {

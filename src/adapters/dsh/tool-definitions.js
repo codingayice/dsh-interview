@@ -31,6 +31,7 @@ function practiceConfigurationParameters({ includePracticeId = false } = {}) {
     oneOf: [
       variant('bagu', { topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' } }, ['topic']),
       variant('scenario', { topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' } }, ['topic']),
+      variant('leetcode', {}, []),
       variant('mock', {
         resume: { type: 'string', minLength: 1, description: '用户明确提供的完整简历内容。' },
         interviewer_style: { type: 'string', minLength: 1, description: '用户明确选择的面试官风格。' },
@@ -47,7 +48,7 @@ function practiceConfigurationPayload(args) {
     mode: args.mode,
     config: args.mode === 'mock'
       ? { resume: args.resume, interviewerStyle: args.interviewer_style, coding: args.coding, difficulty: args.difficulty }
-      : { topic: args.topic },
+      : args.mode === 'leetcode' ? {} : { topic: args.topic },
   }
 }
 
@@ -85,7 +86,7 @@ const tools = [
   atomicTool({
     name: 'interview_start_practice',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
-    description: `开始一条全新的面试练习。成功后先调用 interview_read_practice_context 读取已保存配置，再按 nextAction 生成第一题。${PRACTICE_CONFIGURATION_POLICY}`,
+    description: `开始一条全新的练习。刷力扣模式会直接从固定题库随机抽题并展示；其他模式成功后先调用 interview_read_practice_context 读取已保存配置，再按 nextAction 生成第一题。${PRACTICE_CONFIGURATION_POLICY}`,
     parameters: practiceConfigurationParameters(),
     payload: practiceConfigurationPayload,
   }),
@@ -178,7 +179,7 @@ const tools = [
     name: 'interview_open_question', action: INTERVIEW_ACTIONS.OPEN_QUESTION, description: '打开并通过 UI 展示指定历史题目，不创建新题。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
   }),
-  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: `请求进入下一题。成功后必须先调用 interview_read_practice_context 读取已保存配置和历史，再按照 nextAction 生成题目并调用 interview_present_question。${QUESTION_GENERATION_POLICY}` }),
+  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: `请求进入下一题。刷力扣模式由插件直接随机抽题；其他模式成功后必须先调用 interview_read_practice_context 读取已保存配置和历史，再按照 nextAction 生成题目并调用 interview_present_question。${QUESTION_GENERATION_POLICY}` }),
   atomicTool({
     name: 'interview_retry_question', action: INTERVIEW_ACTIONS.RETRY_QUESTION, description: '把指定历史题切换为当前待回答题目。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
@@ -248,7 +249,7 @@ const tools = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario'] },
+        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'leetcode'] },
         status: { type: 'string', enum: ['active', 'completed'] },
       },
       additionalProperties: false,
@@ -263,6 +264,20 @@ const tools = [
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),
   atomicTool({ name: 'interview_get_insights', action: INTERVIEW_ACTIONS.GET_INSIGHTS, description: '生成并展示全部练习的能力复盘。' }),
+  atomicTool({ name: 'interview_get_leetcode_catalog', action: INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG, description: '按力扣热题 100 官方题型分组打开全部题目，展示题目地址、难度和本地完成状态。' }),
+  atomicTool({
+    name: 'interview_set_leetcode_completion', action: INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION,
+    description: '将力扣热题 100 中指定题目标记为完成或未完成。completed 必须由用户明确表达，禁止自行推断。',
+    parameters: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', minLength: 1, description: '固定题库中的题目标识，例如 two-sum。' },
+        completed: { type: 'boolean', description: '用户明确指定的完成状态。' },
+      },
+      required: ['slug', 'completed'],
+      additionalProperties: false,
+    },
+  }),
   atomicTool({
     name: 'interview_export_practices', action: INTERVIEW_ACTIONS.EXPORT_PRACTICES, description: '导出当前练习、指定练习或全部练习的 Markdown 复盘。',
     parameters: {

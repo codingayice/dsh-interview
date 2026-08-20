@@ -22,6 +22,8 @@ export const INTERVIEW_TOOL_NAMES = Object.freeze([
   'interview_read_practice_context',
   'interview_get_practice',
   'interview_get_insights',
+  'interview_get_leetcode_catalog',
+  'interview_set_leetcode_completion',
   'interview_export_practices',
   'interview_delete_practice',
 ])

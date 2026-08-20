@@ -22,6 +22,8 @@ export const INTERVIEW_ACTIONS = Object.freeze({
   READ_PRACTICE_CONTEXT: 'library.read_context',
   GET_PRACTICE: 'library.get',
   GET_INSIGHTS: 'library.insights',
+  GET_LEETCODE_CATALOG: 'leetcode.catalog',
+  SET_LEETCODE_COMPLETION: 'leetcode.set_completion',
   EXPORT_PRACTICES: 'library.export',
   DELETE_PRACTICE: 'library.delete',
 })
