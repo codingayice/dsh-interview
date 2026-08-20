@@ -1,5 +1,5 @@
 import { DomainError, assertDomain } from '../domain/errors.js'
-import { LEETCODE_TOP_100_GROUPS, LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from '../domain/leetcode-top-100.js'
+import { LEETCODE_TOP_100, LEETCODE_TOP_100_GROUPS, LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from '../domain/leetcode-top-100.js'
 import {
   askQuestion as addQuestion,
   completePractice,
@@ -25,6 +25,7 @@ import {
   markNextRequested,
   markPracticeCompleted,
   markPracticeFinishRequested,
+  markLeetcodeProblemPresented,
   markQuestionAsked,
   markQuestionRetried,
   WORKFLOW_PHASES,
@@ -45,6 +46,7 @@ export class InterviewApplication {
     this.exporter = validated.exporter
     this.clock = validated.clock
     this.ids = validated.ids
+    this.random = validated.random
   }
 
   async #practice(practiceId) {
@@ -64,6 +66,43 @@ export class InterviewApplication {
     if (events.length) await this.events.publish(events)
   }
 
+  async #leetcodeProgress() {
+    return new Map((await this.repository.listLeetcodeProgress()).map((item) => [item.slug, item]))
+  }
+
+  async #cursorForQuestion(cursor, question, now) {
+    if (!question.leetcode) return cursorForQuestion(cursor, question, now)
+    const progress = await this.#leetcodeProgress()
+    return cursorForQuestion(cursor, question, now, {
+      leetcodeCompleted: progress.get(question.leetcode.slug)?.completed === true,
+    })
+  }
+
+  async #drawLeetcodeProblem(practice, cursor, now) {
+    assertDomain(practice.mode === 'leetcode', 'INVALID_PRACTICE_MODE', '只有刷力扣模式可以从题库抽题')
+    const progress = await this.#leetcodeProgress()
+    const used = new Set(practice.questions.map((question) => question.leetcode?.slug).filter(Boolean))
+    const incomplete = (problem) => progress.get(problem.slug)?.completed !== true
+    const pools = [
+      LEETCODE_TOP_100.filter((problem) => !used.has(problem.slug) && incomplete(problem)),
+      LEETCODE_TOP_100.filter((problem) => !used.has(problem.slug)),
+      LEETCODE_TOP_100.filter(incomplete),
+      LEETCODE_TOP_100,
+    ]
+    const candidates = pools.find((pool) => pool.length > 0)
+    const randomValue = Number(this.random.next())
+    assertDomain(Number.isFinite(randomValue) && randomValue >= 0 && randomValue < 1, 'INVALID_RANDOM_VALUE', '随机数必须位于 [0, 1) 区间')
+    const problem = candidates[Math.floor(randomValue * candidates.length)]
+    const added = addQuestion(practice, {
+      id: this.ids.next('question'),
+      prompt: `${problem.id}. ${problem.title}`,
+      leetcode: problem,
+      now,
+    })
+    const nextCursor = markLeetcodeProblemPresented(cursor, added.question.id, now)
+    return { ...added, cursor: nextCursor }
+  }
+
   #result(kind, data, cursor, events = [], explicitReferences = {}) {
     const references = {
       ...(cursor?.practiceId ? { practiceId: cursor.practiceId } : {}),
@@ -76,8 +115,17 @@ export class InterviewApplication {
 
   async startPractice(sessionId, input) {
     const now = this.clock.now()
-    const practice = createPractice({ ...input, id: this.ids.next('practice'), now })
-    const cursor = createCursor({ sessionId, practiceId: practice.id, now })
+    let practice = createPractice({ ...input, id: this.ids.next('practice'), now })
+    let cursor = createCursor({ sessionId, practiceId: practice.id, now })
+    if (practice.mode === 'leetcode') {
+      const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
+      practice = drawn.practice
+      cursor = drawn.cursor
+      const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
+      await this.repository.commit({ practice, cursor })
+      await this.#publish(events)
+      return this.#result('question', toQuestionDto(drawn.question), cursor, events)
+    }
     const events = [{
       type: 'question.generation_requested',
       sessionId,
@@ -119,6 +167,22 @@ export class InterviewApplication {
     let events = []
     let question = null
     let attempt = null
+
+    if (practice.mode === 'leetcode' && [CONTINUATION_ACTIONS.GENERATE_QUESTION, CONTINUATION_ACTIONS.REQUEST_NEXT].includes(resumeAction)) {
+      const now = this.clock.now()
+      const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
+      const drawnEvents = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
+      await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
+      await this.#publish(drawnEvents)
+      return this.#result('continuation', {
+        selected: true,
+        phase: drawn.cursor.phase,
+        resumeAction: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
+        practiceId: practice.id,
+        questionId: drawn.question.id,
+        question: toQuestionDto(drawn.question),
+      }, drawn.cursor, drawnEvents)
+    }
 
     if (resumeAction === CONTINUATION_ACTIONS.REQUEST_NEXT) {
       cursor = markNextRequested(cursor, this.clock.now())
@@ -188,7 +252,7 @@ export class InterviewApplication {
     const practice = await this.#practice(practiceId)
     let cursor = createCursor({ sessionId, practiceId: practice.id, now })
     const latestQuestion = practice.questions.at(-1) || null
-    if (latestQuestion) cursor = cursorForQuestion(cursor, latestQuestion, now)
+    if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
     if (practice.status === 'completed') cursor = { ...cursor, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1 }
     const events = [{ type: 'practice.selected', sessionId, practiceId: practice.id, phase: cursor.phase }]
     await this.repository.commit({ cursor })
@@ -213,7 +277,7 @@ export class InterviewApplication {
     const question = findQuestion(practice, questionId)
     const nextCursor = practice.status === 'completed'
       ? { ...cursor, questionId: question.id, attemptId: question.attempts.at(-1)?.id || null, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1, updatedAt: now }
-      : cursorForQuestion(cursor, question, now)
+      : await this.#cursorForQuestion(cursor, question, now)
     await this.repository.commit({ cursor: nextCursor })
     return this.#result('question', toQuestionDto(question), nextCursor)
   }
@@ -242,7 +306,7 @@ export class InterviewApplication {
       if (selected?.practiceId === current.id && selected.questionId === questionId) {
         cursor = createCursor({ sessionId, practiceId: current.id, now })
         const latestQuestion = removed.practice.questions.at(-1) || null
-        if (latestQuestion) cursor = cursorForQuestion(cursor, latestQuestion, now)
+        if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
         if (removed.practice.status === 'completed') cursor = { ...cursor, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1 }
       }
     }
@@ -315,6 +379,13 @@ export class InterviewApplication {
   async requestNextQuestion(sessionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
+    if (practice.mode === 'leetcode') {
+      const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
+      const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
+      await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
+      await this.#publish(events)
+      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, events)
+    }
     const nextCursor = markNextRequested(cursor, now)
     const events = [{ type: 'question.generation_requested', sessionId, practiceId: practice.id, reason: 'next_requested' }]
     await this.repository.commit({ cursor: nextCursor })
@@ -360,7 +431,7 @@ export class InterviewApplication {
     const practice = reopenPractice(await this.#practice(practiceId), now)
     let cursor = createCursor({ sessionId, practiceId: practice.id, now })
     const latestQuestion = practice.questions.at(-1) || null
-    if (latestQuestion) cursor = cursorForQuestion(cursor, latestQuestion, now)
+    if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
     const events = latestQuestion ? [] : [{ type: 'question.generation_requested', sessionId, practiceId: practice.id, reason: 'practice_reopened' }]
     await this.repository.commit({ practice, cursor })
     await this.#publish(events)
@@ -402,14 +473,24 @@ export class InterviewApplication {
     }, null)
   }
 
-  async setLeetcodeProblemCompletion(slug, completed) {
+  async setLeetcodeProblemCompletion(slug, completed, sessionId = null) {
     const problem = leetcodeTop100Problem(requiredId(slug, 'slug'))
     assertDomain(Boolean(problem), 'LEETCODE_PROBLEM_NOT_FOUND', `力扣热题 100 中不存在题目：${String(slug)}`)
     assertDomain(typeof completed === 'boolean', 'LEETCODE_COMPLETION_REQUIRED', '必须明确提供是否完成')
     const now = this.clock.now()
     const progress = { slug: problem.slug, completed, completedAt: completed ? now : null, updatedAt: now }
     await this.repository.saveLeetcodeProgress(progress)
-    return this.#result('leetcode-progress', { ...problem, ...progress }, null, [], { problemSlug: problem.slug })
+    let cursor = null
+    if (sessionId) {
+      const selected = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
+      const practice = selected ? await this.repository.getPractice(selected.practiceId) : null
+      const question = practice?.questions.find((item) => item.id === selected.questionId) || null
+      if (question?.leetcode?.slug === problem.slug && practice.status === 'active') {
+        cursor = cursorForQuestion(selected, question, now, { leetcodeCompleted: completed })
+        await this.repository.commit({ cursor })
+      }
+    }
+    return this.#result('leetcode-progress', { ...problem, ...progress }, cursor, [], { problemSlug: problem.slug })
   }
 
   async deletePractice(practiceId, sessionId = null) {

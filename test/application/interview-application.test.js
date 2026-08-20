@@ -209,3 +209,29 @@ test('力扣热题目录按官方题型分组并持久化完成状态', async ()
   assert.equal((await fixture.application.getLeetcodeCatalog()).resource.data.completedCount, 0)
   await assert.rejects(() => fixture.application.setLeetcodeProblemCompletion('not-in-plan', true), { code: 'LEETCODE_PROBLEM_NOT_FOUND' })
 })
+
+test('刷力扣模式由应用层随机抽题并根据完成状态继续', async () => {
+  const fixture = applicationFixture()
+  const started = await fixture.application.startPractice('leetcode-session', { mode: 'leetcode', config: {} })
+  assert.equal(started.resource.kind, 'question')
+  assert.equal(started.resource.data.leetcode.slug, 'two-sum')
+  assert.equal(started.resource.data.leetcode.category, '哈希')
+  assert.equal(started.resource.data.leetcode.difficulty, 'easy')
+  assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_solution')
+  assert.equal(fixture.published.at(-1).type, 'leetcode.problem_drawn')
+
+  await fixture.application.setLeetcodeProblemCompletion('two-sum', true, 'leetcode-session')
+  assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_next')
+
+  const continued = await fixture.application.continuePractice('leetcode-session')
+  assert.equal(continued.resource.data.resumeAction, 'show_current_question')
+  assert.equal(continued.resource.data.question.leetcode.slug, 'group-anagrams')
+  assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_solution')
+
+  const next = await fixture.application.requestNextQuestion('leetcode-session')
+  assert.equal(next.resource.data.leetcode.slug, 'longest-consecutive-sequence')
+  assert.equal((await fixture.application.getPractice(next.references.practiceId)).resource.data.questions.length, 3)
+
+  await fixture.application.selectPractice('leetcode-session-2', next.references.practiceId)
+  assert.equal((await fixture.application.getSession('leetcode-session-2')).resource.data.phase, 'awaiting_solution')
+})

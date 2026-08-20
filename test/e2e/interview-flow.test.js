@@ -23,6 +23,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
     events: { async publish(batch) { events.push(...batch) } },
     clock: { now: () => ++time },
     ids: { next: (prefix) => `${prefix}-${++sequence}` },
+    random: { next: () => 0 },
   })
   const coordinator = new InterviewCoordinator({ application })
   const tools = Object.fromEntries(createToolDefinitions(coordinator).map((tool) => [tool.name, tool]))

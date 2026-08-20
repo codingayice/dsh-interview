@@ -2,6 +2,7 @@ import { assertDomain } from './errors.js'
 
 export const WORKFLOW_PHASES = Object.freeze({
   AWAITING_QUESTION: 'awaiting_question',
+  AWAITING_SOLUTION: 'awaiting_solution',
   AWAITING_ANSWER: 'awaiting_answer',
   AWAITING_EVALUATION: 'awaiting_evaluation',
   GENERATING_EXPLANATION: 'generating_explanation',
@@ -22,6 +23,7 @@ export const CONTINUATION_ACTIONS = Object.freeze({
 
 const CONTINUATION_BY_PHASE = Object.freeze({
   [WORKFLOW_PHASES.AWAITING_QUESTION]: CONTINUATION_ACTIONS.GENERATE_QUESTION,
+  [WORKFLOW_PHASES.AWAITING_SOLUTION]: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
   [WORKFLOW_PHASES.AWAITING_ANSWER]: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
   [WORKFLOW_PHASES.AWAITING_EVALUATION]: CONTINUATION_ACTIONS.EVALUATE_ANSWER,
   [WORKFLOW_PHASES.GENERATING_EXPLANATION]: CONTINUATION_ACTIONS.GENERATE_EXPLANATION,
@@ -70,6 +72,19 @@ export function markQuestionAsked(cursor, questionId, now) {
     questionId,
     attemptId: null,
     phase: WORKFLOW_PHASES.AWAITING_ANSWER,
+  }, now)
+}
+
+export function markLeetcodeProblemPresented(cursor, questionId, now) {
+  requirePhase(cursor, [
+    WORKFLOW_PHASES.AWAITING_QUESTION,
+    WORKFLOW_PHASES.AWAITING_SOLUTION,
+    WORKFLOW_PHASES.AWAITING_NEXT,
+  ])
+  return advance(cursor, {
+    questionId,
+    attemptId: null,
+    phase: WORKFLOW_PHASES.AWAITING_SOLUTION,
   }, now)
 }
 
@@ -129,7 +144,14 @@ export function markPracticeCompleted(cursor, now) {
   return advance(cursor, { phase: WORKFLOW_PHASES.COMPLETED }, now)
 }
 
-export function cursorForQuestion(cursor, question, now) {
+export function cursorForQuestion(cursor, question, now, { leetcodeCompleted = false } = {}) {
+  if (question.leetcode) {
+    return advance(cursor, {
+      questionId: question.id,
+      attemptId: null,
+      phase: leetcodeCompleted ? WORKFLOW_PHASES.AWAITING_NEXT : WORKFLOW_PHASES.AWAITING_SOLUTION,
+    }, now)
+  }
   const latestAttempt = question.attempts.at(-1) || null
   let phase = question.explanation
     ? WORKFLOW_PHASES.AWAITING_NEXT

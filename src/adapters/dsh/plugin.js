@@ -20,6 +20,7 @@ export function createRuntime(ctx, options = {}) {
     events: options.events || system.events,
     clock: options.clock || system.clock,
     ids: options.ids || system.ids,
+    random: options.random || system.random,
   })
   const eventBridge = new AgentEventBridge(ctx)
   const coordinator = options.coordinator || new InterviewCoordinator({ application, eventBridge })

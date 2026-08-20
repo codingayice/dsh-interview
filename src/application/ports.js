@@ -17,5 +17,6 @@ export function validateApplicationPorts(ports) {
   if (typeof ports.exporter?.export !== 'function') throw new TypeError('exporter.export 必须是函数')
   if (typeof ports.clock?.now !== 'function') throw new TypeError('clock.now 必须是函数')
   if (typeof ports.ids?.next !== 'function') throw new TypeError('ids.next 必须是函数')
+  if (typeof ports.random?.next !== 'function') throw new TypeError('random.next 必须是函数')
   return ports
 }

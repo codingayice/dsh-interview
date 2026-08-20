@@ -11,6 +11,7 @@ import {
   markNextRequested,
   markPracticeCompleted,
   markPracticeFinishRequested,
+  markLeetcodeProblemPresented,
   markQuestionAsked,
   markQuestionRetried,
   cursorForQuestion,
@@ -21,6 +22,7 @@ test('每个工作流阶段都有唯一的继续动作', () => {
   const cursor = { phase: null }
   const cases = [
     [WORKFLOW_PHASES.AWAITING_QUESTION, CONTINUATION_ACTIONS.GENERATE_QUESTION],
+    [WORKFLOW_PHASES.AWAITING_SOLUTION, CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION],
     [WORKFLOW_PHASES.AWAITING_ANSWER, CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION],
     [WORKFLOW_PHASES.AWAITING_EVALUATION, CONTINUATION_ACTIONS.EVALUATE_ANSWER],
     [WORKFLOW_PHASES.GENERATING_EXPLANATION, CONTINUATION_ACTIONS.GENERATE_EXPLANATION],
@@ -30,6 +32,17 @@ test('每个工作流阶段都有唯一的继续动作', () => {
   ]
   for (const [phase, action] of cases) assert.equal(continuationFor({ ...cursor, phase }), action)
   assert.throws(() => continuationFor(cursor), { code: 'INVALID_WORKFLOW_PHASE' })
+})
+
+test('刷力扣题目使用独立作答阶段并可按完成状态恢复', () => {
+  let cursor = createCursor({ sessionId: 'session-1', practiceId: 'practice-1', now: 1 })
+  cursor = markLeetcodeProblemPresented(cursor, 'question-1', 2)
+  assert.equal(cursor.phase, WORKFLOW_PHASES.AWAITING_SOLUTION)
+  assert.equal(continuationFor(cursor), CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION)
+
+  const question = { id: 'question-1', leetcode: { slug: 'two-sum' }, attempts: [], explanation: null }
+  assert.equal(cursorForQuestion(cursor, question, 3).phase, WORKFLOW_PHASES.AWAITING_SOLUTION)
+  assert.equal(cursorForQuestion(cursor, question, 4, { leetcodeCompleted: true }).phase, WORKFLOW_PHASES.AWAITING_NEXT)
 })
 
 test('完整面试流程只能按状态机顺序推进', () => {

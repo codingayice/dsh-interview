@@ -53,6 +53,7 @@ export function applicationFixture() {
     exporter: { async export(practices) { exported.push(...clone(practices)); return practices.map((practice) => ({ practiceId: practice.id, name: `${practice.topic}.md`, token: `download-${practice.id}` })) } },
     clock: { now() { return ++now } },
     ids: { next(prefix) { return `${prefix}-${++sequence}` } },
+    random: { next() { return 0 } },
   })
   return { application, repository, published, exported }
 }
