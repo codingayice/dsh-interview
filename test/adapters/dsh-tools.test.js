@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createToolDefinitions, modelText, sessionIdOf } from '../../src/adapters/dsh/tool-definitions.js'
 import { instructionFor } from '../../src/adapters/dsh/agent-event-bridge.js'
+import { assistantResponseFor, assistantResponseInstruction } from '../../src/adapters/dsh/assistant-response-policy.js'
 import { dispatchCommand } from '../../src/adapters/http/command-dispatcher.js'
 import { errorResponse } from '../../src/adapters/http/api-routes.js'
 import { DomainError } from '../../src/domain/errors.js'
@@ -25,6 +26,20 @@ test('DSH 只暴露四个职责明确的面试工具', () => {
     'interview_answer',
     'interview_library',
   ])
+})
+
+test('Assistant 响应契约区分中间步骤与 UI 终态', () => {
+  const started = assistantResponseFor({ toolName: 'interview_session', command: 'start', data: { phase: 'awaiting_question' } })
+  const status = assistantResponseFor({ toolName: 'interview_session', command: 'status', data: { phase: 'awaiting_question' } })
+  const asked = assistantResponseFor({ toolName: 'interview_question', command: 'ask', data: {} })
+  const evaluated = assistantResponseFor({ toolName: 'interview_answer', command: 'evaluate', data: {} })
+
+  assert.equal(started.mode, 'continue')
+  assert.equal(status.mode, 'continue')
+  assert.deepEqual(asked, { mode: 'exact', text: '已出题，请开始作答。', mustNotRepeatResource: true })
+  assert.match(evaluated.text, /^评价已完成/)
+  assert.match(assistantResponseInstruction(asked), /最终回复必须且只能是/)
+  assert.match(assistantResponseInstruction(started), /不要向用户输出普通文本/)
 })
 
 test('工具协议驱动完整的开始、出题、回答和评价流程', async () => {
