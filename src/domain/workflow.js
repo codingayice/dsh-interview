@@ -4,7 +4,6 @@ export const WORKFLOW_PHASES = Object.freeze({
   AWAITING_QUESTION: 'awaiting_question',
   AWAITING_ANSWER: 'awaiting_answer',
   AWAITING_EVALUATION: 'awaiting_evaluation',
-  READY_FOR_EXPLANATION: 'ready_for_explanation',
   GENERATING_EXPLANATION: 'generating_explanation',
   AWAITING_NEXT: 'awaiting_next',
   COMPLETED: 'completed',
@@ -55,29 +54,20 @@ export function markAnswerSubmitted(cursor, attemptId, now) {
   }, now)
 }
 
-export function markAnswerEvaluated(cursor, now) {
+export function markAnswerEvaluated(cursor, now, { reviewReady = false } = {}) {
   requirePhase(cursor, WORKFLOW_PHASES.AWAITING_EVALUATION)
-  return advance(cursor, { phase: WORKFLOW_PHASES.READY_FOR_EXPLANATION }, now)
-}
-
-export function markExplanationRequested(cursor, now) {
-  requirePhase(cursor, WORKFLOW_PHASES.READY_FOR_EXPLANATION)
-  return advance(cursor, { phase: WORKFLOW_PHASES.GENERATING_EXPLANATION }, now)
+  return advance(cursor, {
+    phase: reviewReady ? WORKFLOW_PHASES.AWAITING_NEXT : WORKFLOW_PHASES.GENERATING_EXPLANATION,
+  }, now)
 }
 
 export function markExplanationSaved(cursor, now) {
-  requirePhase(cursor, [
-    WORKFLOW_PHASES.READY_FOR_EXPLANATION,
-    WORKFLOW_PHASES.GENERATING_EXPLANATION,
-  ])
+  requirePhase(cursor, WORKFLOW_PHASES.GENERATING_EXPLANATION)
   return advance(cursor, { phase: WORKFLOW_PHASES.AWAITING_NEXT }, now)
 }
 
 export function markNextRequested(cursor, now) {
-  requirePhase(cursor, [
-    WORKFLOW_PHASES.READY_FOR_EXPLANATION,
-    WORKFLOW_PHASES.AWAITING_NEXT,
-  ])
+  requirePhase(cursor, WORKFLOW_PHASES.AWAITING_NEXT)
   return advance(cursor, {
     questionId: null,
     attemptId: null,
@@ -108,7 +98,7 @@ export function cursorForQuestion(cursor, question, now) {
     if (!latestAttempt.evaluation) phase = WORKFLOW_PHASES.AWAITING_EVALUATION
     else phase = question.explanation
       ? WORKFLOW_PHASES.AWAITING_NEXT
-      : WORKFLOW_PHASES.READY_FOR_EXPLANATION
+      : WORKFLOW_PHASES.GENERATING_EXPLANATION
   }
   return advance(cursor, { questionId: question.id, attemptId, phase }, now)
 }

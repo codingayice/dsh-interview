@@ -6,7 +6,6 @@ const UI_ACTIONS = Object.freeze({
   'session.finish': INTERVIEW_ACTIONS.FINISH_PRACTICE,
   'session.reopen': INTERVIEW_ACTIONS.REOPEN_PRACTICE,
   'question.open': INTERVIEW_ACTIONS.OPEN_QUESTION,
-  'question.request_explanation': INTERVIEW_ACTIONS.REQUEST_EXPLANATION,
   'question.next': INTERVIEW_ACTIONS.REQUEST_NEXT,
   'question.retry': INTERVIEW_ACTIONS.RETRY_QUESTION,
   'library.delete': INTERVIEW_ACTIONS.DELETE_PRACTICE,

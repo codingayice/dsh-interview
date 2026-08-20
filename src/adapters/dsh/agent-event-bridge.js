@@ -11,8 +11,6 @@ function instructionFor(event) {
   switch (event.type) {
     case 'question.generation_requested':
       return `面试工作流事件：需要生成题目。practice_id=${event.practiceId}，reason=${event.reason}。先调用 interview_get_status；需要历史上下文时调用 interview_read_practice_context。你必须自行生成一道完整题目，然后把非空完整题目作为 prompt 调用 interview_present_question；该工具只保存和展示，不会替你生成题目。${ASSISTANT_RESPONSE_PROTOCOL}`
-    case 'explanation.generation_requested':
-      return `面试工作流事件：用户明确请求当前题讲解。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_read_practice_context 获取题目和作答，自行生成完整讲解，再调用 interview_present_explanation 保存完整讲解与直接背要点。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'question.retry_requested':
       return `面试工作流事件：用户要重新回答历史题。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_open_question 展示该题并等待用户回答，不要创建新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     default:

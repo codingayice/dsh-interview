@@ -32,7 +32,6 @@ test('应用层完成一条面试主流程', async () => {
     feedback: '回答准确。',
     dimensions: { accuracy: 8, structure: 7 },
   })
-  await fixture.application.requestExplanation('session-1')
   await fixture.application.saveExplanation('session-1', {
     detail: '父加载器先尝试加载。',
     memorizationPoints: '向上委托，向下加载。',
@@ -61,12 +60,18 @@ test('重新作答保留历史 attempt', async () => {
   const question = await fixture.application.askQuestion('session-1', { prompt: '什么是可见性？' })
   await fixture.application.submitAnswer('session-1', { answer: '线程可以看到最新值。' })
   await fixture.application.evaluateAnswer('session-1', { score: 7, feedback: '缺少 happens-before。' })
+  await fixture.application.saveExplanation('session-1', {
+    detail: '可见性由 happens-before 规则建立保证。',
+    memorizationPoints: '写前读后，规则建立可见性。',
+  })
   await fixture.application.retryQuestion('session-1', question.resource.data.id)
   await fixture.application.submitAnswer('session-1', { answer: '通过 happens-before 保证可见性。' })
   await fixture.application.evaluateAnswer('session-1', { score: 9, feedback: '完整。' })
 
   const detail = await fixture.application.getPractice(question.events[0].practiceId)
   assert.deepEqual(detail.resource.data.questions[0].attempts.map((attempt) => attempt.evaluation.score), [7, 9])
+  assert.equal(detail.resource.data.questions[0].explanation.memorizationPoints, '写前读后，规则建立可见性。')
+  assert.equal((await fixture.application.getSession('session-1')).resource.data.phase, 'awaiting_next')
 })
 
 test('结束、重新打开、洞察和导出通过独立用例完成', async () => {

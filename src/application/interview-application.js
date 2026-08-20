@@ -14,7 +14,6 @@ import {
   cursorForQuestion,
   markAnswerEvaluated,
   markAnswerSubmitted,
-  markExplanationRequested,
   markExplanationSaved,
   markNextRequested,
   markPracticeCompleted,
@@ -145,22 +144,13 @@ export class InterviewApplication {
     const questionId = input.questionId || cursor.questionId
     const attemptId = input.attemptId || cursor.attemptId
     assertDomain(Boolean(questionId) && Boolean(attemptId) && questionId === cursor.questionId && attemptId === cursor.attemptId, 'ATTEMPT_NOT_FOCUSED', '只能评价当前作答')
+    const reviewReady = Boolean(findQuestion(practice, questionId).explanation)
     const added = addEvaluation(practice, { ...input, questionId, attemptId, now })
-    const nextCursor = markAnswerEvaluated(cursor, now)
+    const nextCursor = markAnswerEvaluated(cursor, now, { reviewReady })
     const events = [{ type: 'answer.evaluated', sessionId, practiceId: practice.id, questionId, attemptId }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('evaluation', { questionId, attemptId, ...added.evaluation }, nextCursor, events)
-  }
-
-  async requestExplanation(sessionId) {
-    const now = this.clock.now()
-    const { cursor, practice } = await this.#context(sessionId)
-    const nextCursor = markExplanationRequested(cursor, now)
-    const events = [{ type: 'explanation.generation_requested', sessionId, practiceId: practice.id, questionId: cursor.questionId }]
-    await this.repository.commit({ cursor: nextCursor })
-    await this.#publish(events)
-    return this.#result('explanation-requested', toSessionDto(nextCursor, practice), nextCursor, events)
+    return this.#result('evaluation', { questionId, attemptId, reviewReady, ...added.evaluation }, nextCursor, events)
   }
 
   async saveExplanation(sessionId, input) {
@@ -170,7 +160,7 @@ export class InterviewApplication {
     assertDomain(questionId === cursor.questionId, 'QUESTION_NOT_FOCUSED', '只能保存当前题目的讲解')
     const added = addExplanation(practice, { ...input, questionId, now })
     const nextCursor = markExplanationSaved(cursor, now)
-    const events = [{ type: 'explanation.saved', sessionId, practiceId: practice.id, questionId }]
+    const events = [{ type: 'review.completed', sessionId, practiceId: practice.id, questionId, attemptId: cursor.attemptId }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
     return this.#result('explanation', { questionId, ...added.explanation }, nextCursor, events)

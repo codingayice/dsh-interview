@@ -116,9 +116,9 @@ const tools = [
     payload: (args) => ({ answer: args.answer, questionId: args.question_id }),
   }),
   atomicTool({
-    name: 'interview_present_evaluation',
-    action: INTERVIEW_ACTIONS.PRESENT_EVALUATION,
-    description: '保存并通过 UI 展示对当前回答的结构化评价。必须先完成评分和反馈，再调用本工具。',
+    name: 'interview_save_evaluation',
+    action: INTERVIEW_ACTIONS.SAVE_EVALUATION,
+    description: '保存当前回答的结构化评价。若 nextAction=generate_explanation，必须继续读取练习上下文并调用 interview_complete_review，不得在评价后停止。',
     parameters: {
       type: 'object',
       properties: {
@@ -133,19 +133,18 @@ const tools = [
     },
     payload: (args) => ({ score: args.score, feedback: args.feedback, dimensions: args.dimensions, questionId: args.question_id, attemptId: args.attempt_id }),
   }),
-  atomicTool({ name: 'interview_request_explanation', action: INTERVIEW_ACTIONS.REQUEST_EXPLANATION, description: '记录用户明确请求当前题讲解。成功后必须按 nextAction 生成完整讲解。' }),
   atomicTool({
-    name: 'interview_present_explanation',
-    action: INTERVIEW_ACTIONS.PRESENT_EXPLANATION,
-    description: '保存并通过 UI 展示已经生成完成的参考讲解。',
+    name: 'interview_complete_review',
+    action: INTERVIEW_ACTIONS.COMPLETE_REVIEW,
+    description: '保存完整参考讲解和直接背要点，并通过 UI 展示包含评价、讲解和背诵要点的本题复盘。',
     parameters: {
       type: 'object',
       properties: {
         detail: { type: 'string', minLength: 1, description: '完整参考讲解。' },
-        memorization_points: { type: 'string' },
+        memorization_points: { type: 'string', minLength: 1, description: '可直接复述的精炼背诵要点。' },
         question_id: { type: 'string', minLength: 1 },
       },
-      required: ['detail'],
+      required: ['detail', 'memorization_points'],
       additionalProperties: false,
     },
     payload: (args) => ({ detail: args.detail, memorizationPoints: args.memorization_points, questionId: args.question_id }),

@@ -31,11 +31,13 @@ function descriptor(action, result) {
     case INTERVIEW_ACTIONS.SELECT_PRACTICE:
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: {
       const needsQuestion = data.phase === 'awaiting_question'
+      const needsExplanation = data.phase === 'generating_explanation'
+      const generating = needsQuestion || needsExplanation
       return {
         state: data.phase,
-        nextAction: needsQuestion ? 'generate_question' : 'wait_for_user',
-        presentation: needsQuestion ? null : { kind: 'live-session' },
-        assistantResponse: needsQuestion ? continueSilently() : exact('练习已切换，请继续作答。'),
+        nextAction: needsQuestion ? 'generate_question' : needsExplanation ? 'generate_explanation' : 'wait_for_user',
+        presentation: generating ? null : { kind: 'live-session' },
+        assistantResponse: generating ? continueSilently() : exact('练习已切换，请继续作答。'),
         context: data,
       }
     }
@@ -55,27 +57,29 @@ function descriptor(action, result) {
         assistantResponse: continueSilently(),
         context: { ...referencesOf(result, 'practiceId', 'questionId', 'attemptId'), answer: data.answer },
       }
-    case INTERVIEW_ACTIONS.PRESENT_EVALUATION:
-      return {
-        state: 'ready_for_explanation',
-        nextAction: 'wait_for_user',
-        presentation: { kind: 'evaluation', ...referencesOf(result, 'practiceId', 'questionId', 'attemptId') },
-        assistantResponse: exact('评价已完成，请查看卡片。你可以查看讲解、重新作答或进入下一题。'),
-      }
-    case INTERVIEW_ACTIONS.REQUEST_EXPLANATION:
-      return {
-        state: 'generating_explanation',
-        nextAction: 'generate_explanation',
-        presentation: null,
-        assistantResponse: continueSilently(),
-        context: referencesOf(result, 'practiceId', 'questionId'),
-      }
-    case INTERVIEW_ACTIONS.PRESENT_EXPLANATION:
+    case INTERVIEW_ACTIONS.SAVE_EVALUATION: {
+      const references = referencesOf(result, 'practiceId', 'questionId', 'attemptId')
+      return result.resource.data.reviewReady
+        ? {
+            state: 'awaiting_next',
+            nextAction: 'wait_for_user',
+            presentation: { kind: 'review', ...references },
+            assistantResponse: exact('本题复盘已生成，请查看卡片。'),
+          }
+        : {
+            state: 'generating_explanation',
+            nextAction: 'generate_explanation',
+            presentation: null,
+            assistantResponse: continueSilently(),
+            context: references,
+          }
+    }
+    case INTERVIEW_ACTIONS.COMPLETE_REVIEW:
       return {
         state: 'awaiting_next',
         nextAction: 'wait_for_user',
-        presentation: { kind: 'explanation', ...referencesOf(result, 'practiceId', 'questionId') },
-        assistantResponse: exact('讲解已生成，请查看卡片。'),
+        presentation: { kind: 'review', ...referencesOf(result, 'practiceId', 'questionId', 'attemptId') },
+        assistantResponse: exact('本题复盘已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:
       return { state: 'awaiting_question', nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }

@@ -38,15 +38,18 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.deepEqual(presentQuestion.parameters.required, ['prompt'])
   assert.equal(presentQuestion.parameters.properties.prompt.minLength, 1)
   assert.equal(presentQuestion.parameters.additionalProperties, false)
+  assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
+  assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
 })
 
-test('原子工具驱动开始、出题、回答和评价流程', async () => {
+test('原子工具驱动开始、出题、回答和完整复盘流程', async () => {
   const fixture = toolFixture()
   const { tools } = fixture
   const started = await tools.interview_start_practice.execute({ mode: 'mock', topic: 'Java', target_question_count: 3 }, exec())
   const question = await tools.interview_present_question.execute({ prompt: '什么是 JMM？' }, exec())
   const attempt = await tools.interview_submit_answer.execute({ answer: 'Java 内存模型。' }, exec())
-  const evaluation = await tools.interview_present_evaluation.execute({ score: 8, feedback: '正确。' }, exec())
+  const evaluation = await tools.interview_save_evaluation.execute({ score: 8, feedback: '正确。' }, exec())
+  const review = await tools.interview_complete_review.execute({ detail: 'JMM 定义线程间可见性与有序性规则。', memorization_points: '原子性、可见性、有序性。' }, exec())
   const context = await tools.interview_read_practice_context.execute({ practice_id: started.resource.data.practice.id }, exec())
 
   assert.equal(started.nextAction, 'generate_question')
@@ -54,16 +57,18 @@ test('原子工具驱动开始、出题、回答和评价流程', async () => {
   assert.equal(question.presentation.practiceId, started.resource.data.practice.id)
   assert.equal(question.presentation.questionId, question.resource.data.id)
   assert.equal(attempt.nextAction, 'evaluate_answer')
-  assert.equal(evaluation.presentation.kind, 'evaluation')
-  assert.equal(evaluation.presentation.practiceId, started.resource.data.practice.id)
-  assert.equal(evaluation.presentation.questionId, question.resource.data.id)
-  assert.equal(evaluation.presentation.attemptId, attempt.resource.data.id)
+  assert.equal(evaluation.presentation, null)
+  assert.equal(evaluation.nextAction, 'generate_explanation')
+  assert.equal(review.presentation.kind, 'review')
+  assert.equal(review.presentation.practiceId, started.resource.data.practice.id)
+  assert.equal(review.presentation.questionId, question.resource.data.id)
+  assert.equal(review.presentation.attemptId, attempt.resource.data.id)
   assert.equal(context.presentation, null)
   assert.equal(context.assistantResponse.mode, 'continue')
   assert.match(modelText(context)[0].text, /什么是 JMM/)
   assert.match(modelText(question)[0].text, /"text": "已出题，请开始作答。"/)
   assert.doesNotMatch(modelText(question)[0].text, /什么是 JMM/)
-  assert.match(tools.interview_present_evaluation.output.render({}, evaluation)[0].text, /最终回复必须且只能是/)
+  assert.match(tools.interview_complete_review.output.render({}, review)[0].text, /最终回复必须且只能是/)
 })
 
 test('空题目被归类为 Agent 可恢复协议错误而不生成 UI', async () => {
@@ -90,7 +95,6 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   const question = instructionFor({ type: 'question.generation_requested', practiceId: 'p1', reason: 'next_requested' })
   assert.match(question, /interview_present_question/)
   assert.match(question, /非空完整题目作为 prompt/)
-  assert.match(instructionFor({ type: 'explanation.generation_requested', practiceId: 'p1', questionId: 'q1' }), /interview_read_practice_context/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 
