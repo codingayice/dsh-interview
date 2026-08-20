@@ -1,10 +1,9 @@
 import React from 'react'
 import {
   CompactResultCard,
-  EvaluationResourceCard,
-  ExplanationResourceCard,
   LiveInterviewCard,
   QuestionResourceCard,
+  ReviewResourceCard,
   ToolErrorCard,
 } from './features/live-interview.js'
 import { InsightsCard, PracticeLibrary } from './features/practice-library.js'
@@ -31,8 +30,7 @@ function ToolResourceView({ toolName, sessionId, block }) {
   switch (view.kind) {
     case 'error': return h(ToolErrorCard, { message: view.message })
     case 'question': return h(QuestionResourceCard, { presentation: view, revision: view.revision })
-    case 'evaluation': return h(EvaluationResourceCard, { presentation: view, revision: view.revision })
-    case 'explanation': return h(ExplanationResourceCard, { presentation: view, revision: view.revision })
+    case 'review': return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId })
     case 'library': return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId })
     case 'insights': return h(InsightsCard)
     case 'deleted': return h(CompactResultCard, { title: '练习已删除', detail: '档案和对应会话游标已经清理。', tone: 'completed' })

@@ -8,7 +8,7 @@ dsh-interview 是面向 DeepSeek Harness Web 的本地 AI 面试训练工作区�
 ## 功能
 
 - 四种练习模式：背八股、模拟面试、场景题和简历出题。
-- 显式面试流程：出题、回答、评价、讲解、下一题和结束。
+- 显式面试流程：出题、回答、自动生成完整复盘、下一题和结束。
 - 历次作答永久保留，重新回答不会覆盖已评价记录。
 - 练习档案支持搜索、筛选、详情、继续、重新打开、删除和导出。
 - 能力复盘提供平均分、主题掌握度和薄弱主题。
@@ -49,28 +49,29 @@ dsh plugin --profile web update dsh-interview
 
 创建后，Agent 会生成第一题并在聊天流中展示题目卡片。
 
-### 回答和评价
+### 回答和完整复盘
 
-直接在正常聊天输入框回答。Agent 会依次保存回答并生成结构化评价：
+直接在正常聊天输入框回答。Agent 会保存回答，并自动完成一份结构化本题复盘：
 
 - 0–10 分总分
 - 文字反馈
 - 可选的准确性、完整性、分析深度和表达结构等维度分
+- 完整参考讲解
+- 必填的“直接背”要点
 
 同一道题可以重新回答。每次回答都是独立记录，适合比较进步。
 
-### 讲解和下一题
+### 复盘后的操作
 
-评价完成后，可以点击卡片按钮或直接说：
+完整复盘卡片生成后，可以直接点击卡片按钮或使用自然语言：
 
 ```text
-看讲解
 下一题
 重新回答这道题
 结束练习
 ```
 
-讲解只在明确请求后生成，包含完整说明和“直接背”要点。
+评价是内部中间结果，不单独生成半成品卡片。参考讲解和“直接背”保存完成后，题目、作答、评价与讲解会统一展示。
 
 ### 练习档案和复盘
 
@@ -109,11 +110,10 @@ dsh plugin --profile web update dsh-interview
 | --- | --- |
 | 练习生命周期 | `interview_start_practice`、`interview_get_status`、`interview_select_practice`、`interview_reopen_practice`、`interview_finish_practice` |
 | 题目流程 | `interview_present_question`、`interview_open_question`、`interview_request_next`、`interview_retry_question` |
-| 回答与评价 | `interview_submit_answer`、`interview_present_evaluation` |
-| 讲解流程 | `interview_request_explanation`、`interview_present_explanation` |
+| 回答与复盘 | `interview_submit_answer`、`interview_save_evaluation`、`interview_complete_review` |
 | 档案与复盘 | `interview_list_practices`、`interview_read_practice_context`、`interview_get_practice`、`interview_get_insights`、`interview_export_practices`、`interview_delete_practice` |
 
-工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。题目、回答、评价和讲解的正文参数均设置 `minLength` 与 `required`，无效的 Agent 调用不会进入领域写入。
+工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。评价保存后必须继续完成复盘；参考讲解和“直接背”均由 Schema 设置为非空必填，无效调用不会进入领域写入。
 
 UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具先进入同一个 `InterviewCoordinator`，再调用 `InterviewApplication`。
 

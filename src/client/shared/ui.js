@@ -46,9 +46,8 @@ export function PhaseBadge({ phase }) {
     awaiting_question: '准备出题',
     awaiting_answer: '等待回答',
     awaiting_evaluation: '正在评价',
-    ready_for_explanation: '可查看讲解',
-    generating_explanation: '正在生成讲解',
-    awaiting_next: '本题完成',
+    generating_explanation: '正在生成完整复盘',
+    awaiting_next: '复盘完成',
     completed: '练习已结束',
     idle: '未选择练习',
   }

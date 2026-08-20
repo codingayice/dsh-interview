@@ -42,7 +42,7 @@ Adapter Input
 
 ## UI 同步
 
-UI 使用统一 API Client 和查询缓存。工具卡片只读取结构化 `presentation` 中的资源 ID，再通过读接口获取题目、评价和讲解；不解析面向 Agent 的文本，也不从工具参数重建业务数据。
+UI 使用统一 API Client 和查询缓存。工具卡片只读取结构化 `presentation` 中的资源 ID，再通过读接口获取题目、作答、评价和讲解；不解析面向 Agent 的文本，也不从工具参数重建业务数据。评价是内部中间状态，只有讲解和“直接背”保存完成后才生成统一的 `review` 展示资源。
 
 ## 交互协议
 
@@ -57,3 +57,14 @@ error.audience    agent / user / system 错误受众
 ```
 
 Agent 协议错误是可恢复的中间结果，不产生 UI；用户操作错误和系统错误才进入用户可见错误通道。
+
+回答提交后的工具链固定为：
+
+```text
+interview_submit_answer
+→ interview_save_evaluation
+→ interview_complete_review
+→ presentation.kind = review
+```
+
+若重新作答的题目已经存在参考讲解，保存新评价后直接复用该讲解生成复盘卡片。

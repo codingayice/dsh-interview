@@ -69,6 +69,14 @@ test('工具视图只按结构化 presentation 渲染用户可见卡片', () => 
     kind: 'question', practiceId: 'p1', questionId: 'q1', revision: 2, toolName: 'interview_present_question',
   })
 
+  const review = plugin.resolveToolView('interview_complete_review', settled({
+    revision: 5,
+    presentation: { kind: 'review', practiceId: 'p1', questionId: 'q1', attemptId: 'a1' },
+  }))
+  assert.deepEqual(JSON.parse(JSON.stringify(review)), {
+    kind: 'review', practiceId: 'p1', questionId: 'q1', attemptId: 'a1', revision: 5, toolName: 'interview_complete_review',
+  })
+
   const recoverable = plugin.resolveToolView('interview_present_question', settled({
     revision: 0,
     presentation: null,

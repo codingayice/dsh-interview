@@ -172,9 +172,8 @@ function PhaseBadge({ phase }) {
     awaiting_question: "\u51C6\u5907\u51FA\u9898",
     awaiting_answer: "\u7B49\u5F85\u56DE\u7B54",
     awaiting_evaluation: "\u6B63\u5728\u8BC4\u4EF7",
-    ready_for_explanation: "\u53EF\u67E5\u770B\u8BB2\u89E3",
-    generating_explanation: "\u6B63\u5728\u751F\u6210\u8BB2\u89E3",
-    awaiting_next: "\u672C\u9898\u5B8C\u6210",
+    generating_explanation: "\u6B63\u5728\u751F\u6210\u5B8C\u6574\u590D\u76D8",
+    awaiting_next: "\u590D\u76D8\u5B8C\u6210",
     completed: "\u7EC3\u4E60\u5DF2\u7ED3\u675F",
     idle: "\u672A\u9009\u62E9\u7EC3\u4E60"
   };
@@ -281,9 +280,8 @@ function LiveInterviewCard({ sessionId }) {
       h(
         "div",
         { className: "di-actions" },
-        session.phase === "ready_for_explanation" ? h(Button, { tone: "primary", busy: command.busy === "question.request_explanation", onClick: () => run("question.request_explanation") }, "\u67E5\u770B\u8BB2\u89E3") : null,
-        session.phase === "awaiting_next" || session.phase === "ready_for_explanation" ? h(Button, { tone: session.phase === "awaiting_next" ? "primary" : "quiet", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898") : null,
-        question && ["ready_for_explanation", "awaiting_next"].includes(session.phase) ? h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
+        session.phase === "awaiting_next" ? h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898") : null,
+        question && session.phase === "awaiting_next" ? h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
         session.phase !== "completed" ? h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
       )
     )
@@ -325,42 +323,50 @@ function QuestionResultCard({ question }) {
     )
   );
 }
-function EvaluationResultCard({ evaluation }) {
-  if (!evaluation) return null;
+function ReviewResultCard({ sessionId, question, attempt }) {
+  if (!question || !attempt?.evaluation || !question.explanation) return null;
+  const command = useCommand(sessionId);
+  const run = (name2, payload) => command.run(name2, payload).catch(() => {
+  });
   return h(
     "article",
-    { className: "di-card", "aria-label": "\u56DE\u7B54\u8BC4\u4EF7" },
+    { className: "di-card", "aria-label": "\u672C\u9898\u590D\u76D8" },
     h(
       "header",
       { className: "di-card-head" },
-      h("div", null, h("div", { className: "di-eyebrow" }, "ANSWER REVIEW"), h("div", { className: "di-title" }, "\u672C\u9898\u8BC4\u4EF7")),
-      h(PhaseBadge, { phase: "ready_for_explanation" })
-    ),
-    h(
-      "div",
-      { className: "di-card-body" },
-      h("div", { className: "di-score-row" }, h("span", { className: "di-score-number" }, evaluation.score), h(ScoreRail, { score: evaluation.score })),
-      evaluation.feedback ? h("div", { className: "di-section" }, h(Markdown, null, evaluation.feedback)) : null,
-      Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-attempt" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("div", { className: "di-attempt-head", key: name2 }, h("span", null, name2), h("strong", null, `${score}/10`)))) : null
-    )
-  );
-}
-function ExplanationResultCard({ explanation }) {
-  if (!explanation) return null;
-  return h(
-    "article",
-    { className: "di-card", "aria-label": "\u53C2\u8003\u8BB2\u89E3" },
-    h(
-      "header",
-      { className: "di-card-head" },
-      h("div", null, h("div", { className: "di-eyebrow" }, "REFERENCE NOTES"), h("div", { className: "di-title" }, "\u53C2\u8003\u8BB2\u89E3")),
+      h(
+        "div",
+        null,
+        h("div", { className: "di-eyebrow" }, `QUESTION REVIEW \xB7 Q${String(question.sequence || 0).padStart(2, "0")}`),
+        h("div", { className: "di-title" }, "\u672C\u9898\u5B8C\u6574\u590D\u76D8")
+      ),
       h(PhaseBadge, { phase: "awaiting_next" })
     ),
     h(
       "div",
       { className: "di-card-body" },
-      h(Markdown, null, explanation.detail),
-      explanation.memorizationPoints ? h("div", { className: "di-attempt" }, h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"), h(Markdown, null, explanation.memorizationPoints)) : null
+      h(
+        "div",
+        { className: "di-section" },
+        h("div", { className: "di-section-label" }, "\u9898\u76EE"),
+        h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt))
+      ),
+      h(
+        "div",
+        { className: "di-attempt" },
+        h("div", { className: "di-section-label" }, `\u7B2C ${attempt.sequence} \u6B21\u4F5C\u7B54`),
+        h(Markdown, null, attempt.answer)
+      ),
+      h(Evaluation, { attempt }),
+      h(Explanation, { explanation: question.explanation }),
+      h(ErrorNotice, null, command.error),
+      h(
+        "div",
+        { className: "di-actions" },
+        h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
+        h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54"),
+        h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+      )
     )
   );
 }
@@ -392,18 +398,13 @@ function QuestionResourceCard({ presentation, revision }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? h(QuestionResultCard, { question }) : null);
 }
-function EvaluationResourceCard({ presentation, revision }) {
+function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   const attempt = question?.attempts?.find((item) => item.id === presentation.attemptId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BC4\u4EF7\u5361\u7247\u6570\u636E" }, attempt?.evaluation ? h(EvaluationResultCard, { evaluation: attempt.evaluation }) : null);
-}
-function ExplanationResourceCard({ presentation, revision }) {
-  const query = usePresentedPractice(presentation, revision);
-  const practice = query.data?.resource?.data;
-  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u5361\u7247\u6570\u636E" }, question?.explanation ? h(ExplanationResultCard, { explanation: question.explanation }) : null);
+  const complete = attempt?.evaluation && question?.explanation;
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u5B8C\u6574\u590D\u76D8\u5361\u7247\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
 }
 
 // src/client/features/practice-library.js
@@ -625,9 +626,8 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_request_next",
   "interview_retry_question",
   "interview_submit_answer",
-  "interview_present_evaluation",
-  "interview_request_explanation",
-  "interview_present_explanation",
+  "interview_save_evaluation",
+  "interview_complete_review",
   "interview_list_practices",
   "interview_read_practice_context",
   "interview_get_practice",
@@ -642,7 +642,7 @@ var STYLE_TEXT = `
 .di-card,.di-ledger,.di-timeline{font-family:"Segoe UI","Microsoft YaHei",sans-serif;color:var(--color-text-primary,var(--di-ink));box-sizing:border-box}
 .di-card *,.di-ledger *,.di-timeline *{box-sizing:border-box}.di-preline{white-space:pre-wrap}.di-card{width:min(680px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden;box-shadow:0 8px 28px rgba(23,32,51,.08)}
 .di-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-eyebrow{font:600 11px/1.2 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.13em;text-transform:uppercase;color:var(--di-cobalt)}.di-title{font-size:16px;font-weight:680}.di-subtitle{margin-top:3px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-card-body{padding:18px}.di-question-text{font-size:16px;line-height:1.75}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.di-button{appearance:none;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 12px;background:var(--color-bg-primary,var(--di-white));color:inherit;font:600 13px/1 "Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--di-cobalt)}.di-button:focus-visible{outline:3px solid rgba(49,91,232,.25);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-cobalt);border-color:var(--di-cobalt);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:rgba(201,75,86,.4)}
-.di-phase{display:inline-flex;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:999px;padding:4px 8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--color-text-secondary,var(--di-muted));white-space:nowrap}.di-phase-awaiting_answer{border-color:rgba(49,91,232,.45);color:var(--di-cobalt)}.di-phase-ready_for_explanation,.di-phase-generating_explanation{border-color:rgba(216,147,43,.5);color:var(--di-amber)}.di-phase-awaiting_next{border-color:rgba(46,139,114,.45);color:var(--di-green)}.di-phase-completed{border-color:rgba(102,112,133,.35)}
+.di-phase{display:inline-flex;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:999px;padding:4px 8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--color-text-secondary,var(--di-muted));white-space:nowrap}.di-phase-awaiting_answer{border-color:rgba(49,91,232,.45);color:var(--di-cobalt)}.di-phase-generating_explanation{border-color:rgba(216,147,43,.5);color:var(--di-amber)}.di-phase-awaiting_next{border-color:rgba(46,139,114,.45);color:var(--di-green)}.di-phase-completed{border-color:rgba(102,112,133,.35)}
 .di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font:700 26px/1 Bahnschrift,"Segoe UI",sans-serif}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,9px);gap:3px}.di-score-rail i{display:block;height:16px;border-radius:2px;background:var(--color-bg-tertiary,#e8ebf2)}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:10px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
 .di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border-secondary,var(--di-line))}.di-section-label{margin-bottom:8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-secondary,var(--di-muted))}.di-attempt{margin-top:12px;padding:12px;border-left:3px solid var(--di-cobalt);background:var(--color-bg-secondary,var(--di-paper));border-radius:0 6px 6px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--color-text-secondary,var(--di-muted))}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-cobalt);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 0;padding:10px 12px;border-radius:6px;background:rgba(49,91,232,.08);font-size:13px}.di-notice.is-error{background:rgba(201,75,86,.1);color:var(--di-red)}
@@ -681,10 +681,8 @@ function ToolResourceView({ toolName, sessionId, block }) {
       return h(ToolErrorCard, { message: view.message });
     case "question":
       return h(QuestionResourceCard, { presentation: view, revision: view.revision });
-    case "evaluation":
-      return h(EvaluationResourceCard, { presentation: view, revision: view.revision });
-    case "explanation":
-      return h(ExplanationResourceCard, { presentation: view, revision: view.revision });
+    case "review":
+      return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId });
     case "library":
       return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId });
     case "insights":
