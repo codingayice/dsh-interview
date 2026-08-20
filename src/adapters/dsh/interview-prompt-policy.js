@@ -16,3 +16,13 @@ export const QUESTION_GENERATION_POLICY = [
   '必须严格遵循练习中已经保存的模式专属配置；模拟面试必须遵循简历、面试官风格、是否手撕代码和难度。',
   '练习开始后禁止重新询问或自行修改配置。',
 ].join('')
+
+export const CONTINUE_PRACTICE_POLICY = [
+  '继续规则：仅当用户明确表达继续、接着练或恢复当前练习时调用。切换练习不等于继续练习。',
+  '必须严格执行工具返回的 nextAction，不得自行猜测恢复阶段。',
+  'nextAction=generate_question 时先调用 interview_read_practice_context，再生成一道题并调用 interview_present_question。',
+  'nextAction=evaluate_answer 时读取完整上下文，对返回的当前原始回答生成评价并调用 interview_save_evaluation，随后继续完成讲解。',
+  'nextAction=generate_explanation 时读取完整上下文，生成详细讲解和直接背并调用 interview_complete_review。',
+  'nextAction=generate_summary 时读取完整上下文，生成总结并调用 interview_complete_summary。',
+  'nextAction=select_practice、show_current_question 或 confirm_reopen 时遵守 assistantResponse 立即停止，不得继续生成内容。',
+].join('')

@@ -52,6 +52,8 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_start_practice.description, /第一步只确认模式/)
   assert.match(fixture.tools.interview_start_practice.description, /简历、面试官风格、是否手撕代码、面试难度/)
   assert.match(fixture.tools.interview_start_practice.description, /不得询问题数、是否追问/)
+  assert.match(fixture.tools.interview_continue_practice.description, /不把“继续”简单等同于“下一题”/)
+  assert.match(fixture.tools.interview_continue_practice.description, /必须严格执行工具返回的 nextAction/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
   assert.deepEqual(fixture.tools.interview_complete_summary.parameters.required, ['overall', 'strengths', 'improvements'])
@@ -84,6 +86,29 @@ test('原子工具驱动开始、出题、回答和完整复盘流程', async ()
   assert.match(modelText(question)[0].text, /"text": "已出题，请开始作答。"/)
   assert.doesNotMatch(modelText(question)[0].text, /什么是 JMM/)
   assert.match(tools.interview_complete_review.output.render({}, review)[0].text, /最终回复必须且只能是/)
+})
+
+test('继续工具按阶段恢复并向模型返回确定的下一动作', async () => {
+  const fixture = toolFixture()
+  const idle = await fixture.tools.interview_continue_practice.execute({}, exec('idle-session'))
+  assert.equal(idle.nextAction, 'select_practice')
+  assert.equal(idle.presentation.kind, 'library')
+
+  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec('continue-session'))
+  const generating = await fixture.tools.interview_continue_practice.execute({}, exec('continue-session'))
+  assert.equal(generating.nextAction, 'generate_question')
+  assert.equal(generating.assistantResponse.mode, 'continue')
+
+  await fixture.tools.interview_present_question.execute({ prompt: '什么是类加载器？' }, exec('continue-session'))
+  const answering = await fixture.tools.interview_continue_practice.execute({}, exec('continue-session'))
+  assert.equal(answering.nextAction, 'wait_for_user')
+  assert.equal(answering.presentation.kind, 'question')
+  assert.equal(answering.assistantResponse.text, '已恢复当前题，请继续作答。')
+
+  await fixture.tools.interview_submit_answer.execute({ answer: '负责加载类。' }, exec('continue-session'))
+  const evaluating = await fixture.tools.interview_continue_practice.execute({}, exec('continue-session'))
+  assert.equal(evaluating.nextAction, 'evaluate_answer')
+  assert.equal(evaluating.context.answer, '负责加载类。')
 })
 
 test('空题目被归类为 Agent 可恢复协议错误而不生成 UI', async () => {
@@ -125,6 +150,8 @@ test('UI 命令分发与 Agent 工具复用同一个协调器', async () => {
   await dispatchCommand(fixture.coordinator, 'session-1', 'session.start', {
     mode: 'bagu', config: { topic: 'JVM' },
   })
+  const continued = await dispatchCommand(fixture.coordinator, 'session-1', 'session.continue')
+  assert.equal(continued.nextAction, 'generate_question')
   const question = await fixture.application.askQuestion('session-1', { prompt: '类加载过程？' })
   const result = await dispatchCommand(fixture.coordinator, 'session-1', 'question.open', { questionId: question.resource.data.id })
   assert.equal(result.presentation.kind, 'question')
@@ -145,6 +172,12 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   const summary = instructionFor({ type: 'practice.summary_requested', practiceId: 'p1' })
   assert.match(summary, /全部历次作答、评价和讲解/)
   assert.match(summary, /interview_complete_summary/)
+  const evaluation = instructionFor({ type: 'answer.evaluation_requested', practiceId: 'p1', questionId: 'q1', attemptId: 'a1' })
+  assert.match(evaluation, /interview_save_evaluation/)
+  assert.match(evaluation, /不得创建新作答或新题/)
+  const review = instructionFor({ type: 'review.generation_requested', practiceId: 'p1', questionId: 'q1' })
+  assert.match(review, /interview_complete_review/)
+  assert.match(review, /不得重复评价/)
   const selected = instructionFor({ type: 'practice.selected', practiceId: 'p1', phase: 'awaiting_answer' })
   assert.match(selected, /interview_select_practice/)
   assert.match(selected, /完成确认后停止/)

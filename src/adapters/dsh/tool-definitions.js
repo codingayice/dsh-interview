@@ -2,7 +2,7 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 import { toAgentInteractionResult } from '../../application/interaction-result.js'
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
 import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'
-import { PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
+import { CONTINUE_PRACTICE_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
 
 const emptyParameters = Object.freeze({ type: 'object', properties: {}, additionalProperties: false })
 
@@ -96,6 +96,10 @@ const tools = [
     payload: practiceConfigurationPayload,
   }),
   atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
+  atomicTool({
+    name: 'interview_continue_practice', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE,
+    description: `从当前权威阶段恢复练习，不把“继续”简单等同于“下一题”。${CONTINUE_PRACTICE_POLICY}`,
+  }),
   atomicTool({
     name: 'interview_select_practice', action: INTERVIEW_ACTIONS.SELECT_PRACTICE, description: '把当前会话切换到指定练习。返回上下文包含该练习配置、总结、全部题目、历次作答、评价和讲解；最终只确认已切换到当前练习，不继续执行其他动作。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),

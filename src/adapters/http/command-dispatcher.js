@@ -2,6 +2,7 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 
 const UI_ACTIONS = Object.freeze({
   'session.start': INTERVIEW_ACTIONS.START_PRACTICE,
+  'session.continue': INTERVIEW_ACTIONS.CONTINUE_PRACTICE,
   'practice.update': INTERVIEW_ACTIONS.UPDATE_PRACTICE,
   'session.select': INTERVIEW_ACTIONS.SELECT_PRACTICE,
   'session.finish': INTERVIEW_ACTIONS.REQUEST_FINISH,

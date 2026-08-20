@@ -63,6 +63,38 @@ test('UI 入口由协调器统一派发后续生成事件', async () => {
   assert.equal(dispatched.at(-1).type, 'practice.selected')
 })
 
+test('UI 继续命令按当前阶段派发对应恢复事件', async () => {
+  const fixture = applicationFixture()
+  const dispatched = []
+  const coordinator = new InterviewCoordinator({
+    application: fixture.application,
+    eventBridge: { dispatch(events) { dispatched.push(...events) } },
+  })
+  await coordinator.execute({
+    sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.START_PRACTICE,
+    payload: { mode: 'bagu', config: { topic: '并发编程' } }, source: 'agent',
+  })
+  const questionResume = await coordinator.execute({
+    sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE, source: 'ui',
+  })
+  assert.equal(questionResume.nextAction, 'generate_question')
+  assert.equal(dispatched.at(-1).type, 'question.generation_requested')
+
+  await coordinator.execute({
+    sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.PRESENT_QUESTION,
+    payload: { prompt: '什么是可见性？' }, source: 'agent',
+  })
+  await coordinator.execute({
+    sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.SUBMIT_ANSWER,
+    payload: { answer: '一个线程能看到另一个线程的修改。' }, source: 'agent',
+  })
+  const evaluationResume = await coordinator.execute({
+    sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE, source: 'ui',
+  })
+  assert.equal(evaluationResume.nextAction, 'evaluate_answer')
+  assert.equal(dispatched.at(-1).type, 'answer.evaluation_requested')
+})
+
 test('选择练习向模型提供完整上下文并只返回切换确认', async () => {
   const fixture = applicationFixture()
   const coordinator = new InterviewCoordinator({ application: fixture.application })

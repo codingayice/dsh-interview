@@ -2,6 +2,7 @@ export const INTERVIEW_ACTIONS = Object.freeze({
   START_PRACTICE: 'practice.start',
   UPDATE_PRACTICE: 'practice.update',
   GET_STATUS: 'session.status',
+  CONTINUE_PRACTICE: 'practice.continue',
   SELECT_PRACTICE: 'practice.select',
   REOPEN_PRACTICE: 'practice.reopen',
   REQUEST_FINISH: 'practice.request_finish',

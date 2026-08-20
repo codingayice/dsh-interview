@@ -41,6 +41,48 @@ function descriptor(action, result) {
         context: data,
       }
     }
+    case INTERVIEW_ACTIONS.CONTINUE_PRACTICE: {
+      const nextAction = data.resumeAction
+      if (nextAction === 'select_practice') {
+        return {
+          state: 'idle',
+          nextAction,
+          presentation: { kind: 'library' },
+          assistantResponse: exact('当前没有选中的练习，请先选择一条练习。'),
+        }
+      }
+      if (nextAction === 'show_current_question') {
+        return {
+          state: data.phase,
+          nextAction: 'wait_for_user',
+          presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
+          assistantResponse: exact('已恢复当前题，请继续作答。'),
+        }
+      }
+      if (nextAction === 'confirm_reopen') {
+        return {
+          state: data.phase,
+          nextAction,
+          presentation: { kind: 'live-session' },
+          assistantResponse: exact('当前练习已结束，如需继续请先确认重新打开。'),
+          context: referencesOf(result, 'practiceId'),
+        }
+      }
+      const context = nextAction === 'evaluate_answer'
+        ? { ...referencesOf(result, 'practiceId', 'questionId', 'attemptId'), answer: data.attempt.answer }
+        : {
+            ...optionalReference(result, 'practiceId'),
+            ...optionalReference(result, 'questionId'),
+            ...optionalReference(result, 'attemptId'),
+          }
+      return {
+        state: data.phase,
+        nextAction,
+        presentation: null,
+        assistantResponse: continueSilently(),
+        context,
+      }
+    }
     case INTERVIEW_ACTIONS.SELECT_PRACTICE:
       return {
         state: data.phase,
