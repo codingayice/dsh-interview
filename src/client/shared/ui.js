@@ -70,6 +70,7 @@ export function toolErrorAudience(block) {
 export function PhaseBadge({ phase }) {
   const labels = {
     awaiting_question: '准备出题',
+    awaiting_solution: '刷题中',
     awaiting_answer: '等待回答',
     awaiting_evaluation: '正在评价',
     generating_explanation: '正在生成点评讲解',

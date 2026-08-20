@@ -2,6 +2,7 @@ import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, PhaseBadge, ScoreRail, StarRating } from '../shared/ui.js'
+import { LeetcodeProblemCard } from './leetcode.js'
 
 function Evaluation({ attempt }) {
   if (!attempt?.evaluation) return null
@@ -39,6 +40,7 @@ export function LiveInterviewCard({ sessionId }) {
   if (!session?.selected) return h('div', { className: 'di-card' }, h(Empty, { title: '还没有开始练习', detail: '用自然语言描述面试模式和主题即可开始。' }))
 
   const question = session.currentQuestion
+  if (question?.leetcode) return h(LeetcodeProblemCard, { sessionId, initialQuestion: question })
   const latestAttempt = question?.attempts?.at(-1) || null
   const run = (name, payload) => command.run(name, payload).catch(() => {})
 
@@ -156,7 +158,11 @@ export function QuestionResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision)
   const practice = query.data?.resource?.data
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
-  return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question ? h(QuestionResultCard, { sessionId, question }) : null)
+  return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question
+    ? question.leetcode
+      ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question })
+      : h(QuestionResultCard, { sessionId, question })
+    : null)
 }
 
 export function ReviewResourceCard({ presentation, revision, sessionId }) {

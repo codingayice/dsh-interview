@@ -1,0 +1,125 @@
+import React from 'react'
+import { interviewApi } from '../shared/api.js'
+import { useCommand, useInterviewQuery } from '../shared/hooks.js'
+import { Button, ErrorNotice, h, Loading } from '../shared/ui.js'
+
+const DIFFICULTY = Object.freeze({
+  easy: { label: '简单', tone: 'easy' },
+  medium: { label: '中等', tone: 'medium' },
+  hard: { label: '困难', tone: 'hard' },
+})
+
+function catalogProblem(catalog, slug) {
+  return catalog?.groups?.flatMap((group) => group.problems).find((problem) => problem.slug === slug) || null
+}
+
+function DifficultyBadge({ difficulty }) {
+  const value = DIFFICULTY[difficulty] || { label: difficulty, tone: 'unknown' }
+  return h('span', { className: `di-lc-difficulty is-${value.tone}` }, value.label)
+}
+
+function CompletionButton({ problem, pending, onToggle }) {
+  return h('button', {
+    type: 'button',
+    className: `di-lc-check${problem.completed ? ' is-complete' : ''}`,
+    disabled: pending,
+    'aria-pressed': problem.completed,
+    'aria-label': problem.completed ? `将${problem.title}标记为未完成` : `将${problem.title}标记为完成`,
+    onClick: () => onToggle(problem),
+  }, problem.completed ? '✓' : '')
+}
+
+export function LeetcodeCatalog({ sessionId = 'global' }) {
+  const query = useInterviewQuery('leetcode-catalog', () => interviewApi.leetcodeCatalog(), [], { cache: false })
+  const command = useCommand(sessionId)
+  const [pendingSlug, setPendingSlug] = React.useState('')
+  if (query.loading && !query.data) return h('div', { className: 'di-lc-catalog' }, h(Loading, { label: '正在读取力扣热题 100…' }))
+  if (query.error) return h('div', { className: 'di-lc-catalog' }, h(ErrorNotice, null, query.error))
+  const catalog = query.data?.resource?.data
+  if (!catalog) return null
+  const toggle = async (problem) => {
+    setPendingSlug(problem.slug)
+    try {
+      await command.run('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed })
+      await query.reload()
+    } catch {
+      // useCommand 已保存可展示错误。
+    } finally {
+      setPendingSlug('')
+    }
+  }
+  const progress = catalog.total ? Math.round((catalog.completedCount / catalog.total) * 100) : 0
+
+  return h('section', { className: 'di-lc-catalog', 'aria-label': '力扣热题 100 题目列表' },
+    h('header', { className: 'di-lc-catalog-head' },
+      h('div', null,
+        h('div', { className: 'di-eyebrow' }, 'LEETCODE STUDY PLAN'),
+        h('h2', { className: 'di-lc-title' }, '热题 100'),
+        h('a', { className: 'di-lc-source', href: catalog.source.url, target: '_blank', rel: 'noreferrer' }, '打开官方学习计划 ↗')),
+      h('div', { className: 'di-lc-progress-copy' },
+        h('strong', null, catalog.completedCount),
+        h('span', null, `/ ${catalog.total}`))),
+    h('div', { className: 'di-lc-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': catalog.total, 'aria-valuenow': catalog.completedCount },
+      h('i', { style: { width: `${progress}%` } })),
+    h(ErrorNotice, null, command.error),
+    h('div', { className: 'di-lc-groups' }, catalog.groups.map((group) => {
+      const completed = group.problems.filter((problem) => problem.completed).length
+      return h('section', { className: 'di-lc-group', key: group.category },
+        h('div', { className: 'di-lc-group-head' },
+          h('h3', null, group.category),
+          h('span', null, `${completed}/${group.problems.length}`)),
+        h('div', { className: 'di-lc-problems' }, group.problems.map((problem) => h('div', {
+          className: `di-lc-row${problem.completed ? ' is-complete' : ''}`,
+          key: problem.slug,
+        },
+        h(CompletionButton, { problem, pending: pendingSlug === problem.slug, onToggle: toggle }),
+        h('a', { className: 'di-lc-problem-link', href: problem.url, target: '_blank', rel: 'noreferrer' },
+          h('span', { className: 'di-lc-problem-id' }, problem.id),
+          h('span', null, problem.title),
+          h('span', { className: 'di-lc-open', 'aria-hidden': 'true' }, '↗')),
+        h(DifficultyBadge, { difficulty: problem.difficulty }))))
+      )
+    })))
+}
+
+export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
+  const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
+  const command = useCommand(sessionId)
+  const [showCatalog, setShowCatalog] = React.useState(false)
+  const session = sessionQuery.data?.resource?.data
+  const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion
+  const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null
+  const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null
+  if (sessionQuery.loading && !current) return h('div', { className: 'di-card' }, h(Loading))
+  if (!problem) return null
+  const run = async (name, payload) => {
+    try {
+      await command.run(name, payload)
+      await Promise.all([sessionQuery.reload(), catalogQuery.reload()])
+    } catch {
+      // useCommand 已保存可展示错误。
+    }
+  }
+
+  return h(React.Fragment, null,
+    h('article', { className: 'di-card di-lc-problem-card', 'aria-label': '当前力扣题目' },
+      h('div', { className: 'di-lc-problem-main' },
+        h('div', { className: 'di-eyebrow' }, `LEETCODE · ${problem.category}`),
+        h('div', { className: 'di-lc-problem-title' }, h('span', null, problem.id), problem.title),
+        h('div', { className: 'di-lc-problem-meta' },
+          h(DifficultyBadge, { difficulty: problem.difficulty }),
+          h('span', { className: problem.completed ? 'is-complete' : '' }, problem.completed ? '已完成' : '未完成'))),
+      h('div', { className: 'di-lc-problem-actions' },
+        h('a', { className: 'di-button is-primary', href: problem.url, target: '_blank', rel: 'noreferrer' }, '打开题目 ↗'),
+        h(Button, {
+          busy: command.busy === 'leetcode.set-completion',
+          onClick: () => run('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed }),
+        }, problem.completed ? '标记未完成' : '标记完成'),
+        h(Button, { busy: command.busy === 'question.next', onClick: () => run('question.next') }, '随机下一题'),
+        h(Button, { onClick: () => setShowCatalog((value) => !value) }, showCatalog ? '收起题目列表' : '查看题目列表'),
+        h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习')),
+      h(ErrorNotice, null, command.error)),
+    showCatalog ? h(LeetcodeCatalog, { sessionId }) : null)
+}
+

@@ -37,10 +37,10 @@ __export(index_exports, {
   resolveToolView: () => resolveToolView
 });
 module.exports = __toCommonJS(index_exports);
-var import_react6 = __toESM(require("react"), 1);
+var import_react7 = __toESM(require("react"), 1);
 
 // src/client/features/live-interview.js
-var import_react3 = __toESM(require("react"), 1);
+var import_react4 = __toESM(require("react"), 1);
 
 // src/client/shared/api.js
 var cache = /* @__PURE__ */ new Map();
@@ -206,6 +206,7 @@ function toolErrorAudience(block) {
 function PhaseBadge({ phase }) {
   const labels = {
     awaiting_question: "\u51C6\u5907\u51FA\u9898",
+    awaiting_solution: "\u5237\u9898\u4E2D",
     awaiting_answer: "\u7B49\u5F85\u56DE\u7B54",
     awaiting_evaluation: "\u6B63\u5728\u8BC4\u4EF7",
     generating_explanation: "\u6B63\u5728\u751F\u6210\u70B9\u8BC4\u8BB2\u89E3",
@@ -236,6 +237,160 @@ function Empty({ title, detail }) {
 }
 function Button({ children, tone = "quiet", busy = false, ...props }) {
   return h("button", { ...props, className: `di-button is-${tone}${props.className ? ` ${props.className}` : ""}`, disabled: props.disabled || busy }, busy ? "\u5904\u7406\u4E2D\u2026" : children);
+}
+
+// src/client/features/leetcode.js
+var import_react3 = __toESM(require("react"), 1);
+var DIFFICULTY = Object.freeze({
+  easy: { label: "\u7B80\u5355", tone: "easy" },
+  medium: { label: "\u4E2D\u7B49", tone: "medium" },
+  hard: { label: "\u56F0\u96BE", tone: "hard" }
+});
+function catalogProblem(catalog, slug) {
+  return catalog?.groups?.flatMap((group) => group.problems).find((problem) => problem.slug === slug) || null;
+}
+function DifficultyBadge({ difficulty }) {
+  const value = DIFFICULTY[difficulty] || { label: difficulty, tone: "unknown" };
+  return h("span", { className: `di-lc-difficulty is-${value.tone}` }, value.label);
+}
+function CompletionButton({ problem, pending, onToggle }) {
+  return h("button", {
+    type: "button",
+    className: `di-lc-check${problem.completed ? " is-complete" : ""}`,
+    disabled: pending,
+    "aria-pressed": problem.completed,
+    "aria-label": problem.completed ? `\u5C06${problem.title}\u6807\u8BB0\u4E3A\u672A\u5B8C\u6210` : `\u5C06${problem.title}\u6807\u8BB0\u4E3A\u5B8C\u6210`,
+    onClick: () => onToggle(problem)
+  }, problem.completed ? "\u2713" : "");
+}
+function LeetcodeCatalog({ sessionId = "global" }) {
+  const query = useInterviewQuery("leetcode-catalog", () => interviewApi.leetcodeCatalog(), [], { cache: false });
+  const command = useCommand(sessionId);
+  const [pendingSlug, setPendingSlug] = import_react3.default.useState("");
+  if (query.loading && !query.data) return h("div", { className: "di-lc-catalog" }, h(Loading, { label: "\u6B63\u5728\u8BFB\u53D6\u529B\u6263\u70ED\u9898 100\u2026" }));
+  if (query.error) return h("div", { className: "di-lc-catalog" }, h(ErrorNotice, null, query.error));
+  const catalog = query.data?.resource?.data;
+  if (!catalog) return null;
+  const toggle = async (problem) => {
+    setPendingSlug(problem.slug);
+    try {
+      await command.run("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed });
+      await query.reload();
+    } catch {
+    } finally {
+      setPendingSlug("");
+    }
+  };
+  const progress = catalog.total ? Math.round(catalog.completedCount / catalog.total * 100) : 0;
+  return h(
+    "section",
+    { className: "di-lc-catalog", "aria-label": "\u529B\u6263\u70ED\u9898 100 \u9898\u76EE\u5217\u8868" },
+    h(
+      "header",
+      { className: "di-lc-catalog-head" },
+      h(
+        "div",
+        null,
+        h("div", { className: "di-eyebrow" }, "LEETCODE STUDY PLAN"),
+        h("h2", { className: "di-lc-title" }, "\u70ED\u9898 100"),
+        h("a", { className: "di-lc-source", href: catalog.source.url, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u5B98\u65B9\u5B66\u4E60\u8BA1\u5212 \u2197")
+      ),
+      h(
+        "div",
+        { className: "di-lc-progress-copy" },
+        h("strong", null, catalog.completedCount),
+        h("span", null, `/ ${catalog.total}`)
+      )
+    ),
+    h(
+      "div",
+      { className: "di-lc-progress", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": catalog.total, "aria-valuenow": catalog.completedCount },
+      h("i", { style: { width: `${progress}%` } })
+    ),
+    h(ErrorNotice, null, command.error),
+    h("div", { className: "di-lc-groups" }, catalog.groups.map((group) => {
+      const completed = group.problems.filter((problem) => problem.completed).length;
+      return h(
+        "section",
+        { className: "di-lc-group", key: group.category },
+        h(
+          "div",
+          { className: "di-lc-group-head" },
+          h("h3", null, group.category),
+          h("span", null, `${completed}/${group.problems.length}`)
+        ),
+        h("div", { className: "di-lc-problems" }, group.problems.map((problem) => h(
+          "div",
+          {
+            className: `di-lc-row${problem.completed ? " is-complete" : ""}`,
+            key: problem.slug
+          },
+          h(CompletionButton, { problem, pending: pendingSlug === problem.slug, onToggle: toggle }),
+          h(
+            "a",
+            { className: "di-lc-problem-link", href: problem.url, target: "_blank", rel: "noreferrer" },
+            h("span", { className: "di-lc-problem-id" }, problem.id),
+            h("span", null, problem.title),
+            h("span", { className: "di-lc-open", "aria-hidden": "true" }, "\u2197")
+          ),
+          h(DifficultyBadge, { difficulty: problem.difficulty })
+        )))
+      );
+    }))
+  );
+}
+function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
+  const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
+  const command = useCommand(sessionId);
+  const [showCatalog, setShowCatalog] = import_react3.default.useState(false);
+  const session = sessionQuery.data?.resource?.data;
+  const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion;
+  const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null;
+  const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null;
+  if (sessionQuery.loading && !current) return h("div", { className: "di-card" }, h(Loading));
+  if (!problem) return null;
+  const run = async (name2, payload) => {
+    try {
+      await command.run(name2, payload);
+      await Promise.all([sessionQuery.reload(), catalogQuery.reload()]);
+    } catch {
+    }
+  };
+  return h(
+    import_react3.default.Fragment,
+    null,
+    h(
+      "article",
+      { className: "di-card di-lc-problem-card", "aria-label": "\u5F53\u524D\u529B\u6263\u9898\u76EE" },
+      h(
+        "div",
+        { className: "di-lc-problem-main" },
+        h("div", { className: "di-eyebrow" }, `LEETCODE \xB7 ${problem.category}`),
+        h("div", { className: "di-lc-problem-title" }, h("span", null, problem.id), problem.title),
+        h(
+          "div",
+          { className: "di-lc-problem-meta" },
+          h(DifficultyBadge, { difficulty: problem.difficulty }),
+          h("span", { className: problem.completed ? "is-complete" : "" }, problem.completed ? "\u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210")
+        )
+      ),
+      h(
+        "div",
+        { className: "di-lc-problem-actions" },
+        h("a", { className: "di-button is-primary", href: problem.url, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u9898\u76EE \u2197"),
+        h(Button, {
+          busy: command.busy === "leetcode.set-completion",
+          onClick: () => run("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
+        }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
+        h(Button, { busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
+        h(Button, { onClick: () => setShowCatalog((value) => !value) }, showCatalog ? "\u6536\u8D77\u9898\u76EE\u5217\u8868" : "\u67E5\u770B\u9898\u76EE\u5217\u8868"),
+        h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+      ),
+      h(ErrorNotice, null, command.error)
+    ),
+    showCatalog ? h(LeetcodeCatalog, { sessionId }) : null
+  );
 }
 
 // src/client/features/live-interview.js
@@ -279,6 +434,7 @@ function LiveInterviewCard({ sessionId }) {
   const session = query.data?.resource?.data;
   if (!session?.selected) return h("div", { className: "di-card" }, h(Empty, { title: "\u8FD8\u6CA1\u6709\u5F00\u59CB\u7EC3\u4E60", detail: "\u7528\u81EA\u7136\u8BED\u8A00\u63CF\u8FF0\u9762\u8BD5\u6A21\u5F0F\u548C\u4E3B\u9898\u5373\u53EF\u5F00\u59CB\u3002" }));
   const question = session.currentQuestion;
+  if (question?.leetcode) return h(LeetcodeProblemCard, { sessionId, initialQuestion: question });
   const latestAttempt = question?.attempts?.at(-1) || null;
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });
@@ -301,7 +457,7 @@ function LiveInterviewCard({ sessionId }) {
       "div",
       { className: "di-card-body" },
       question ? h(
-        import_react3.default.Fragment,
+        import_react4.default.Fragment,
         null,
         h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt)),
         latestAttempt ? h(
@@ -449,7 +605,7 @@ function QuestionResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? h(QuestionResultCard, { sessionId, question }) : null);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question }) : h(QuestionResultCard, { sessionId, question }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
@@ -499,19 +655,19 @@ function PracticeSummaryCard({ presentation, revision }) {
 }
 
 // src/client/features/practice-library.js
-var import_react4 = __toESM(require("react"), 1);
+var import_react5 = __toESM(require("react"), 1);
 function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
-  const [mode, setMode] = import_react4.default.useState(initial?.mode || "");
-  const [topic, setTopic] = import_react4.default.useState(initial?.config?.topic || "");
-  const [resume, setResume] = import_react4.default.useState(initial?.config?.resume || "");
-  const [interviewerStyle, setInterviewerStyle] = import_react4.default.useState(initial?.config?.interviewerStyle || "");
-  const [coding, setCoding] = import_react4.default.useState(typeof initial?.config?.coding === "boolean" ? String(initial.config.coding) : "");
-  const [difficulty, setDifficulty] = import_react4.default.useState(initial?.config?.difficulty || "");
+  const [mode, setMode] = import_react5.default.useState(initial?.mode || "");
+  const [topic, setTopic] = import_react5.default.useState(initial?.config?.topic || "");
+  const [resume, setResume] = import_react5.default.useState(initial?.config?.resume || "");
+  const [interviewerStyle, setInterviewerStyle] = import_react5.default.useState(initial?.config?.interviewerStyle || "");
+  const [coding, setCoding] = import_react5.default.useState(typeof initial?.config?.coding === "boolean" ? String(initial.config.coding) : "");
+  const [difficulty, setDifficulty] = import_react5.default.useState(initial?.config?.difficulty || "");
   const topicMode = mode === "bagu" || mode === "scenario";
-  const valid = topicMode ? Boolean(topic.trim()) : mode === "mock" && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty);
+  const valid = topicMode ? Boolean(topic.trim()) : mode === "leetcode" || mode === "mock" && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty);
   const submit = () => {
     if (!valid) return;
-    onSubmit(mode === "mock" ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === "true", difficulty } } : { mode, config: { topic: topic.trim() } });
+    onSubmit(mode === "mock" ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === "true", difficulty } } : mode === "leetcode" ? { mode, config: {} } : { mode, config: { topic: topic.trim() } });
   };
   return h(
     "div",
@@ -526,7 +682,8 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
         h("option", { value: "" }, "\u8BF7\u9009\u62E9"),
         h("option", { value: "bagu" }, "\u80CC\u516B\u80A1"),
         h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
-        h("option", { value: "scenario" }, "\u573A\u666F\u9898")
+        h("option", { value: "scenario" }, "\u573A\u666F\u9898"),
+        h("option", { value: "leetcode" }, "\u5237\u529B\u6263")
       )
     ),
     topicMode ? h(
@@ -536,7 +693,7 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
       h("input", { className: "di-input", value: topic, onChange: (event) => setTopic(event.target.value) })
     ) : null,
     mode === "mock" ? h(
-      import_react4.default.Fragment,
+      import_react5.default.Fragment,
       null,
       h(
         "label",
@@ -586,12 +743,12 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
 }
 function PracticeDetail({ practice, sessionId, onDeleted }) {
   const command = useCommand(sessionId);
-  const [confirming, setConfirming] = import_react4.default.useState(false);
-  const [editing, setEditing] = import_react4.default.useState(false);
-  const [editingQuestionId, setEditingQuestionId] = import_react4.default.useState(null);
-  const [questionDraft, setQuestionDraft] = import_react4.default.useState("");
-  const [deletingQuestionId, setDeletingQuestionId] = import_react4.default.useState(null);
-  const [downloads, setDownloads] = import_react4.default.useState([]);
+  const [confirming, setConfirming] = import_react5.default.useState(false);
+  const [editing, setEditing] = import_react5.default.useState(false);
+  const [editingQuestionId, setEditingQuestionId] = import_react5.default.useState(null);
+  const [questionDraft, setQuestionDraft] = import_react5.default.useState("");
+  const [deletingQuestionId, setDeletingQuestionId] = import_react5.default.useState(null);
+  const [downloads, setDownloads] = import_react5.default.useState([]);
   if (!practice) return h(Empty, { title: "\u9009\u62E9\u4E00\u6761\u7EC3\u4E60", detail: "\u53F3\u4FA7\u4F1A\u5C55\u793A\u9898\u76EE\u3001\u5386\u6B21\u4F5C\u7B54\u548C\u8BB2\u89E3\u3002" });
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
   const activate = async () => {
@@ -630,7 +787,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     { className: "di-detail" },
     h("div", { className: "di-eyebrow" }, practice.modeLabel),
     h("h3", { className: "di-ledger-title", style: { margin: "5px 0 0" } }, practice.topic),
-    h("div", { className: "di-subtitle" }, `${practice.questionCount} \u9898 \xB7 ${practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7 \xB7 \u5747\u5206 ${practice.averageScore ?? "\u2014"}`),
+    h("div", { className: "di-subtitle" }, practice.mode === "leetcode" ? `${practice.questionCount} \u9053\u5DF2\u62BD\u53D6\u9898\u76EE` : `${practice.questionCount} \u9898 \xB7 ${practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7 \xB7 \u5747\u5206 ${practice.averageScore ?? "\u2014"}`),
     h(
       "div",
       { className: "di-actions" },
@@ -677,7 +834,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           { className: "di-detail-question-head" },
           h("span", { className: "di-sequence" }, `Q${String(question.sequence).padStart(2, "0")}`),
           h("div", { className: "di-detail-question-text" }, editingQuestionId === question.id ? h("input", { className: "di-input", value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) }) : h(Markdown, null, question.prompt)),
-          h(ScoreRail, { score: question.latestScore, compact: true })
+          question.leetcode ? h("a", { className: "di-link", href: question.leetcode.url, target: "_blank", rel: "noreferrer" }, `${question.leetcode.category} \xB7 ${question.leetcode.difficulty}`) : h(ScoreRail, { score: question.latestScore, compact: true })
         ),
         question.attempts.map((attempt) => h(
           "div",
@@ -695,19 +852,19 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(
           "div",
           { className: "di-detail-actions" },
-          editingQuestionId === question.id ? h(
-            import_react4.default.Fragment,
+          !question.leetcode && editingQuestionId === question.id ? h(
+            import_react5.default.Fragment,
             null,
             h(Button, { tone: "primary", disabled: !questionDraft.trim(), busy: command.busy === "question.update", onClick: () => updateQuestion(question.id) }, "\u4FDD\u5B58\u9898\u76EE"),
             h(Button, { onClick: () => {
               setEditingQuestionId(null);
               setQuestionDraft("");
             } }, "\u53D6\u6D88")
-          ) : h(Button, { onClick: () => {
+          ) : !question.leetcode ? h(Button, { onClick: () => {
             setEditingQuestionId(question.id);
             setQuestionDraft(question.prompt);
-          } }, "\u7F16\u8F91\u9898\u76EE"),
-          practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => retry(question.id) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
+          } }, "\u7F16\u8F91\u9898\u76EE") : null,
+          !question.leetcode && practice.status === "active" && latest?.evaluation ? h(Button, { onClick: () => retry(question.id) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
           h(Button, { tone: "danger", onClick: () => setDeletingQuestionId(question.id) }, "\u5220\u9664\u9898\u76EE")
         ),
         deletingQuestionId === question.id ? h(
@@ -726,13 +883,13 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   );
 }
 function PracticeLibrary({ sessionId, initialPracticeId = null }) {
-  const [queryText, setQueryText] = import_react4.default.useState("");
-  const [mode, setMode] = import_react4.default.useState("");
-  const [status, setStatus] = import_react4.default.useState("");
-  const [selectedId, setSelectedId] = import_react4.default.useState(initialPracticeId);
-  const [confirmingId, setConfirmingId] = import_react4.default.useState(null);
-  const [downloads, setDownloads] = import_react4.default.useState([]);
-  const [creating, setCreating] = import_react4.default.useState(false);
+  const [queryText, setQueryText] = import_react5.default.useState("");
+  const [mode, setMode] = import_react5.default.useState("");
+  const [status, setStatus] = import_react5.default.useState("");
+  const [selectedId, setSelectedId] = import_react5.default.useState(initialPracticeId);
+  const [confirmingId, setConfirmingId] = import_react5.default.useState(null);
+  const [downloads, setDownloads] = import_react5.default.useState([]);
+  const [creating, setCreating] = import_react5.default.useState(false);
   const command = useCommand(sessionId);
   const filters = { query: queryText, mode, status };
   const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status]);
@@ -744,7 +901,7 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     const result = await run("session.start", payload);
     if (!result) return;
     setCreating(false);
-    setSelectedId(result.resource?.data?.practice?.id || null);
+    setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null);
   };
   const activate = async (practice) => {
     await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
@@ -808,7 +965,8 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
         h("option", { value: "" }, "\u5168\u90E8\u6A21\u5F0F"),
         h("option", { value: "bagu" }, "\u80CC\u516B\u80A1"),
         h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
-        h("option", { value: "scenario" }, "\u573A\u666F\u9898")
+        h("option", { value: "scenario" }, "\u573A\u666F\u9898"),
+        h("option", { value: "leetcode" }, "\u5237\u529B\u6263")
       ),
       h(
         "select",
@@ -883,7 +1041,7 @@ function InsightsCard() {
 }
 
 // src/client/features/timeline.js
-var import_react5 = __toESM(require("react"), 1);
+var import_react6 = __toESM(require("react"), 1);
 var TIMELINE_VIEWS = [
   { id: "question", label: "\u9898\u76EE" },
   { id: "attempts", label: "\u4F5C\u7B54\u8BB0\u5F55" },
@@ -933,7 +1091,7 @@ function TimelineContent({ question, view }) {
   );
 }
 function TimelinePanel({ sessionId, revisionSignal }) {
-  const [selection, setSelection] = import_react5.default.useState(null);
+  const [selection, setSelection] = import_react6.default.useState(null);
   const sessionQuery = useInterviewQuery(`timeline-session:${sessionId}:${revisionSignal}`, () => interviewApi.session(sessionId), [sessionId, revisionSignal], { cache: false });
   const session = sessionQuery.data?.resource?.data;
   const practiceId = session?.practice?.id || null;
@@ -1026,24 +1184,26 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
 // src/client/shared/styles.js
 var STYLE_TEXT = `
 :root{--di-ink:#10182f;--di-muted:#64708a;--di-paper:#f7f9fc;--di-line:#e5eaf1;--di-blue:#245cff;--di-blue-soft:#f5f7ff;--di-green:#15884e;--di-green-soft:#f2faf6;--di-amber:#ffb800;--di-red:#ef4444;--di-white:#fff;--di-shadow:0 8px 28px rgba(28,39,67,.07)}
-.di-card,.di-ledger,.di-timeline{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink);box-sizing:border-box}
-.di-card *,.di-ledger *,.di-timeline *{box-sizing:border-box}.di-preline{white-space:pre-wrap;line-height:1.75}.di-icon{display:inline-block;flex:0 0 auto;vertical-align:middle}
+.di-card,.di-ledger,.di-timeline,.di-lc-catalog{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink);box-sizing:border-box}
+.di-card *,.di-ledger *,.di-timeline *,.di-lc-catalog *{box-sizing:border-box}.di-preline{white-space:pre-wrap;line-height:1.75}.di-icon{display:inline-block;flex:0 0 auto;vertical-align:middle}
 .di-card{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}
 .di-card-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 24px;border-bottom:1px solid var(--di-line);background:var(--di-white)}
 .di-card-body{padding:24px}.di-eyebrow{font-size:11px;font-weight:700;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:var(--di-blue)}.di-title{font-size:18px;font-weight:720}.di-subtitle{margin-top:4px;font-size:13px;color:var(--di-muted)}
 .di-question-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:30px;padding:26px 34px}.di-question-main{min-width:0}.di-question-text{font-size:19px;font-weight:620;line-height:1.55;color:var(--di-ink)}.di-question-text p{margin:0}.di-answer-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:140px;padding:12px 18px!important;border-color:var(--di-blue)!important;color:var(--di-blue)!important;background:var(--di-white)!important;font-size:15px!important}
 .di-button{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--di-line);border-radius:8px;padding:9px 13px;background:var(--di-white);color:var(--di-ink);font:600 13px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:#b8c6e6;box-shadow:0 4px 12px rgba(36,92,255,.08)}.di-button:focus-visible,.di-input:focus-visible,.di-select:focus-visible,.di-history-topic:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-blue);border-color:var(--di-blue);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:#ffd9dc;background:#fffafa}
-.di-phase{display:inline-flex;border:1px solid var(--di-line);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;color:var(--di-muted);white-space:nowrap}.di-phase-awaiting_answer{border-color:#b9c8ff;color:var(--di-blue);background:var(--di-blue-soft)}.di-phase-generating_explanation{border-color:#ffe1a3;color:#a76500;background:#fffaf0}.di-phase-awaiting_next{border-color:#bde6cf;color:var(--di-green);background:var(--di-green-soft)}.di-phase-completed{color:var(--di-muted);background:var(--di-paper)}
+.di-phase{display:inline-flex;border:1px solid var(--di-line);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;color:var(--di-muted);white-space:nowrap}.di-phase-awaiting_answer,.di-phase-awaiting_solution{border-color:#b9c8ff;color:var(--di-blue);background:var(--di-blue-soft)}.di-phase-generating_explanation{border-color:#ffe1a3;color:#a76500;background:#fffaf0}.di-phase-awaiting_next{border-color:#bde6cf;color:var(--di-green);background:var(--di-green-soft)}.di-phase-completed{color:var(--di-muted);background:var(--di-paper)}
 .di-review-card{display:flex;flex-direction:column}.di-review-score{display:flex;align-items:center;gap:18px;padding:20px 28px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-review-check{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:9px;color:#fff;background:var(--di-green);box-shadow:0 0 0 7px var(--di-green-soft)}.di-review-score-summary{display:flex;align-items:baseline;gap:12px}.di-review-score-label{font-size:14px;font-weight:700}.di-review-score-value{display:flex;align-items:baseline;gap:7px}.di-review-score-value strong{font-size:30px;font-weight:550;line-height:1;color:var(--di-green)}.di-review-score-value span{font-size:15px;color:var(--di-muted)}.di-stars{display:flex;gap:4px;margin-left:auto}.di-star{font-size:23px;line-height:1;background:linear-gradient(90deg,var(--di-amber) var(--di-star-fill),#dfe4ec var(--di-star-fill));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent}.di-review-content{min-width:0;padding:26px 28px}.di-review-section+.di-review-section{margin-top:20px}.di-review-section h3{margin:0 0 9px;font-size:15px}.di-feedback-banner{padding:12px 15px;border:1px solid #e0f0e7;border-radius:9px;background:var(--di-green-soft);font-size:14px;line-height:1.65}.di-dimensions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.di-dimensions span{display:inline-flex;gap:8px;padding:6px 9px;border-radius:6px;background:var(--di-paper);font-size:12px;color:var(--di-muted)}.di-dimensions strong{color:var(--di-ink)}.di-explanation-copy{font-size:14px;line-height:1.75}.di-explanation-copy p,.di-explanation-copy ul,.di-explanation-copy ol{margin-top:6px;margin-bottom:6px}.di-memorize-box{margin-top:18px;padding:14px 15px;border:1px solid #dcefe5;border-radius:9px;background:linear-gradient(100deg,#f2faf6,#f8fbf9)}.di-memorize-label{margin-bottom:5px;font-size:13px;font-weight:700;color:#116d40}.di-memorize-copy{font-size:14px;line-height:1.65}.di-review-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:15px;border-top:1px solid var(--di-line)}
 .di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font-size:27px;font-weight:700}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,8px);gap:3px}.di-score-rail i{display:block;height:15px;border-radius:2px;background:#e8ebf2}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:9px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
 .di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--di-line)}.di-section-label{margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--di-muted)}.di-attempt{margin-top:12px;padding:12px 14px;border-left:3px solid var(--di-blue);background:var(--di-paper);border-radius:0 7px 7px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--di-muted)}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
 .di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(1080px,100%);padding:10px 13px;border-left:3px solid var(--di-red);border-radius:0 7px 7px 0;background:#fff1f2;color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--di-muted)}
 .di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{font-size:18px;font-weight:730}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-textarea{min-height:150px;resize:vertical;line-height:1.6}.di-practice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-field{display:grid;gap:6px;font-size:13px;font-weight:600}.di-field-wide{grid-column:1/-1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:500;text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:750;color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
+.di-lc-problem-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:28px;padding:25px 28px;overflow:visible}.di-lc-problem-main{min-width:0}.di-lc-problem-title{display:flex;align-items:baseline;gap:11px;margin-top:7px;font-size:21px;font-weight:700;line-height:1.35}.di-lc-problem-title>span{font-size:13px;font-weight:750;color:var(--di-muted)}.di-lc-problem-meta{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--di-muted)}.di-lc-problem-meta .is-complete{color:var(--di-green);font-weight:700}.di-lc-problem-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;max-width:510px}.di-lc-problem-actions>.di-button{text-decoration:none}.di-lc-difficulty{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700}.di-lc-difficulty.is-easy{color:#087a45;background:#edf9f3}.di-lc-difficulty.is-medium{color:#a86300;background:#fff7e7}.di-lc-difficulty.is-hard{color:#cf3139;background:#fff0f1}
+.di-lc-catalog{width:min(1080px,100%);margin-top:12px;border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-lc-catalog-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:24px 28px 18px}.di-lc-title{margin:5px 0 2px;font-size:24px;line-height:1.15}.di-lc-source{color:var(--di-muted);font-size:12px;text-decoration:none}.di-lc-source:hover{color:var(--di-blue)}.di-lc-progress-copy{display:flex;align-items:baseline;gap:5px;color:var(--di-muted)}.di-lc-progress-copy strong{font-size:26px;font-weight:650;color:var(--di-green)}.di-lc-progress{height:3px;margin:0 28px 6px;border-radius:99px;background:#edf0f5;overflow:hidden}.di-lc-progress>i{display:block;height:100%;border-radius:inherit;background:var(--di-green);transition:width .2s ease}.di-lc-groups{padding:4px 28px 28px}.di-lc-group{display:grid;grid-template-columns:132px minmax(0,1fr);padding:22px 0;border-top:1px solid var(--di-line)}.di-lc-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-right:24px}.di-lc-group-head h3{margin:0;font-size:14px}.di-lc-group-head span{color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums}.di-lc-problems{min-width:0}.di-lc-row{display:grid;grid-template-columns:24px minmax(0,1fr) 52px;align-items:center;gap:10px;min-height:38px;padding:3px 4px;border-radius:7px}.di-lc-row:hover{background:var(--di-paper)}.di-lc-row.is-complete .di-lc-problem-link{color:var(--di-muted)}.di-lc-check{appearance:none;width:19px;height:19px;border:1.5px solid #b9c2d2;border-radius:5px;background:var(--di-white);color:#fff;font:800 12px/16px "Segoe UI",sans-serif;cursor:pointer}.di-lc-check:hover{border-color:var(--di-green)}.di-lc-check:focus-visible,.di-lc-problem-link:focus-visible,.di-lc-source:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-lc-check.is-complete{border-color:var(--di-green);background:var(--di-green)}.di-lc-check:disabled{opacity:.55;cursor:wait}.di-lc-problem-link{display:flex;align-items:baseline;gap:9px;min-width:0;color:var(--di-ink);font-size:13px;font-weight:600;text-decoration:none}.di-lc-problem-link:hover{color:var(--di-blue)}.di-lc-problem-id{width:30px;flex:0 0 auto;color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums;text-align:right}.di-lc-open{opacity:0;color:var(--di-blue);transition:opacity .15s ease}.di-lc-row:hover .di-lc-open{opacity:1}
 .di-timeline{position:fixed;right:18px;top:112px;z-index:40;display:grid;gap:14px;width:56px;max-height:calc(100vh - 144px);padding:4px 0;overflow:visible;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink)}.di-time-item{position:relative;min-height:34px}.di-time-item:not(:last-child)::after{content:"";position:absolute;z-index:-1;top:27px;right:43px;width:1px;height:25px;background:var(--di-line)}.di-time-node{appearance:none;display:flex;align-items:center;gap:7px;width:56px;height:30px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--di-muted);font:700 11px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:color .15s ease,background .15s ease}.di-time-node:hover,.di-time-node:focus-visible,.di-time-item.has-view .di-time-node{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-node:focus-visible,.di-time-tab:focus-visible,.di-time-flyout-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-time-dot{width:7px;height:7px;flex:0 0 auto;border:2px solid #b7c0d0;border-radius:50%;background:var(--di-white)}.di-time-item.is-current .di-time-dot{border-color:var(--di-blue);background:var(--di-blue);box-shadow:0 0 0 4px rgba(36,92,255,.1)}.di-time-flyout{position:fixed;right:82px;top:112px;width:min(390px,calc(100vw - 112px));max-height:calc(100vh - 144px);overflow:hidden;border:1px solid var(--di-line);border-radius:11px;background:var(--di-white);box-shadow:0 16px 42px rgba(23,32,51,.14)}.di-time-flyout-head{display:flex;align-items:stretch;border-bottom:1px solid var(--di-line)}.di-time-tabs{display:flex;align-items:stretch;min-width:0;padding-left:14px}.di-time-tab{appearance:none;position:relative;border:0;padding:13px 2px 11px;margin-right:20px;background:transparent;color:var(--di-muted);font:650 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer}.di-time-tab::after{content:"";position:absolute;right:0;bottom:-1px;left:0;height:2px;border-radius:2px;background:transparent}.di-time-tab:hover{color:var(--di-ink)}.di-time-tab.is-active{color:var(--di-blue)}.di-time-tab.is-active::after{background:var(--di-blue)}.di-time-flyout-head>button{appearance:none;width:42px;border:0;margin-left:auto;background:transparent;color:var(--di-muted);font-size:20px;line-height:1;cursor:pointer}.di-time-flyout-head>button:hover{color:var(--di-ink);background:var(--di-paper)}.di-time-flyout-body{max-height:calc(100vh - 188px);padding:15px 16px;overflow:auto;font-size:13px;line-height:1.7}.di-time-records{display:grid;gap:16px}.di-time-record{padding-bottom:15px;border-bottom:1px solid var(--di-line)}.di-time-record:last-child{padding-bottom:0;border-bottom:0}.di-time-record-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;color:var(--di-muted);font-size:11px;font-weight:700}.di-time-record-label strong{color:var(--di-green)}.di-time-content-label{margin-bottom:4px;color:var(--di-muted);font-size:11px;font-weight:700}.di-time-record-review{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--di-paper)}.di-time-answer>.di-time-memorize{margin-top:14px;padding:12px;border-radius:8px;background:var(--di-green-soft)}.di-time-empty{padding:16px 4px;text-align:center;color:var(--di-muted)}
 @keyframes di-spin{to{transform:rotate(360deg)}}
-@media(max-width:760px){.di-question-card{grid-template-columns:1fr;padding:22px}.di-answer-button{justify-self:start}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}}
-@media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-review-score{flex-wrap:wrap;padding:18px}.di-review-score-summary{flex:1}.di-stars{width:100%;margin-left:56px}.di-review-content{padding:20px 18px}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-practice-form{grid-template-columns:1fr;padding:16px 18px}.di-field-wide{grid-column:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}}
+@media(max-width:760px){.di-question-card,.di-lc-problem-card{grid-template-columns:1fr;padding:22px}.di-lc-problem-actions{justify-content:flex-start;max-width:none}.di-lc-group{grid-template-columns:1fr;gap:10px}.di-lc-group-head{justify-content:flex-start}.di-answer-button{justify-self:start}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}}
+@media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-review-score{flex-wrap:wrap;padding:18px}.di-review-score-summary{flex:1}.di-stars{width:100%;margin-left:56px}.di-review-content{padding:20px 18px}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-practice-form{grid-template-columns:1fr;padding:16px 18px}.di-field-wide{grid-column:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}.di-lc-catalog-head{align-items:flex-start;padding:20px;}.di-lc-progress{margin-right:20px;margin-left:20px}.di-lc-groups{padding-right:20px;padding-left:20px}.di-lc-row{grid-template-columns:22px minmax(0,1fr) 44px}.di-lc-problem-id{display:none}}
 @media(prefers-reduced-motion:reduce){.di-button,.di-time-node{transition:none}.di-spinner{animation-duration:1.5s}}
 `;
 function installStyles() {
@@ -1079,6 +1239,8 @@ function ToolResourceView({ toolName, sessionId, block }) {
       return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId });
     case "insights":
       return h(InsightsCard);
+    case "leetcode-catalog":
+      return h(LeetcodeCatalog, { sessionId });
     case "deleted":
       return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u5220\u9664", detail: "\u6863\u6848\u548C\u5BF9\u5E94\u4F1A\u8BDD\u6E38\u6807\u5DF2\u7ECF\u6E05\u7406\u3002", tone: "completed" });
     case "exported":

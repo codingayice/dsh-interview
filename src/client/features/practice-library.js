@@ -13,12 +13,12 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const topicMode = mode === 'bagu' || mode === 'scenario'
   const valid = topicMode
     ? Boolean(topic.trim())
-    : mode === 'mock' && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty)
+    : mode === 'leetcode' || (mode === 'mock' && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty))
   const submit = () => {
     if (!valid) return
     onSubmit(mode === 'mock'
       ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === 'true', difficulty } }
-      : { mode, config: { topic: topic.trim() } })
+      : mode === 'leetcode' ? { mode, config: {} } : { mode, config: { topic: topic.trim() } })
   }
   return h('div', { className: 'di-practice-form' },
     h('label', { className: 'di-field' }, h('span', null, '模式'),
@@ -26,7 +26,8 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
         h('option', { value: '' }, '请选择'),
         h('option', { value: 'bagu' }, '背八股'),
         h('option', { value: 'mock' }, '模拟面试'),
-        h('option', { value: 'scenario' }, '场景题'))),
+        h('option', { value: 'scenario' }, '场景题'),
+        h('option', { value: 'leetcode' }, '刷力扣'))),
     topicMode ? h('label', { className: 'di-field' }, h('span', null, '主题'),
       h('input', { className: 'di-input', value: topic, onChange: (event) => setTopic(event.target.value) })) : null,
     mode === 'mock' ? h(React.Fragment, null,
@@ -86,7 +87,9 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   return h('section', { className: 'di-detail' },
     h('div', { className: 'di-eyebrow' }, practice.modeLabel),
     h('h3', { className: 'di-ledger-title', style: { margin: '5px 0 0' } }, practice.topic),
-    h('div', { className: 'di-subtitle' }, `${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`),
+    h('div', { className: 'di-subtitle' }, practice.mode === 'leetcode'
+      ? `${practice.questionCount} 道已抽取题目`
+      : `${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`),
     h('div', { className: 'di-actions' },
       h(Button, { tone: 'primary', busy: Boolean(command.busy?.startsWith('session.')), onClick: activate }, practice.status === 'completed' ? '重新打开' : '切换到练习'),
       h(Button, { onClick: () => setEditing((value) => !value) }, '编辑配置'),
@@ -117,7 +120,9 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           h('div', { className: 'di-detail-question-text' }, editingQuestionId === question.id
             ? h('input', { className: 'di-input', value: questionDraft, onChange: (event) => setQuestionDraft(event.target.value) })
             : h(Markdown, null, question.prompt)),
-          h(ScoreRail, { score: question.latestScore, compact: true })),
+          question.leetcode
+            ? h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, `${question.leetcode.category} · ${question.leetcode.difficulty}`)
+            : h(ScoreRail, { score: question.latestScore, compact: true })),
         question.attempts.map((attempt) => h('div', { className: 'di-attempt', key: attempt.id },
           h('div', { className: 'di-attempt-head' }, h('span', null, `第 ${attempt.sequence} 次作答`), h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '未评价')),
           h(Markdown, null, attempt.answer),
@@ -126,12 +131,12 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           h('div', { className: 'di-section-label' }, '参考讲解'),
           h(Markdown, null, question.explanation.detail)) : null,
         h('div', { className: 'di-detail-actions' },
-          editingQuestionId === question.id
+          !question.leetcode && editingQuestionId === question.id
             ? h(React.Fragment, null,
                 h(Button, { tone: 'primary', disabled: !questionDraft.trim(), busy: command.busy === 'question.update', onClick: () => updateQuestion(question.id) }, '保存题目'),
                 h(Button, { onClick: () => { setEditingQuestionId(null); setQuestionDraft('') } }, '取消'))
-            : h(Button, { onClick: () => { setEditingQuestionId(question.id); setQuestionDraft(question.prompt) } }, '编辑题目'),
-          practice.status === 'active' && latest?.evaluation
+            : !question.leetcode ? h(Button, { onClick: () => { setEditingQuestionId(question.id); setQuestionDraft(question.prompt) } }, '编辑题目') : null,
+          !question.leetcode && practice.status === 'active' && latest?.evaluation
             ? h(Button, { onClick: () => retry(question.id) }, '重新作答')
             : null,
           h(Button, { tone: 'danger', onClick: () => setDeletingQuestionId(question.id) }, '删除题目')),
@@ -162,7 +167,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     const result = await run('session.start', payload)
     if (!result) return
     setCreating(false)
-    setSelectedId(result.resource?.data?.practice?.id || null)
+    setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null)
   }
   const activate = async (practice) => {
     await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
@@ -204,7 +209,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
       h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
-        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题')),
+        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'leetcode' }, '刷力扣')),
       h('select', { className: 'di-select', value: status, onChange: (event) => setStatus(event.target.value), 'aria-label': '筛选状态' },
         h('option', { value: '' }, '全部状态'), h('option', { value: 'active' }, '进行中'), h('option', { value: 'completed' }, '已结束'))),
     h(ErrorNotice, null, list.error),
