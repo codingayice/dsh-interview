@@ -22,6 +22,9 @@ const AGENT_RECOVERABLE_CODES = new Set([
   'INVALID_FEEDBACK',
   'INVALID_EXPLANATION',
   'INVALID_MEMORIZATION_POINTS',
+  'INVALID_SUMMARY',
+  'INVALID_SUMMARY_STRENGTHS',
+  'INVALID_SUMMARY_IMPROVEMENTS',
   'INVALID_SCORE',
   'INVALID_DIMENSION_SCORE',
 ])
@@ -32,7 +35,8 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.GET_STATUS: return application.getSession(sessionId)
     case INTERVIEW_ACTIONS.SELECT_PRACTICE: return application.selectPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: return application.reopenPractice(sessionId, payload.practiceId)
-    case INTERVIEW_ACTIONS.FINISH_PRACTICE: return application.completePractice(sessionId)
+    case INTERVIEW_ACTIONS.REQUEST_FINISH: return application.requestPracticeSummary(sessionId)
+    case INTERVIEW_ACTIONS.COMPLETE_SUMMARY: return application.completePractice(sessionId, payload)
     case INTERVIEW_ACTIONS.PRESENT_QUESTION: return application.askQuestion(sessionId, { prompt: payload.prompt })
     case INTERVIEW_ACTIONS.OPEN_QUESTION: {
       const result = await application.openQuestion(sessionId, payload.questionId)

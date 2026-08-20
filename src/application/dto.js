@@ -31,6 +31,7 @@ export function toPracticeSummaryDto(practice) {
     createdAt: practice.createdAt,
     updatedAt: practice.updatedAt,
     completedAt: practice.completedAt,
+    summary: practice.summary ? { ...practice.summary, strengths: [...practice.summary.strengths], improvements: [...practice.summary.improvements] } : null,
     ...summary,
   }
 }

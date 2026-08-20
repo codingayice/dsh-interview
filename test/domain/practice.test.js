@@ -96,7 +96,9 @@ test('已评价回答不能被覆盖，重新回答必须创建新记录', () =>
 })
 
 test('结束后的练习禁止继续出题，重新打开后恢复写入', () => {
-  const completed = completePractice(samplePractice(), 2)
+  const completed = completePractice(samplePractice(), {
+    overall: '完成本次练习。', strengths: ['基础扎实。'], improvements: ['继续补充细节。'], now: 2,
+  })
   assert.throws(() => askQuestion(completed, { id: 'question-1', prompt: '问题', now: 3 }), {
     code: 'PRACTICE_NOT_ACTIVE',
   })

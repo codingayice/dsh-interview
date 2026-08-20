@@ -206,6 +206,7 @@ function PhaseBadge({ phase }) {
     awaiting_answer: "\u7B49\u5F85\u56DE\u7B54",
     awaiting_evaluation: "\u6B63\u5728\u8BC4\u4EF7",
     generating_explanation: "\u6B63\u5728\u751F\u6210\u5B8C\u6574\u590D\u76D8",
+    generating_summary: "\u6B63\u5728\u751F\u6210\u7EC3\u4E60\u603B\u7ED3",
     awaiting_next: "\u590D\u76D8\u5B8C\u6210",
     completed: "\u7EC3\u4E60\u5DF2\u7ED3\u675F",
     idle: "\u672A\u9009\u62E9\u7EC3\u4E60"
@@ -480,6 +481,44 @@ function ReviewResourceCard({ presentation, revision, sessionId }) {
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
   return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u5B8C\u6574\u590D\u76D8\u5361\u7247\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
 }
+function PracticeSummaryCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision);
+  const practice = query.data?.resource?.data;
+  const summary = practice?.summary;
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u7EC3\u4E60\u603B\u7ED3" }, summary ? h(
+    "article",
+    { className: "di-card", "aria-label": "\u7EC3\u4E60\u603B\u7ED3" },
+    h(
+      "header",
+      { className: "di-card-head" },
+      h(
+        "div",
+        null,
+        h("div", { className: "di-title" }, "\u7EC3\u4E60\u603B\u7ED3"),
+        h("div", { className: "di-subtitle" }, `${practice.modeLabel} \xB7 ${practice.topic}`)
+      ),
+      h(PhaseBadge, { phase: "completed" })
+    ),
+    h(
+      "div",
+      { className: "di-card-body" },
+      h(Markdown, null, summary.overall),
+      h(
+        "section",
+        { className: "di-section" },
+        h("div", { className: "di-section-label" }, "\u8868\u73B0\u4EAE\u70B9"),
+        h("ul", null, summary.strengths.map((item) => h("li", { key: item }, item)))
+      ),
+      h(
+        "section",
+        { className: "di-section" },
+        h("div", { className: "di-section-label" }, "\u6539\u8FDB\u5EFA\u8BAE"),
+        h("ul", null, summary.improvements.map((item) => h("li", { key: item }, item)))
+      ),
+      h("div", { className: "di-subtitle" }, `${practice.questionCount} \u9053\u9898 \xB7 ${practice.attemptCount} \u6B21\u4F5C\u7B54 \xB7 \u5E73\u5747\u5206 ${practice.averageScore ?? "\u2014"}`)
+    )
+  ) : null);
+}
 
 // src/client/features/practice-library.js
 var import_react4 = __toESM(require("react"), 1);
@@ -531,6 +570,20 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       )
     ) : null,
     h(ErrorNotice, null, command.error),
+    practice.summary ? h(
+      "section",
+      { className: "di-section" },
+      h("div", { className: "di-section-label" }, "\u7EC3\u4E60\u603B\u7ED3"),
+      h(Markdown, null, practice.summary.overall),
+      h(
+        "div",
+        { className: "di-attempt" },
+        h("strong", null, "\u8868\u73B0\u4EAE\u70B9"),
+        h("ul", null, practice.summary.strengths.map((item) => h("li", { key: item }, item))),
+        h("strong", null, "\u6539\u8FDB\u5EFA\u8BAE"),
+        h("ul", null, practice.summary.improvements.map((item) => h("li", { key: item }, item)))
+      )
+    ) : null,
     practice.questions.length ? practice.questions.map((question) => {
       const latest = question.attempts.at(-1);
       return h(
@@ -762,6 +815,7 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_select_practice",
   "interview_reopen_practice",
   "interview_finish_practice",
+  "interview_complete_summary",
   "interview_present_question",
   "interview_open_question",
   "interview_request_next",
@@ -840,7 +894,7 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "exported":
       return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
     case "finished":
-      return h(CompactResultCard, { title: "\u7EC3\u4E60\u5DF2\u7ED3\u675F", detail: "\u672C\u6B21\u7EC3\u4E60\u5DF2\u7ECF\u5F52\u6863\uFF0C\u53EF\u4EE5\u5728\u7EC3\u4E60\u6863\u6848\u4E2D\u67E5\u770B\u590D\u76D8\u3002", tone: "completed" });
+      return h(PracticeSummaryCard, { presentation: view, revision: view.revision });
     case "live-session":
       return h(LiveInterviewCard, { sessionId });
     default:

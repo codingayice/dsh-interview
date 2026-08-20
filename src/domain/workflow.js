@@ -6,6 +6,7 @@ export const WORKFLOW_PHASES = Object.freeze({
   AWAITING_EVALUATION: 'awaiting_evaluation',
   GENERATING_EXPLANATION: 'generating_explanation',
   AWAITING_NEXT: 'awaiting_next',
+  GENERATING_SUMMARY: 'generating_summary',
   COMPLETED: 'completed',
 })
 
@@ -92,8 +93,13 @@ export function markQuestionRetried(cursor, questionId, now) {
   }, now)
 }
 
-export function markPracticeCompleted(cursor, now) {
+export function markPracticeFinishRequested(cursor, now) {
   assertDomain(cursor.phase !== WORKFLOW_PHASES.COMPLETED, 'PRACTICE_ALREADY_COMPLETED', '练习已经结束')
+  return advance(cursor, { phase: WORKFLOW_PHASES.GENERATING_SUMMARY }, now)
+}
+
+export function markPracticeCompleted(cursor, now) {
+  requirePhase(cursor, WORKFLOW_PHASES.GENERATING_SUMMARY)
   return advance(cursor, { phase: WORKFLOW_PHASES.COMPLETED }, now)
 }
 

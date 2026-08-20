@@ -24,10 +24,16 @@ function descriptor(action, result) {
     case INTERVIEW_ACTIONS.START_PRACTICE:
       return { state: data.phase, nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }
     case INTERVIEW_ACTIONS.GET_STATUS: {
-      const generating = ['awaiting_question', 'generating_explanation'].includes(data.phase)
+      const generating = ['awaiting_question', 'generating_explanation', 'generating_summary'].includes(data.phase)
       return {
         state: data.phase,
-        nextAction: data.phase === 'awaiting_question' ? 'generate_question' : data.phase === 'generating_explanation' ? 'generate_explanation' : 'wait_for_user',
+        nextAction: data.phase === 'awaiting_question'
+          ? 'generate_question'
+          : data.phase === 'generating_explanation'
+            ? 'generate_explanation'
+            : data.phase === 'generating_summary'
+              ? 'generate_summary'
+              : 'wait_for_user',
         presentation: generating ? null : { kind: 'live-session' },
         assistantResponse: generating ? continueSilently() : exact('当前练习状态已更新，请查看卡片。'),
         context: data,
@@ -112,7 +118,15 @@ function descriptor(action, result) {
         presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
         assistantResponse: exact('已切换到这道题，请重新作答。'),
       }
-    case INTERVIEW_ACTIONS.FINISH_PRACTICE:
+    case INTERVIEW_ACTIONS.REQUEST_FINISH:
+      return {
+        state: 'generating_summary',
+        nextAction: 'generate_summary',
+        presentation: null,
+        assistantResponse: continueSilently(),
+        context: data,
+      }
+    case INTERVIEW_ACTIONS.COMPLETE_SUMMARY:
       return {
         state: 'completed',
         nextAction: 'wait_for_user',

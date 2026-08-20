@@ -18,6 +18,7 @@ import {
   markExplanationSaved,
   markNextRequested,
   markPracticeCompleted,
+  markPracticeFinishRequested,
   markQuestionAsked,
   markQuestionRetried,
   WORKFLOW_PHASES,
@@ -205,10 +206,20 @@ export class InterviewApplication {
     return this.#result('question-retried', toSessionDto(nextCursor, practice), nextCursor, events)
   }
 
-  async completePractice(sessionId) {
+  async requestPracticeSummary(sessionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
-    const completed = completePractice(practice, now)
+    const nextCursor = markPracticeFinishRequested(cursor, now)
+    const events = [{ type: 'practice.summary_requested', sessionId, practiceId: practice.id }]
+    await this.repository.commit({ cursor: nextCursor })
+    await this.#publish(events)
+    return this.#result('summary-requested', toPracticeDetailDto(practice), nextCursor, events)
+  }
+
+  async completePractice(sessionId, input) {
+    const now = this.clock.now()
+    const { cursor, practice } = await this.#context(sessionId)
+    const completed = completePractice(practice, { ...input, now })
     const nextCursor = markPracticeCompleted(cursor, now)
     const events = [{ type: 'practice.completed', sessionId, practiceId: practice.id }]
     await this.repository.commit({ practice: completed, cursor: nextCursor })

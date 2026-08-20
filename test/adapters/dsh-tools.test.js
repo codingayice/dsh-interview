@@ -51,6 +51,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_start_practice.description, /不得询问题数、是否追问/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
+  assert.deepEqual(fixture.tools.interview_complete_summary.parameters.required, ['overall', 'strengths', 'improvements'])
 })
 
 test('原子工具驱动开始、出题、回答和完整复盘流程', async () => {
@@ -138,6 +139,9 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   const reveal = instructionFor({ type: 'answer.reveal_requested', practiceId: 'p1', questionId: 'q1' })
   assert.match(reveal, /禁止创建用户作答、评分或评价/)
   assert.match(reveal, /interview_complete_review/)
+  const summary = instructionFor({ type: 'practice.summary_requested', practiceId: 'p1' })
+  assert.match(summary, /全部历次作答、评价和讲解/)
+  assert.match(summary, /interview_complete_summary/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 
@@ -156,4 +160,18 @@ test('未指定范围时只导出当前选择的练习', async () => {
   const result = await fixture.tools.interview_export_practices.execute({}, exec())
   assert.equal(result.resource.data.length, 1)
   assert.match(result.resource.data[0].name, /Redis/)
+})
+
+test('结束练习必须生成并持久化完整总结', async () => {
+  const fixture = toolFixture()
+  const started = await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
+  const requested = await fixture.tools.interview_finish_practice.execute({}, exec())
+  assert.equal(requested.nextAction, 'generate_summary')
+  assert.equal(requested.presentation, null)
+  const completed = await fixture.tools.interview_complete_summary.execute({
+    overall: '完成了一次 JVM 练习。', strengths: ['主动开始练习。'], improvements: ['继续积累题目。'],
+  }, exec())
+  assert.equal(completed.presentation.kind, 'finished')
+  const detail = await fixture.application.getPractice(started.resource.data.practice.id)
+  assert.equal(detail.resource.data.summary.overall, '完成了一次 JVM 练习。')
 })

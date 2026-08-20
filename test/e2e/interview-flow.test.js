@@ -41,6 +41,11 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
     await tools.interview_save_evaluation.execute({ score: 7.5, feedback: '需要补充复制积压缓冲区和故障转移条件。' }, exec)
     await tools.interview_complete_review.execute({ detail: '应结合复制偏移量、积压缓冲区和 Sentinel 故障转移分析数据安全。', memorization_points: '确认复制进度，保留积压缓冲，约束故障转移。' }, exec)
     await tools.interview_finish_practice.execute({}, exec)
+    await tools.interview_complete_summary.execute({
+      overall: 'Redis 高可用核心知识掌握较好。',
+      strengths: ['能够识别缓存击穿与主从切换的关键风险。'],
+      improvements: ['补充复制积压缓冲区和故障转移条件。'],
+    }, exec)
 
     const detail = await tools.interview_get_practice.execute({ practice_id: practiceId }, exec)
     const insight = await tools.interview_get_insights.execute({}, exec)
@@ -50,6 +55,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
     assert.equal(detail.resource.data.status, 'completed')
     assert.equal(detail.resource.data.questions.length, 2)
     assert.equal(detail.resource.data.averageScore, 8)
+    assert.equal(detail.resource.data.summary.overall, 'Redis 高可用核心知识掌握较好。')
     assert.equal(insight.resource.data.weakestTopic.topic, 'Redis 高可用')
     assert.match(readFileSync(download.filePath, 'utf8'), /互斥重建、逻辑过期、限流降级/)
     assert.equal(events.filter((event) => event.type === 'question.generation_requested').length, 2)
@@ -60,6 +66,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
       const restored = await restoredRepository.getPractice(practiceId)
       assert.equal(restored.questions[0].attempts[0].evaluation.score, 8.5)
       assert.equal(restored.status, 'completed')
+      assert.equal(restored.summary.strengths.length, 1)
     } finally {
       restoredRepository.close()
     }

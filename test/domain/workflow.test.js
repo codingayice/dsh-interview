@@ -8,6 +8,7 @@ import {
   markExplanationSaved,
   markNextRequested,
   markPracticeCompleted,
+  markPracticeFinishRequested,
   markQuestionAsked,
   markQuestionRetried,
   WORKFLOW_PHASES,
@@ -64,10 +65,12 @@ test('已有参考讲解的重答评价直接进入完整复盘', () => {
 })
 
 test('练习结束后游标进入 completed', () => {
-  const cursor = markPracticeCompleted(
+  let cursor = markPracticeFinishRequested(
     createCursor({ sessionId: 'session-1', practiceId: 'practice-1', now: 1 }),
     2,
   )
+  assert.equal(cursor.phase, WORKFLOW_PHASES.GENERATING_SUMMARY)
+  cursor = markPracticeCompleted(cursor, 3)
   assert.equal(cursor.phase, WORKFLOW_PHASES.COMPLETED)
-  assert.throws(() => markQuestionRetried(cursor, 'question-1', 3), { code: 'PRACTICE_ALREADY_COMPLETED' })
+  assert.throws(() => markQuestionRetried(cursor, 'question-1', 4), { code: 'PRACTICE_ALREADY_COMPLETED' })
 })

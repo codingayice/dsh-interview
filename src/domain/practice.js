@@ -48,6 +48,7 @@ export function createPractice({ id, mode, config, now }) {
     createdAt: now,
     updatedAt: now,
     completedAt: null,
+    summary: null,
     questions: [],
   }
 }
@@ -146,14 +147,22 @@ export function saveExplanation(practice, { questionId, detail, memorizationPoin
   return { practice: withUpdatedAt(practice, now, { questions }), explanation }
 }
 
-export function completePractice(practice, now) {
+export function completePractice(practice, { overall, strengths, improvements, now }) {
   activePractice(practice)
-  return withUpdatedAt(practice, now, { status: 'completed', completedAt: now })
+  assertDomain(Array.isArray(strengths) && strengths.length > 0, 'INVALID_SUMMARY_STRENGTHS', '练习总结必须包含至少一项表现亮点')
+  assertDomain(Array.isArray(improvements) && improvements.length > 0, 'INVALID_SUMMARY_IMPROVEMENTS', '练习总结必须包含至少一项改进建议')
+  const summary = {
+    overall: requiredText(overall, 'INVALID_SUMMARY', '练习总结不能为空'),
+    strengths: strengths.map((item) => requiredText(item, 'INVALID_SUMMARY_STRENGTHS', '表现亮点不能为空')),
+    improvements: improvements.map((item) => requiredText(item, 'INVALID_SUMMARY_IMPROVEMENTS', '改进建议不能为空')),
+    createdAt: now,
+  }
+  return withUpdatedAt(practice, now, { status: 'completed', completedAt: now, summary })
 }
 
 export function reopenPractice(practice, now) {
   assertDomain(practice?.status === 'completed', 'PRACTICE_NOT_COMPLETED', '只有已结束练习可以重新打开')
-  return withUpdatedAt(practice, now, { status: 'active', completedAt: null })
+  return withUpdatedAt(practice, now, { status: 'active', completedAt: null, summary: null })
 }
 
 export function summarizePractice(practice) {

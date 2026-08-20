@@ -41,6 +41,14 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(Button, { onClick: () => setConfirming(false) }, '取消'),
         h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: remove }, '确认删除'))) : null,
     h(ErrorNotice, null, command.error),
+    practice.summary ? h('section', { className: 'di-section' },
+      h('div', { className: 'di-section-label' }, '练习总结'),
+      h(Markdown, null, practice.summary.overall),
+      h('div', { className: 'di-attempt' },
+        h('strong', null, '表现亮点'),
+        h('ul', null, practice.summary.strengths.map((item) => h('li', { key: item }, item))),
+        h('strong', null, '改进建议'),
+        h('ul', null, practice.summary.improvements.map((item) => h('li', { key: item }, item))))) : null,
     practice.questions.length ? practice.questions.map((question) => {
       const latest = question.attempts.at(-1)
       return h('article', { className: 'di-detail-question', key: question.id },

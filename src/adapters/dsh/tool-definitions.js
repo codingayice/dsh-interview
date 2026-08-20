@@ -97,7 +97,21 @@ const tools = [
     name: 'interview_reopen_practice', action: INTERVIEW_ACTIONS.REOPEN_PRACTICE, description: '重新打开一条已经结束的练习。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),
-  atomicTool({ name: 'interview_finish_practice', action: INTERVIEW_ACTIONS.FINISH_PRACTICE, description: '结束并归档当前练习。' }),
+  atomicTool({ name: 'interview_finish_practice', action: INTERVIEW_ACTIONS.REQUEST_FINISH, description: '请求结束当前练习。必须基于返回的完整上下文生成总结，再调用 interview_complete_summary。' }),
+  atomicTool({
+    name: 'interview_complete_summary', action: INTERVIEW_ACTIONS.COMPLETE_SUMMARY,
+    description: '保存基于完整练习上下文生成的总结，并正式结束练习。',
+    parameters: {
+      type: 'object',
+      properties: {
+        overall: { type: 'string', minLength: 1, description: '本次练习的总体总结。' },
+        strengths: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 }, description: '用户表现亮点。' },
+        improvements: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 }, description: '后续改进建议。' },
+      },
+      required: ['overall', 'strengths', 'improvements'],
+      additionalProperties: false,
+    },
+  }),
   atomicTool({
     name: 'interview_present_question',
     action: INTERVIEW_ACTIONS.PRESENT_QUESTION,

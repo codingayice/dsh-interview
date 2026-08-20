@@ -73,6 +73,7 @@ export function PhaseBadge({ phase }) {
     awaiting_answer: '等待回答',
     awaiting_evaluation: '正在评价',
     generating_explanation: '正在生成完整复盘',
+    generating_summary: '正在生成练习总结',
     awaiting_next: '复盘完成',
     completed: '练习已结束',
     idle: '未选择练习',

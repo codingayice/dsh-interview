@@ -74,6 +74,20 @@ export function renderPracticeMarkdown(practice, include) {
       `- 平均分：${summary.averageScore ?? '未评分'}`,
       `- 结论：${summary.verdict}`,
     )
+    if (practice.summary) {
+      lines.push(
+        '',
+        practice.summary.overall,
+        '',
+        '### 表现亮点',
+        '',
+        ...practice.summary.strengths.map((item) => `- ${item}`),
+        '',
+        '### 改进建议',
+        '',
+        ...practice.summary.improvements.map((item) => `- ${item}`),
+      )
+    }
   }
 
   for (const question of practice.questions) {

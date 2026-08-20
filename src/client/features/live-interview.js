@@ -192,3 +192,24 @@ export function ReviewResourceCard({ presentation, revision, sessionId }) {
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
   return h(PresentedState, { query, missing: '找不到完整复盘卡片数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
 }
+
+export function PracticeSummaryCard({ presentation, revision }) {
+  const query = usePresentedPractice(presentation, revision)
+  const practice = query.data?.resource?.data
+  const summary = practice?.summary
+  return h(PresentedState, { query, missing: '找不到练习总结' }, summary ? h('article', { className: 'di-card', 'aria-label': '练习总结' },
+    h('header', { className: 'di-card-head' },
+      h('div', null,
+        h('div', { className: 'di-title' }, '练习总结'),
+        h('div', { className: 'di-subtitle' }, `${practice.modeLabel} · ${practice.topic}`)),
+      h(PhaseBadge, { phase: 'completed' })),
+    h('div', { className: 'di-card-body' },
+      h(Markdown, null, summary.overall),
+      h('section', { className: 'di-section' },
+        h('div', { className: 'di-section-label' }, '表现亮点'),
+        h('ul', null, summary.strengths.map((item) => h('li', { key: item }, item)))),
+      h('section', { className: 'di-section' },
+        h('div', { className: 'di-section-label' }, '改进建议'),
+        h('ul', null, summary.improvements.map((item) => h('li', { key: item }, item)))),
+      h('div', { className: 'di-subtitle' }, `${practice.questionCount} 道题 · ${practice.attemptCount} 次作答 · 平均分 ${practice.averageScore ?? '—'}`))) : null)
+}

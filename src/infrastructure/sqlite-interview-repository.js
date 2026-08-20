@@ -29,7 +29,8 @@ export class SqliteInterviewRepository {
         status TEXT NOT NULL CHECK (status IN ('active', 'completed')),
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
-        completed_at INTEGER
+        completed_at INTEGER,
+        summary_json TEXT
       );
 
       CREATE TABLE IF NOT EXISTS questions (
@@ -72,6 +73,10 @@ export class SqliteInterviewRepository {
       CREATE INDEX IF NOT EXISTS idx_questions_practice ON questions(practice_id, sequence);
       CREATE INDEX IF NOT EXISTS idx_attempts_question ON attempts(question_id, sequence);
     `)
+    const practiceColumns = this.database.prepare('PRAGMA table_info(practices)').all()
+    if (!practiceColumns.some((column) => column.name === 'summary_json')) {
+      this.database.exec('ALTER TABLE practices ADD COLUMN summary_json TEXT')
+    }
   }
 
   #readQuestion(row) {
@@ -119,6 +124,7 @@ export class SqliteInterviewRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
+      summary: parseJson(row.summary_json, null),
       questions: questionRows.map((question) => this.#readQuestion(question)),
     }
   }
@@ -155,8 +161,8 @@ export class SqliteInterviewRepository {
     this.database.prepare(`
       INSERT INTO practices (
         id, mode, topic, source_kind, source_content, config_json, status,
-        created_at, updated_at, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_at, updated_at, completed_at, summary_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         mode = excluded.mode,
         topic = excluded.topic,
@@ -165,7 +171,8 @@ export class SqliteInterviewRepository {
         config_json = excluded.config_json,
         status = excluded.status,
         updated_at = excluded.updated_at,
-        completed_at = excluded.completed_at
+        completed_at = excluded.completed_at,
+        summary_json = excluded.summary_json
     `).run(
       practice.id,
       practice.mode,
@@ -177,6 +184,7 @@ export class SqliteInterviewRepository {
       practice.createdAt,
       practice.updatedAt,
       practice.completedAt,
+      practice.summary ? JSON.stringify(practice.summary) : null,
     )
     this.database.prepare('DELETE FROM questions WHERE practice_id = ?').run(practice.id)
     const insertQuestion = this.database.prepare(`

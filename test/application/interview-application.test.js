@@ -97,11 +97,17 @@ test('结束、重新打开、洞察和导出通过独立用例完成', async ()
   await fixture.application.askQuestion('session-1', { prompt: '问题' })
   await fixture.application.submitAnswer('session-1', { answer: '回答' })
   await fixture.application.evaluateAnswer('session-1', { score: 6, feedback: '继续加强。' })
-  await fixture.application.completePractice('session-1')
-  assert.equal((await fixture.application.getSession('session-1')).resource.data.phase, 'completed')
+  await fixture.application.requestPracticeSummary('session-1')
+  await fixture.application.completePractice('session-1', {
+    overall: '基础知识仍需加强。', strengths: ['完成了作答。'], improvements: ['补充知识细节。'],
+  })
+  const completedSession = await fixture.application.getSession('session-1')
+  assert.equal(completedSession.resource.data.phase, 'completed')
+  assert.equal(completedSession.resource.data.practice.summary.overall, '基础知识仍需加强。')
   assert.equal((await fixture.application.getInsights()).resource.data.weakestTopic.topic, '模拟面试')
   assert.equal((await fixture.application.exportPractices({ practiceIds: [practiceId] })).resource.data[0].token, `download-${practiceId}`)
   assert.equal((await fixture.application.reopenPractice('session-1', practiceId)).resource.data.practice.status, 'active')
+  assert.equal((await fixture.application.getPractice(practiceId)).resource.data.summary, null)
 })
 
 test('练习查询支持筛选，删除会清理会话游标', async () => {

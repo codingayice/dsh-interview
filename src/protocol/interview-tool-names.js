@@ -4,6 +4,7 @@ export const INTERVIEW_TOOL_NAMES = Object.freeze([
   'interview_select_practice',
   'interview_reopen_practice',
   'interview_finish_practice',
+  'interview_complete_summary',
   'interview_present_question',
   'interview_open_question',
   'interview_request_next',

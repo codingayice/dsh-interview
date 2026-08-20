@@ -18,6 +18,8 @@ function instructionFor(event) {
       return `面试工作流事件：用户要重新回答历史题。practice_id=${event.practiceId}，question_id=${event.questionId}。调用 interview_open_question 展示该题并等待用户回答，不要创建新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case 'answer.reveal_requested':
       return `面试工作流事件：用户选择直接看答案。practice_id=${event.practiceId}，question_id=${event.questionId}。必须调用 interview_read_practice_context 读取完整题目与练习配置，直接生成详细知识点讲解和可直接背诵的“直接背”，然后调用 interview_complete_review。禁止创建用户作答、评分或评价。${ASSISTANT_RESPONSE_PROTOCOL}`
+    case 'practice.summary_requested':
+      return `面试工作流事件：用户要求结束练习。practice_id=${event.practiceId}。必须调用 interview_read_practice_context 读取练习配置、全部题目、全部历次作答、评价和讲解；基于这些真实数据生成总体总结、表现亮点和改进建议，然后调用 interview_complete_summary。禁止继续出题。${ASSISTANT_RESPONSE_PROTOCOL}`
     default:
       return null
   }
