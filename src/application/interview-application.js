@@ -107,8 +107,10 @@ export class InterviewApplication {
     const latestQuestion = practice.questions.at(-1) || null
     if (latestQuestion) cursor = cursorForQuestion(cursor, latestQuestion, now)
     if (practice.status === 'completed') cursor = { ...cursor, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1 }
+    const events = [{ type: 'practice.selected', sessionId, practiceId: practice.id, phase: cursor.phase }]
     await this.repository.commit({ cursor })
-    return this.#result('session', toSessionDto(cursor, practice), cursor)
+    await this.#publish(events)
+    return this.#result('session', toSessionDto(cursor, practice), cursor, events)
   }
 
   async askQuestion(sessionId, input) {

@@ -97,7 +97,7 @@ const tools = [
   }),
   atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
   atomicTool({
-    name: 'interview_select_practice', action: INTERVIEW_ACTIONS.SELECT_PRACTICE, description: '把当前会话切换到指定练习。返回上下文包含该练习配置、总结、全部题目、历次作答、评价和讲解，必须据此继续。',
+    name: 'interview_select_practice', action: INTERVIEW_ACTIONS.SELECT_PRACTICE, description: '把当前会话切换到指定练习。返回上下文包含该练习配置、总结、全部题目、历次作答、评价和讲解；最终只确认已切换到当前练习，不继续执行其他动作。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),
   atomicTool({

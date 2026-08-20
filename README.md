@@ -95,6 +95,8 @@ dsh plugin --profile web update dsh-interview
 
 练习档案支持搜索和筛选，并展示每道题的历次回答、评价和讲解。Markdown 导出通过一次性受控令牌下载。
 
+点击“切换到该练习”后，插件会立即通知 Agent 加载该练习的完整上下文，并由 Agent 确认当前练习已经切换成功。
+
 ## 数据存储
 
 默认数据库：

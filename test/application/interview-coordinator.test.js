@@ -49,11 +49,33 @@ test('UI 入口由协调器统一派发后续生成事件', async () => {
     application: fixture.application,
     eventBridge: { dispatch(events) { dispatched.push(...events) } },
   })
-  await coordinator.execute({
+  const started = await coordinator.execute({
     sessionId: 'session-ui',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
     payload: { mode: 'mock', config: { resume: 'Java 简历', interviewerStyle: '深挖项目', coding: true, difficulty: 'intermediate' } },
     source: 'ui',
   })
   assert.equal(dispatched[0].type, 'question.generation_requested')
+  await coordinator.execute({
+    sessionId: 'session-ui', action: INTERVIEW_ACTIONS.SELECT_PRACTICE,
+    payload: { practiceId: started.resource.data.practice.id }, source: 'ui',
+  })
+  assert.equal(dispatched.at(-1).type, 'practice.selected')
+})
+
+test('选择练习向模型提供完整上下文并只返回切换确认', async () => {
+  const fixture = applicationFixture()
+  const coordinator = new InterviewCoordinator({ application: fixture.application })
+  const started = await coordinator.execute({
+    sessionId: 'session-1', action: INTERVIEW_ACTIONS.START_PRACTICE,
+    payload: { mode: 'bagu', config: { topic: 'JVM' } },
+  })
+  await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.PRESENT_QUESTION, payload: { prompt: '什么是 JMM？' } })
+  const selected = await coordinator.execute({
+    sessionId: 'session-2', action: INTERVIEW_ACTIONS.SELECT_PRACTICE,
+    payload: { practiceId: started.resource.data.practice.id },
+  })
+  assert.equal(selected.presentation, null)
+  assert.equal(selected.assistantResponse.text, '已切换到当前练习：JVM。')
+  assert.equal(selected.context.practice.questions[0].prompt, '什么是 JMM？')
 })

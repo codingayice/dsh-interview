@@ -42,6 +42,13 @@ function descriptor(action, result) {
       }
     }
     case INTERVIEW_ACTIONS.SELECT_PRACTICE:
+      return {
+        state: data.phase,
+        nextAction: 'wait_for_user',
+        presentation: null,
+        assistantResponse: exact(`已切换到当前练习：${data.practice.topic}。`),
+        context: data,
+      }
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: {
       const needsQuestion = data.phase === 'awaiting_question'
       const needsExplanation = data.phase === 'generating_explanation'

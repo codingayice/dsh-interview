@@ -139,6 +139,8 @@ test('应用层提供练习与题目 CRUD，切换时返回完整模型上下文
   const selected = await fixture.application.selectPractice('session-2', practiceId)
   assert.equal(selected.resource.data.practice.questions[0].explanation.detail, '历史讲解')
   assert.equal(selected.resource.data.practice.questions[0].attempts[0].answer, '历史回答')
+  assert.equal(selected.events[0].type, 'practice.selected')
+  assert.equal(selected.events[0].practiceId, practiceId)
 
   await fixture.application.deleteQuestion(practiceId, questionId, 'session-2')
   assert.equal((await fixture.application.getPractice(practiceId)).resource.data.questions.length, 0)

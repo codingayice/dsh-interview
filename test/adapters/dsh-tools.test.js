@@ -145,6 +145,9 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   const summary = instructionFor({ type: 'practice.summary_requested', practiceId: 'p1' })
   assert.match(summary, /全部历次作答、评价和讲解/)
   assert.match(summary, /interview_complete_summary/)
+  const selected = instructionFor({ type: 'practice.selected', practiceId: 'p1', phase: 'awaiting_answer' })
+  assert.match(selected, /interview_select_practice/)
+  assert.match(selected, /完成确认后停止/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 
