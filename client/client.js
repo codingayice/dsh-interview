@@ -144,6 +144,39 @@ function Markdown({ children }) {
   const text = String(children || "");
   return MarkdownText2 ? h(MarkdownText2, { text, content: text }) : h("div", { className: "di-preline" }, text);
 }
+var ICON_PATHS = {
+  check: [h("path", { key: "p", d: "m5 12 4 4L19 6" })],
+  eye: [h("path", { key: "p", d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" }), h("circle", { key: "c", cx: 12, cy: 12, r: 2.5 })],
+  copy: [h("rect", { key: "a", x: 9, y: 9, width: 10, height: 10, rx: 1.5 }), h("path", { key: "b", d: "M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9" })],
+  swap: [h("path", { key: "a", d: "M7 7h11l-3-3m3 3-3 3" }), h("path", { key: "b", d: "M17 17H6l3 3m-3-3 3-3" })],
+  trash: [h("path", { key: "a", d: "M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" })],
+  download: [h("path", { key: "a", d: "M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" })]
+};
+function Icon({ name: name2, size = 18 }) {
+  return h("svg", {
+    className: "di-icon",
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true"
+  }, ...ICON_PATHS[name2] || []);
+}
+function StarRating({ score }) {
+  const normalized = Math.max(0, Math.min(5, Number(score || 0) / 2));
+  return h(
+    "div",
+    { className: "di-stars", "aria-label": `${Number(score || 0)} \u5206\uFF0C\u6EE1\u5206 10 \u5206` },
+    Array.from({ length: 5 }, (_, index) => {
+      const fill = Math.max(0, Math.min(1, normalized - index)) * 100;
+      return h("span", { className: "di-star", key: index, style: { "--di-star-fill": `${fill}%` } }, "\u2605");
+    })
+  );
+}
 function resultText(block) {
   return (block?.content || []).filter((item) => item?.type === "text" && typeof item.text === "string").map((item) => item.text).join("\n");
 }
@@ -302,69 +335,113 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
 }
 function QuestionResultCard({ question }) {
   if (!question) return null;
+  const reviewId = `di-review-${question.id}`;
+  const showReview = () => globalThis.document?.getElementById(reviewId)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
   return h(
     "article",
-    { className: "di-card", "aria-label": "\u9762\u8BD5\u9898" },
-    h(
-      "header",
-      { className: "di-card-head" },
-      h(
-        "div",
-        null,
-        h("div", { className: "di-eyebrow" }, `INTERVIEW QUESTION \xB7 Q${String(question.sequence || 0).padStart(2, "0")}`),
-        h("div", { className: "di-title" }, "\u8BF7\u56DE\u7B54\u8FD9\u9053\u9898")
-      ),
-      h(PhaseBadge, { phase: "awaiting_answer" })
-    ),
+    { className: "di-card di-question-card", "aria-label": "\u9762\u8BD5\u9898" },
     h(
       "div",
-      { className: "di-card-body" },
-      h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt))
-    )
+      { className: "di-question-main" },
+      h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt)),
+      h(
+        "ul",
+        { className: "di-question-guide" },
+        h("li", null, "\u8BF4\u660E\u6838\u5FC3\u539F\u7406\u4E0E\u9002\u7528\u573A\u666F"),
+        h("li", null, "\u7ED3\u5408\u9879\u76EE\u5B9E\u8DF5\u8BF4\u660E\u9009\u62E9\u4F9D\u636E")
+      )
+    ),
+    h(Button, {
+      className: "di-answer-button",
+      onClick: showReview,
+      "aria-label": "\u67E5\u770B\u672C\u9898\u7B54\u6848\u4E0E\u590D\u76D8"
+    }, h(Icon, { name: "eye" }), "\u67E5\u770B\u7B54\u6848")
   );
 }
 function ReviewResultCard({ sessionId, question, attempt }) {
   if (!question || !attempt?.evaluation || !question.explanation) return null;
   const command = useCommand(sessionId);
+  const [copied, setCopied] = import_react3.default.useState(false);
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });
+  const evaluation = attempt.evaluation;
+  const explanation = question.explanation;
+  const copyMemorization = async () => {
+    try {
+      if (globalThis.navigator?.clipboard?.writeText) {
+        await globalThis.navigator.clipboard.writeText(explanation.memorizationPoints);
+      } else {
+        const textarea = globalThis.document?.createElement?.("textarea");
+        if (!textarea) return;
+        textarea.value = explanation.memorizationPoints;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        globalThis.document.body.appendChild(textarea);
+        textarea.select();
+        globalThis.document.execCommand?.("copy");
+        textarea.remove();
+      }
+      setCopied(true);
+      globalThis.setTimeout?.(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
   return h(
     "article",
-    { className: "di-card", "aria-label": "\u672C\u9898\u590D\u76D8" },
+    { id: `di-review-${question.id}`, className: "di-card di-review-card", "aria-label": "\u672C\u9898\u590D\u76D8" },
     h(
-      "header",
-      { className: "di-card-head" },
+      "aside",
+      { className: "di-review-score" },
+      h("span", { className: "di-review-check" }, h(Icon, { name: "check", size: 22 })),
+      h("div", { className: "di-review-score-label" }, "\u8BC4\u5206"),
       h(
         "div",
-        null,
-        h("div", { className: "di-eyebrow" }, `QUESTION REVIEW \xB7 Q${String(question.sequence || 0).padStart(2, "0")}`),
-        h("div", { className: "di-title" }, "\u672C\u9898\u5B8C\u6574\u590D\u76D8")
+        { className: "di-review-score-value" },
+        h("strong", null, Number(evaluation.score).toFixed(1)),
+        h("span", null, "/ 10")
       ),
-      h(PhaseBadge, { phase: "awaiting_next" })
+      h(StarRating, { score: evaluation.score })
     ),
     h(
       "div",
-      { className: "di-card-body" },
+      { className: "di-review-content" },
       h(
-        "div",
-        { className: "di-section" },
-        h("div", { className: "di-section-label" }, "\u9898\u76EE"),
-        h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt))
+        "section",
+        { className: "di-review-section" },
+        h("h3", null, "\u8BC4\u4EF7"),
+        h("div", { className: "di-feedback-banner" }, h(Markdown, null, evaluation.feedback)),
+        Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-dimensions" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("span", { key: name2 }, name2, h("strong", null, `${score}/10`)))) : null
+      ),
+      h(
+        "section",
+        { className: "di-review-section" },
+        h("h3", null, "\u8BB2\u89E3"),
+        h("div", { className: "di-explanation-copy" }, h(Markdown, null, explanation.detail))
+      ),
+      h(
+        "section",
+        { className: "di-memorize-box" },
+        h(
+          "div",
+          { className: "di-memorize-copy" },
+          h("div", { className: "di-memorize-label" }, "\u76F4\u63A5\u80CC"),
+          h(Markdown, null, explanation.memorizationPoints)
+        ),
+        h(Button, { className: "di-copy-button", onClick: copyMemorization }, h(Icon, { name: "copy" }), copied ? "\u5DF2\u590D\u5236" : "\u590D\u5236")
       ),
       h(
         "div",
-        { className: "di-attempt" },
-        h("div", { className: "di-section-label" }, `\u7B2C ${attempt.sequence} \u6B21\u4F5C\u7B54`),
+        { className: "di-review-answer" },
+        h("span", null, `\u7B2C ${attempt.sequence} \u6B21\u4F5C\u7B54`),
         h(Markdown, null, attempt.answer)
       ),
-      h(Evaluation, { attempt }),
-      h(Explanation, { explanation: question.explanation }),
       h(ErrorNotice, null, command.error),
       h(
         "div",
-        { className: "di-actions" },
+        { className: "di-review-actions" },
         h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
-        h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54"),
+        h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54"),
         h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
       )
     )
@@ -496,26 +573,75 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const [mode, setMode] = import_react4.default.useState("");
   const [status, setStatus] = import_react4.default.useState("");
   const [selectedId, setSelectedId] = import_react4.default.useState(initialPracticeId);
+  const [confirmingId, setConfirmingId] = import_react4.default.useState(null);
+  const [downloads, setDownloads] = import_react4.default.useState([]);
+  const command = useCommand(sessionId);
   const filters = { query: queryText, mode, status };
   const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status]);
   const practices = list.data?.resource?.data || [];
-  import_react4.default.useEffect(() => {
-    if (!selectedId && practices[0]) setSelectedId(practices[0].id);
-  }, [practices.length, selectedId]);
   const detail = useInterviewQuery(`practice:${selectedId || "none"}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId]);
   const selected = detail.data?.resource?.data || null;
+  const run = (name2, payload) => command.run(name2, payload).catch(() => null);
+  const activate = async (practice) => {
+    await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+  };
+  const exportOne = async (practice) => {
+    const result = await run("library.export", { practiceIds: [practice.id] });
+    if (result) setDownloads(result.resource.data || []);
+  };
+  const remove = async (practice) => {
+    if (!practice) return;
+    const result = await run("library.delete", { practiceId: practice.id });
+    if (!result) return;
+    if (selectedId === practice.id) setSelectedId(null);
+    setConfirmingId(null);
+    interviewApi.invalidate();
+  };
+  const dateText = (value) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "\u2014" : date.toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).replaceAll("/", "-");
+  };
+  const scoreClass = (score) => Number(score) >= 8 ? "is-good" : Number(score) >= 6 ? "is-mid" : "is-empty";
+  const rows = practices.map((practice) => h(
+    "tr",
+    { key: practice.id, className: selectedId === practice.id ? "is-selected" : "" },
+    h("td", null, h("button", { className: "di-history-topic", onClick: () => setSelectedId(selectedId === practice.id ? null : practice.id) }, practice.topic)),
+    h("td", null, practice.modeLabel),
+    h("td", { className: "di-history-time" }, dateText(practice.updatedAt)),
+    h("td", null, h("strong", { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? "\u2014")),
+    h("td", null, h(
+      "div",
+      { className: "di-row-actions" },
+      h(Button, { className: "di-icon-button", title: "\u5207\u6362\u5230\u8BE5\u7EC3\u4E60", "aria-label": `\u5207\u6362\u5230${practice.topic}`, onClick: () => activate(practice) }, h(Icon, { name: "swap" })),
+      h(Button, { className: "di-icon-button is-delete", title: "\u5220\u9664", "aria-label": `\u5220\u9664${practice.topic}`, onClick: () => setConfirmingId(practice.id) }, h(Icon, { name: "trash" })),
+      h(Button, { className: "di-icon-button", title: "\u5BFC\u51FA", "aria-label": `\u5BFC\u51FA${practice.topic}`, onClick: () => exportOne(practice) }, h(Icon, { name: "download" }))
+    ))
+  ));
   return h(
     "section",
-    { className: "di-ledger", "aria-label": "\u7EC3\u4E60\u6863\u6848" },
+    { className: "di-ledger di-history", "aria-label": "\u7EC3\u4E60\u5386\u53F2" },
     h(
       "header",
-      { className: "di-ledger-head" },
-      h("div", null, h("div", { className: "di-eyebrow" }, "PRACTICE LEDGER"), h("div", { className: "di-ledger-title" }, "\u7EC3\u4E60\u6863\u6848"), h("div", { className: "di-subtitle" }, "\u6BCF\u4E00\u6B21\u56DE\u7B54\u90FD\u4FDD\u7559\uFF0C\u8FDB\u6B65\u6709\u8FF9\u53EF\u5FAA\u3002")),
-      h("div", { className: "di-score-row" }, h("span", { className: "di-score-number" }, practices.length), h("span", { className: "di-subtitle" }, "\u6761\u7EC3\u4E60"))
+      { className: "di-history-head" },
+      h("div", null, h("div", { className: "di-ledger-title" }, "\u7EC3\u4E60\u5386\u53F2"), h("div", { className: "di-subtitle" }, `\u5171 ${practices.length} \u6761\u7EC3\u4E60\u8BB0\u5F55`)),
+      h(
+        "div",
+        { className: "di-history-legend", "aria-hidden": "true" },
+        h("span", null, h(Icon, { name: "swap" }), "\u5207\u6362\u5230\u8BE5\u7EC3\u4E60"),
+        h("span", null, h(Icon, { name: "trash" }), "\u5220\u9664"),
+        h("span", null, h(Icon, { name: "download" }), "\u5BFC\u51FA")
+      )
     ),
     h(
       "div",
-      { className: "di-ledger-tools" },
+      { className: "di-history-filters" },
       h("input", { className: "di-input", value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: "\u641C\u7D22\u7EC3\u4E60\u4E3B\u9898", "aria-label": "\u641C\u7D22\u7EC3\u4E60\u4E3B\u9898" }),
       h(
         "select",
@@ -535,25 +661,44 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
       )
     ),
     h(ErrorNotice, null, list.error),
-    h(
+    downloads.length ? h("div", { className: "di-notice" }, downloads.map((file) => h("a", { className: "di-link", href: interviewApi.downloadUrl(file.token), key: file.token }, `\u4E0B\u8F7D ${file.name}`))) : null,
+    confirmingId ? h(
       "div",
-      { className: "di-ledger-grid" },
+      { className: "di-delete-confirm" },
+      h("span", null, `\u786E\u8BA4\u5220\u9664\u201C${practices.find((item) => item.id === confirmingId)?.topic || "\u8BE5\u7EC3\u4E60"}\u201D\u53CA\u5168\u90E8\u4F5C\u7B54\uFF1F`),
       h(
         "div",
-        { className: "di-practice-list" },
-        list.loading && !list.data ? h(Loading) : practices.length ? practices.map((practice, index) => h(
-          "button",
-          { className: `di-practice-row${selectedId === practice.id ? " is-selected" : ""}`, key: practice.id, onClick: () => setSelectedId(practice.id) },
-          h("span", { className: "di-sequence" }, String(index + 1).padStart(2, "0")),
-          h("span", null, h("span", { className: "di-row-title" }, practice.topic), h("span", { className: "di-row-meta", style: { display: "block" } }, `${practice.modeLabel} \xB7 ${practice.status === "completed" ? "\u5DF2\u7ED3\u675F" : "\u8FDB\u884C\u4E2D"} \xB7 ${practice.questionCount} \u9898`)),
-          h("span", null, h("strong", null, practice.averageScore ?? "\u2014"), h(ScoreRail, { score: practice.averageScore, compact: true }))
-        )) : h(Empty, { title: "\u8FD8\u6CA1\u6709\u7B26\u5408\u6761\u4EF6\u7684\u7EC3\u4E60", detail: "\u5F00\u59CB\u4E00\u6B21\u9762\u8BD5\u540E\uFF0C\u6863\u6848\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" })
-      ),
-      detail.loading && selectedId ? h(Loading, { label: "\u6B63\u5728\u8BFB\u53D6\u7EC3\u4E60\u8BE6\u60C5\u2026" }) : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => {
+        { className: "di-actions" },
+        h(Button, { onClick: () => setConfirmingId(null) }, "\u53D6\u6D88"),
+        h(Button, { tone: "danger", busy: command.busy === "library.delete", onClick: () => remove(practices.find((item) => item.id === confirmingId)) }, "\u786E\u8BA4\u5220\u9664")
+      )
+    ) : null,
+    list.loading && !list.data ? h(Loading) : practices.length ? h(
+      "div",
+      { className: "di-history-scroll" },
+      h(
+        "table",
+        { className: "di-history-table" },
+        h("thead", null, h(
+          "tr",
+          null,
+          h("th", null, "\u7EC3\u4E60\u5185\u5BB9"),
+          h("th", null, "\u7C7B\u578B"),
+          h("th", null, "\u7EC3\u4E60\u65F6\u95F4"),
+          h("th", null, "\u5F97\u5206"),
+          h("th", { "aria-label": "\u64CD\u4F5C" })
+        )),
+        h("tbody", null, rows)
+      )
+    ) : h(Empty, { title: "\u8FD8\u6CA1\u6709\u7B26\u5408\u6761\u4EF6\u7684\u7EC3\u4E60", detail: "\u5F00\u59CB\u4E00\u6B21\u9762\u8BD5\u540E\uFF0C\u8BB0\u5F55\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" }),
+    selectedId ? h(
+      "div",
+      { className: "di-history-detail" },
+      detail.loading ? h(Loading, { label: "\u6B63\u5728\u8BFB\u53D6\u7EC3\u4E60\u8BE6\u60C5\u2026" }) : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => {
         setSelectedId(null);
         interviewApi.invalidate();
       } })
-    )
+    ) : null
   );
 }
 function InsightsCard() {
@@ -638,20 +783,25 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
 
 // src/client/shared/styles.js
 var STYLE_TEXT = `
-:root{--di-ink:#172033;--di-muted:#667085;--di-paper:#f7f8fc;--di-line:#d9dfeb;--di-cobalt:#315be8;--di-amber:#d8932b;--di-green:#2e8b72;--di-red:#c94b56;--di-white:#fff}
-.di-card,.di-ledger,.di-timeline{font-family:"Segoe UI","Microsoft YaHei",sans-serif;color:var(--color-text-primary,var(--di-ink));box-sizing:border-box}
-.di-card *,.di-ledger *,.di-timeline *{box-sizing:border-box}.di-preline{white-space:pre-wrap}.di-card{width:min(680px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden;box-shadow:0 8px 28px rgba(23,32,51,.08)}
-.di-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-eyebrow{font:600 11px/1.2 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.13em;text-transform:uppercase;color:var(--di-cobalt)}.di-title{font-size:16px;font-weight:680}.di-subtitle{margin-top:3px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-card-body{padding:18px}.di-question-text{font-size:16px;line-height:1.75}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.di-button{appearance:none;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 12px;background:var(--color-bg-primary,var(--di-white));color:inherit;font:600 13px/1 "Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--di-cobalt)}.di-button:focus-visible{outline:3px solid rgba(49,91,232,.25);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-cobalt);border-color:var(--di-cobalt);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:rgba(201,75,86,.4)}
-.di-phase{display:inline-flex;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:999px;padding:4px 8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--color-text-secondary,var(--di-muted));white-space:nowrap}.di-phase-awaiting_answer{border-color:rgba(49,91,232,.45);color:var(--di-cobalt)}.di-phase-generating_explanation{border-color:rgba(216,147,43,.5);color:var(--di-amber)}.di-phase-awaiting_next{border-color:rgba(46,139,114,.45);color:var(--di-green)}.di-phase-completed{border-color:rgba(102,112,133,.35)}
-.di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font:700 26px/1 Bahnschrift,"Segoe UI",sans-serif}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,9px);gap:3px}.di-score-rail i{display:block;height:16px;border-radius:2px;background:var(--color-bg-tertiary,#e8ebf2)}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:10px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
-.di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border-secondary,var(--di-line))}.di-section-label{margin-bottom:8px;font:600 11px/1 Bahnschrift,"Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-secondary,var(--di-muted))}.di-attempt{margin-top:12px;padding:12px;border-left:3px solid var(--di-cobalt);background:var(--color-bg-secondary,var(--di-paper));border-radius:0 6px 6px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}
-.di-state,.di-empty{padding:28px;text-align:center;color:var(--color-text-secondary,var(--di-muted))}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-cobalt);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 0;padding:10px 12px;border-radius:6px;background:rgba(49,91,232,.08);font-size:13px}.di-notice.is-error{background:rgba(201,75,86,.1);color:var(--di-red)}
-.di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(680px,100%);padding:9px 12px;border-left:3px solid var(--di-red);border-radius:0 6px 6px 0;background:rgba(201,75,86,.08);color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--color-text-secondary,var(--di-muted))}
-.di-ledger{width:min(980px,100%);border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));overflow:hidden}.di-ledger-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-ledger-title{font-size:21px;font-weight:720}.di-ledger-tools{display:flex;gap:8px;padding:12px 18px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-input,.di-select{min-width:0;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:6px;padding:8px 10px;background:var(--color-bg-primary,var(--di-white));color:inherit}.di-input{flex:1}.di-ledger-grid{display:grid;grid-template-columns:minmax(320px,1fr) minmax(330px,.95fr);min-height:360px}.di-practice-list{border-right:1px solid var(--color-border-secondary,var(--di-line));padding:8px}.di-practice-row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;width:100%;padding:12px;border:0;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:transparent;color:inherit;text-align:left;cursor:pointer}.di-practice-row:hover,.di-practice-row.is-selected{background:rgba(49,91,232,.06)}.di-sequence{font:700 13px/1 Bahnschrift,"Segoe UI",sans-serif;color:var(--di-cobalt)}.di-row-title{font-weight:650}.di-row-meta{margin-top:4px;font-size:12px;color:var(--color-text-secondary,var(--di-muted))}.di-detail{padding:18px;max-height:620px;overflow:auto}.di-detail-question{padding:14px 0;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.55}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-link{color:var(--di-cobalt);text-decoration:none}.di-confirm{margin-top:10px;padding:10px;border:1px solid rgba(201,75,86,.35);border-radius:6px}
-.di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--color-border-secondary,var(--di-line));border-radius:8px;background:var(--color-bg-primary,var(--di-white));box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--color-border-secondary,var(--di-line));background:var(--color-bg-secondary,var(--di-paper))}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--color-border-secondary,var(--di-line))}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--color-bg-primary,var(--di-white));border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-cobalt);background:var(--di-cobalt)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--color-text-secondary,var(--di-muted))}
+:root{--di-ink:#10182f;--di-muted:#64708a;--di-paper:#f7f9fc;--di-line:#e5eaf1;--di-blue:#245cff;--di-blue-soft:#f5f7ff;--di-green:#15884e;--di-green-soft:#f2faf6;--di-amber:#ffb800;--di-red:#ef4444;--di-white:#fff;--di-shadow:0 8px 28px rgba(28,39,67,.07)}
+.di-card,.di-ledger,.di-timeline{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink);box-sizing:border-box}
+.di-card *,.di-ledger *,.di-timeline *{box-sizing:border-box}.di-preline{white-space:pre-wrap;line-height:1.75}.di-icon{display:inline-block;flex:0 0 auto;vertical-align:middle}
+.di-card{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}
+.di-card-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 24px;border-bottom:1px solid var(--di-line);background:var(--di-white)}
+.di-card-body{padding:24px}.di-eyebrow{font-size:11px;font-weight:700;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:var(--di-blue)}.di-title{font-size:18px;font-weight:720}.di-subtitle{margin-top:4px;font-size:13px;color:var(--di-muted)}
+.di-question-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:30px;padding:26px 34px}.di-question-main{min-width:0}.di-question-text{font-size:19px;font-weight:620;line-height:1.55;color:var(--di-ink)}.di-question-text p{margin:0}.di-question-guide{display:grid;gap:6px;margin:13px 0 0;padding-left:22px;color:var(--di-muted);font-size:14px;line-height:1.55}.di-answer-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:140px;padding:12px 18px!important;border-color:var(--di-blue)!important;color:var(--di-blue)!important;background:var(--di-white)!important;font-size:15px!important}
+.di-button{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--di-line);border-radius:8px;padding:9px 13px;background:var(--di-white);color:var(--di-ink);font:600 13px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}.di-button:hover:not(:disabled){transform:translateY(-1px);border-color:#b8c6e6;box-shadow:0 4px 12px rgba(36,92,255,.08)}.di-button:focus-visible,.di-input:focus-visible,.di-select:focus-visible,.di-history-topic:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-button:disabled{opacity:.55;cursor:not-allowed}.di-button.is-primary{background:var(--di-blue);border-color:var(--di-blue);color:#fff}.di-button.is-danger{color:var(--di-red);border-color:#ffd9dc;background:#fffafa}
+.di-phase{display:inline-flex;border:1px solid var(--di-line);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;color:var(--di-muted);white-space:nowrap}.di-phase-awaiting_answer{border-color:#b9c8ff;color:var(--di-blue);background:var(--di-blue-soft)}.di-phase-generating_explanation{border-color:#ffe1a3;color:#a76500;background:#fffaf0}.di-phase-awaiting_next{border-color:#bde6cf;color:var(--di-green);background:var(--di-green-soft)}.di-phase-completed{color:var(--di-muted);background:var(--di-paper)}
+.di-review-card{display:grid;grid-template-columns:220px minmax(0,1fr);padding:24px 28px}.di-review-score{padding:8px 28px 8px 0;border-right:1px solid var(--di-line)}.di-review-check{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;margin-bottom:22px;border-radius:9px;color:#fff;background:var(--di-green);box-shadow:0 0 0 8px var(--di-green-soft)}.di-review-score-label{margin-bottom:10px;font-size:14px;font-weight:700}.di-review-score-value{display:flex;align-items:baseline;gap:8px}.di-review-score-value strong{font-size:35px;font-weight:500;line-height:1;color:var(--di-green)}.di-review-score-value span{font-size:16px;color:var(--di-muted)}.di-stars{display:flex;gap:4px;margin-top:16px}.di-star{font-size:25px;line-height:1;background:linear-gradient(90deg,var(--di-amber) var(--di-star-fill),#dfe4ec var(--di-star-fill));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent}.di-review-content{padding-left:30px;min-width:0}.di-review-section+.di-review-section{margin-top:20px}.di-review-section h3{margin:0 0 9px;font-size:15px}.di-feedback-banner{padding:12px 15px;border:1px solid #e0f0e7;border-radius:9px;background:var(--di-green-soft);font-size:14px;line-height:1.65}.di-dimensions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.di-dimensions span{display:inline-flex;gap:8px;padding:6px 9px;border-radius:6px;background:var(--di-paper);font-size:12px;color:var(--di-muted)}.di-dimensions strong{color:var(--di-ink)}.di-explanation-copy{font-size:14px;line-height:1.75}.di-explanation-copy p,.di-explanation-copy ul,.di-explanation-copy ol{margin-top:6px;margin-bottom:6px}.di-memorize-box{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px;margin-top:18px;padding:14px 15px;border:1px solid #dcefe5;border-radius:9px;background:linear-gradient(100deg,#f2faf6,#f8fbf9)}.di-memorize-label{margin-bottom:5px;font-size:13px;font-weight:700;color:#116d40}.di-memorize-copy{font-size:14px;line-height:1.65}.di-copy-button{color:var(--di-green)!important;border-color:#d7ebe0!important;background:rgba(255,255,255,.7)!important}.di-review-answer{margin-top:15px;padding:11px 13px;border-left:3px solid #cbd5e7;background:var(--di-paper);font-size:13px;color:var(--di-muted)}.di-review-answer>span{display:block;margin-bottom:4px;font-weight:700;color:var(--di-ink)}.di-review-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:15px;border-top:1px solid var(--di-line)}
+.di-score-row{display:flex;align-items:center;gap:12px}.di-score-number{font-size:27px;font-weight:700}.di-score-rail{display:inline-grid;grid-template-columns:repeat(10,8px);gap:3px}.di-score-rail i{display:block;height:15px;border-radius:2px;background:#e8ebf2}.di-score-rail.is-compact{grid-template-columns:repeat(10,5px);gap:2px}.di-score-rail.is-compact i{height:9px}.di-score-rail i.is-good{background:var(--di-green)}.di-score-rail i.is-mid{background:var(--di-amber)}.di-score-rail i.is-low{background:var(--di-red)}
+.di-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--di-line)}.di-section-label{margin-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--di-muted)}.di-attempt{margin-top:12px;padding:12px 14px;border-left:3px solid var(--di-blue);background:var(--di-paper);border-radius:0 7px 7px 0}.di-attempt-head{display:flex;justify-content:space-between;margin-bottom:7px;font-size:12px;color:var(--di-muted)}.di-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
+.di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(1080px,100%);padding:10px 13px;border-left:3px solid var(--di-red);border-radius:0 7px 7px 0;background:#fff1f2;color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--di-muted)}
+.di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{font-size:18px;font-weight:730}.di-history-legend{display:flex;gap:28px;color:var(--di-muted);font-size:13px}.di-history-legend span{display:inline-flex;align-items:center;gap:7px}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:500;text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:750;color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
+.di-timeline{position:fixed;right:16px;top:112px;width:278px;max-height:calc(100vh - 150px);z-index:40;border:1px solid var(--di-line);border-radius:12px;background:var(--di-white);box-shadow:0 12px 32px rgba(23,32,51,.12);overflow:hidden}.di-timeline-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-timeline-body{padding:8px 12px;overflow:auto;max-height:calc(100vh - 205px)}.di-time-item{position:relative;padding:10px 0 10px 25px;border-left:1px solid var(--di-line)}.di-time-item::before{content:"";position:absolute;left:-5px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--di-white);border:2px solid var(--di-line)}.di-time-item.is-current::before{border-color:var(--di-blue);background:var(--di-blue)}.di-time-q{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.di-time-meta{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px;color:var(--di-muted)}
 @keyframes di-spin{to{transform:rotate(360deg)}}
-@media(max-width:900px){.di-timeline{display:none}.di-ledger-grid{grid-template-columns:1fr}.di-practice-list{border-right:0;border-bottom:1px solid var(--color-border-secondary,var(--di-line))}}
-@media(max-width:560px){.di-ledger-head{align-items:flex-start;flex-direction:column}.di-ledger-tools{flex-wrap:wrap}.di-select{flex:1}.di-card-body{padding:15px}.di-score-rail{grid-template-columns:repeat(10,7px)}}
+@media(max-width:760px){.di-question-card{grid-template-columns:1fr;padding:22px}.di-answer-button{justify-self:start}.di-review-card{grid-template-columns:1fr;padding:22px}.di-review-score{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:14px;padding:0 0 20px;border-right:0;border-bottom:1px solid var(--di-line)}.di-review-check{margin:0}.di-review-score-label{margin:0}.di-review-score-value{justify-self:end}.di-stars{grid-column:1/-1;margin-top:0}.di-review-content{padding:22px 0 0}.di-history-legend{display:none}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}}
+@media(max-width:520px){.di-card-body{padding:18px}.di-question-text{font-size:17px}.di-question-guide{font-size:13px}.di-review-card{padding:18px}.di-memorize-box{grid-template-columns:1fr}.di-copy-button{justify-self:start}.di-review-actions{justify-content:flex-start}.di-history-head{padding:17px 18px}.di-history-filters{padding:10px 18px}.di-select{flex:1}.di-delete-confirm{align-items:flex-start;flex-direction:column;margin:10px 18px}}
 @media(prefers-reduced-motion:reduce){.di-button{transition:none}.di-spinner{animation-duration:1.5s}}
 `;
 function installStyles() {

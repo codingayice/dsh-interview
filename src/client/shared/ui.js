@@ -10,6 +10,32 @@ export function Markdown({ children }) {
   return MarkdownText ? h(MarkdownText, { text, content: text }) : h('div', { className: 'di-preline' }, text)
 }
 
+const ICON_PATHS = {
+  check: [h('path', { key: 'p', d: 'm5 12 4 4L19 6' })],
+  eye: [h('path', { key: 'p', d: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z' }), h('circle', { key: 'c', cx: 12, cy: 12, r: 2.5 })],
+  copy: [h('rect', { key: 'a', x: 9, y: 9, width: 10, height: 10, rx: 1.5 }), h('path', { key: 'b', d: 'M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9' })],
+  swap: [h('path', { key: 'a', d: 'M7 7h11l-3-3m3 3-3 3' }), h('path', { key: 'b', d: 'M17 17H6l3 3m-3-3 3-3' })],
+  trash: [h('path', { key: 'a', d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5' })],
+  download: [h('path', { key: 'a', d: 'M12 3v12m0 0 4-4m-4 4-4-4M5 19h14' })],
+}
+
+export function Icon({ name, size = 18 }) {
+  return h('svg', {
+    className: 'di-icon', width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true',
+  }, ...(ICON_PATHS[name] || []))
+}
+
+export function StarRating({ score }) {
+  const normalized = Math.max(0, Math.min(5, Number(score || 0) / 2))
+  return h('div', { className: 'di-stars', 'aria-label': `${Number(score || 0)} 分，满分 10 分` },
+    Array.from({ length: 5 }, (_, index) => {
+      const fill = Math.max(0, Math.min(1, normalized - index)) * 100
+      return h('span', { className: 'di-star', key: index, style: { '--di-star-fill': `${fill}%` } }, '★')
+    }))
+}
+
 function resultText(block) {
   return (block?.content || [])
     .filter((item) => item?.type === 'text' && typeof item.text === 'string')

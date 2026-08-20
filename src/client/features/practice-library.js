@@ -1,7 +1,7 @@
 import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
-import { Button, Empty, ErrorNotice, h, Loading, Markdown, ScoreRail } from '../shared/ui.js'
+import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail } from '../shared/ui.js'
 
 function PracticeDetail({ practice, sessionId, onDeleted }) {
   const command = useCommand(sessionId)
@@ -67,37 +67,78 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
   const [mode, setMode] = React.useState('')
   const [status, setStatus] = React.useState('')
   const [selectedId, setSelectedId] = React.useState(initialPracticeId)
+  const [confirmingId, setConfirmingId] = React.useState(null)
+  const [downloads, setDownloads] = React.useState([])
+  const command = useCommand(sessionId)
   const filters = { query: queryText, mode, status }
   const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status])
   const practices = list.data?.resource?.data || []
-  React.useEffect(() => {
-    if (!selectedId && practices[0]) setSelectedId(practices[0].id)
-  }, [practices.length, selectedId])
   const detail = useInterviewQuery(`practice:${selectedId || 'none'}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId])
   const selected = detail.data?.resource?.data || null
+  const run = (name, payload) => command.run(name, payload).catch(() => null)
+  const activate = async (practice) => {
+    await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
+  }
+  const exportOne = async (practice) => {
+    const result = await run('library.export', { practiceIds: [practice.id] })
+    if (result) setDownloads(result.resource.data || [])
+  }
+  const remove = async (practice) => {
+    if (!practice) return
+    const result = await run('library.delete', { practiceId: practice.id })
+    if (!result) return
+    if (selectedId === practice.id) setSelectedId(null)
+    setConfirmingId(null)
+    interviewApi.invalidate()
+  }
+  const dateText = (value) => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).replaceAll('/', '-')
+  }
+  const scoreClass = (score) => Number(score) >= 8 ? 'is-good' : Number(score) >= 6 ? 'is-mid' : 'is-empty'
+  const rows = practices.map((practice) => h('tr', { key: practice.id, className: selectedId === practice.id ? 'is-selected' : '' },
+    h('td', null, h('button', { className: 'di-history-topic', onClick: () => setSelectedId(selectedId === practice.id ? null : practice.id) }, practice.topic)),
+    h('td', null, practice.modeLabel),
+    h('td', { className: 'di-history-time' }, dateText(practice.updatedAt)),
+    h('td', null, h('strong', { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? '—')),
+    h('td', null, h('div', { className: 'di-row-actions' },
+      h(Button, { className: 'di-icon-button', title: '切换到该练习', 'aria-label': `切换到${practice.topic}`, onClick: () => activate(practice) }, h(Icon, { name: 'swap' })),
+      h(Button, { className: 'di-icon-button is-delete', title: '删除', 'aria-label': `删除${practice.topic}`, onClick: () => setConfirmingId(practice.id) }, h(Icon, { name: 'trash' })),
+      h(Button, { className: 'di-icon-button', title: '导出', 'aria-label': `导出${practice.topic}`, onClick: () => exportOne(practice) }, h(Icon, { name: 'download' }))))))
 
-  return h('section', { className: 'di-ledger', 'aria-label': '练习档案' },
-    h('header', { className: 'di-ledger-head' },
-      h('div', null, h('div', { className: 'di-eyebrow' }, 'PRACTICE LEDGER'), h('div', { className: 'di-ledger-title' }, '练习档案'), h('div', { className: 'di-subtitle' }, '每一次回答都保留，进步有迹可循。')),
-      h('div', { className: 'di-score-row' }, h('span', { className: 'di-score-number' }, practices.length), h('span', { className: 'di-subtitle' }, '条练习'))),
-    h('div', { className: 'di-ledger-tools' },
+  return h('section', { className: 'di-ledger di-history', 'aria-label': '练习历史' },
+    h('header', { className: 'di-history-head' },
+      h('div', null, h('div', { className: 'di-ledger-title' }, '练习历史'), h('div', { className: 'di-subtitle' }, `共 ${practices.length} 条练习记录`)),
+      h('div', { className: 'di-history-legend', 'aria-hidden': 'true' },
+        h('span', null, h(Icon, { name: 'swap' }), '切换到该练习'),
+        h('span', null, h(Icon, { name: 'trash' }), '删除'),
+        h('span', null, h(Icon, { name: 'download' }), '导出'))),
+    h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
       h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
         h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'resume' }, '简历出题')),
       h('select', { className: 'di-select', value: status, onChange: (event) => setStatus(event.target.value), 'aria-label': '筛选状态' },
         h('option', { value: '' }, '全部状态'), h('option', { value: 'active' }, '进行中'), h('option', { value: 'completed' }, '已结束'))),
     h(ErrorNotice, null, list.error),
-    h('div', { className: 'di-ledger-grid' },
-      h('div', { className: 'di-practice-list' },
-        list.loading && !list.data ? h(Loading) : practices.length ? practices.map((practice, index) =>
-          h('button', { className: `di-practice-row${selectedId === practice.id ? ' is-selected' : ''}`, key: practice.id, onClick: () => setSelectedId(practice.id) },
-            h('span', { className: 'di-sequence' }, String(index + 1).padStart(2, '0')),
-            h('span', null, h('span', { className: 'di-row-title' }, practice.topic), h('span', { className: 'di-row-meta', style: { display: 'block' } }, `${practice.modeLabel} · ${practice.status === 'completed' ? '已结束' : '进行中'} · ${practice.questionCount} 题`)),
-            h('span', null, h('strong', null, practice.averageScore ?? '—'), h(ScoreRail, { score: practice.averageScore, compact: true }))))
-          : h(Empty, { title: '还没有符合条件的练习', detail: '开始一次面试后，档案会自动出现在这里。' })),
-      detail.loading && selectedId ? h(Loading, { label: '正在读取练习详情…' })
-        : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => { setSelectedId(null); interviewApi.invalidate() } }))
-  )
+    downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
+      h('a', { className: 'di-link', href: interviewApi.downloadUrl(file.token), key: file.token }, `下载 ${file.name}`))) : null,
+    confirmingId ? h('div', { className: 'di-delete-confirm' },
+      h('span', null, `确认删除“${practices.find((item) => item.id === confirmingId)?.topic || '该练习'}”及全部作答？`),
+      h('div', { className: 'di-actions' },
+        h(Button, { onClick: () => setConfirmingId(null) }, '取消'),
+        h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: () => remove(practices.find((item) => item.id === confirmingId)) }, '确认删除'))) : null,
+    list.loading && !list.data ? h(Loading) : practices.length
+      ? h('div', { className: 'di-history-scroll' },
+          h('table', { className: 'di-history-table' },
+            h('thead', null, h('tr', null,
+              h('th', null, '练习内容'), h('th', null, '类型'), h('th', null, '练习时间'), h('th', null, '得分'), h('th', { 'aria-label': '操作' }))),
+            h('tbody', null, rows)))
+      : h(Empty, { title: '还没有符合条件的练习', detail: '开始一次面试后，记录会自动出现在这里。' }),
+    selectedId ? h('div', { className: 'di-history-detail' },
+      detail.loading ? h(Loading, { label: '正在读取练习详情…' })
+        : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => { setSelectedId(null); interviewApi.invalidate() } })) : null)
 }
 
 export function InsightsCard() {

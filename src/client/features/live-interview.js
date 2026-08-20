@@ -1,7 +1,7 @@
 import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
-import { Button, Empty, ErrorNotice, h, Loading, Markdown, PhaseBadge, ScoreRail } from '../shared/ui.js'
+import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, PhaseBadge, ScoreRail, StarRating } from '../shared/ui.js'
 
 function Evaluation({ attempt }) {
   if (!attempt?.evaluation) return null
@@ -83,39 +83,77 @@ export function CompactResultCard({ title, detail, tone = 'quiet' }) {
 
 export function QuestionResultCard({ question }) {
   if (!question) return null
-  return h('article', { className: 'di-card', 'aria-label': '面试题' },
-    h('header', { className: 'di-card-head' },
-      h('div', null,
-        h('div', { className: 'di-eyebrow' }, `INTERVIEW QUESTION · Q${String(question.sequence || 0).padStart(2, '0')}`),
-        h('div', { className: 'di-title' }, '请回答这道题')),
-      h(PhaseBadge, { phase: 'awaiting_answer' })),
-    h('div', { className: 'di-card-body' },
-      h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt))))
+  const reviewId = `di-review-${question.id}`
+  const showReview = () => globalThis.document?.getElementById(reviewId)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  return h('article', { className: 'di-card di-question-card', 'aria-label': '面试题' },
+    h('div', { className: 'di-question-main' },
+      h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt)),
+      h('ul', { className: 'di-question-guide' },
+        h('li', null, '说明核心原理与适用场景'),
+        h('li', null, '结合项目实践说明选择依据'))),
+    h(Button, {
+      className: 'di-answer-button', onClick: showReview, 'aria-label': '查看本题答案与复盘',
+    }, h(Icon, { name: 'eye' }), '查看答案'))
 }
 
 export function ReviewResultCard({ sessionId, question, attempt }) {
   if (!question || !attempt?.evaluation || !question.explanation) return null
   const command = useCommand(sessionId)
+  const [copied, setCopied] = React.useState(false)
   const run = (name, payload) => command.run(name, payload).catch(() => {})
-  return h('article', { className: 'di-card', 'aria-label': '本题复盘' },
-    h('header', { className: 'di-card-head' },
-      h('div', null,
-        h('div', { className: 'di-eyebrow' }, `QUESTION REVIEW · Q${String(question.sequence || 0).padStart(2, '0')}`),
-        h('div', { className: 'di-title' }, '本题完整复盘')),
-      h(PhaseBadge, { phase: 'awaiting_next' })),
-    h('div', { className: 'di-card-body' },
-      h('div', { className: 'di-section' },
-        h('div', { className: 'di-section-label' }, '题目'),
-        h('div', { className: 'di-question-text' }, h(Markdown, null, question.prompt))),
-      h('div', { className: 'di-attempt' },
-        h('div', { className: 'di-section-label' }, `第 ${attempt.sequence} 次作答`),
+  const evaluation = attempt.evaluation
+  const explanation = question.explanation
+  const copyMemorization = async () => {
+    try {
+      if (globalThis.navigator?.clipboard?.writeText) {
+        await globalThis.navigator.clipboard.writeText(explanation.memorizationPoints)
+      } else {
+        const textarea = globalThis.document?.createElement?.('textarea')
+        if (!textarea) return
+        textarea.value = explanation.memorizationPoints
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        globalThis.document.body.appendChild(textarea)
+        textarea.select()
+        globalThis.document.execCommand?.('copy')
+        textarea.remove()
+      }
+      setCopied(true)
+      globalThis.setTimeout?.(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': '本题复盘' },
+    h('aside', { className: 'di-review-score' },
+      h('span', { className: 'di-review-check' }, h(Icon, { name: 'check', size: 22 })),
+      h('div', { className: 'di-review-score-label' }, '评分'),
+      h('div', { className: 'di-review-score-value' },
+        h('strong', null, Number(evaluation.score).toFixed(1)), h('span', null, '/ 10')),
+      h(StarRating, { score: evaluation.score })),
+    h('div', { className: 'di-review-content' },
+      h('section', { className: 'di-review-section' },
+        h('h3', null, '评价'),
+        h('div', { className: 'di-feedback-banner' }, h(Markdown, null, evaluation.feedback)),
+        Object.keys(evaluation.dimensions || {}).length
+          ? h('div', { className: 'di-dimensions' }, Object.entries(evaluation.dimensions).map(([name, score]) =>
+              h('span', { key: name }, name, h('strong', null, `${score}/10`))))
+          : null),
+      h('section', { className: 'di-review-section' },
+        h('h3', null, '讲解'),
+        h('div', { className: 'di-explanation-copy' }, h(Markdown, null, explanation.detail))),
+      h('section', { className: 'di-memorize-box' },
+        h('div', { className: 'di-memorize-copy' },
+          h('div', { className: 'di-memorize-label' }, '直接背'),
+          h(Markdown, null, explanation.memorizationPoints)),
+        h(Button, { className: 'di-copy-button', onClick: copyMemorization }, h(Icon, { name: 'copy' }), copied ? '已复制' : '复制')),
+      h('div', { className: 'di-review-answer' },
+        h('span', null, `第 ${attempt.sequence} 次作答`),
         h(Markdown, null, attempt.answer)),
-      h(Evaluation, { attempt }),
-      h(Explanation, { explanation: question.explanation }),
       h(ErrorNotice, null, command.error),
-      h('div', { className: 'di-actions' },
+      h('div', { className: 'di-review-actions' },
         h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
-        h(Button, { busy: command.busy === 'question.retry', onClick: () => run('question.retry', { questionId: question.id }) }, '重新作答'),
+        h(Button, { busy: command.busy === 'question.retry', onClick: () => run('question.retry', { questionId: question.id }) }, h(Icon, { name: 'swap' }), '重新作答'),
         h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习'))))
 }
 
