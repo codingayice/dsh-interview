@@ -55,6 +55,9 @@ test('题目、作答、评价和讲解形成结构化聚合', () => {
     questionId: 'question-1', attemptId: 'attempt-1', score: 7.5, feedback: '基本正确。', dimensions: { accuracy: 8 }, now: 4,
   })
   practice = evaluated.practice
+  assert.throws(() => saveExplanation(practice, {
+    questionId: 'question-1', detail: '父加载器优先尝试。', memorizationPoints: '  ', now: 5,
+  }), (error) => error instanceof DomainError && error.code === 'INVALID_MEMORIZATION_POINTS')
   practice = saveExplanation(practice, {
     questionId: 'question-1', detail: '父加载器优先尝试。', memorizationPoints: '向上委托，向下加载。', now: 5,
   }).practice

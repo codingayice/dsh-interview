@@ -135,7 +135,7 @@ export function saveExplanation(practice, { questionId, detail, memorizationPoin
   assertDomain(!target.explanation, 'EXPLANATION_ALREADY_EXISTS', '该题已经存在讲解')
   const explanation = {
     detail: requiredText(detail, 'INVALID_EXPLANATION', '讲解内容不能为空'),
-    memorizationPoints: typeof memorizationPoints === 'string' ? memorizationPoints.trim() : '',
+    memorizationPoints: requiredText(memorizationPoints, 'INVALID_MEMORIZATION_POINTS', '直接背内容不能为空'),
     createdAt: now,
   }
   const questions = practice.questions.map((question) => question.id === target.id
