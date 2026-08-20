@@ -17,36 +17,33 @@ function withUpdatedAt(practice, now, patch = {}) {
   return { ...practice, ...patch, updatedAt: now }
 }
 
-export function createPractice({ id, mode, topic, source, config = {}, now }) {
-  const definition = modeDefinition(mode)
-  const normalizedTopic = requiredText(topic, 'INVALID_TOPIC', '练习主题不能为空')
-  const normalizedSource = source && typeof source === 'object'
-    ? {
-        kind: ['topic', 'resume', 'job_description'].includes(source.kind) ? source.kind : 'topic',
-        content: typeof source.content === 'string' ? source.content.trim() : '',
-      }
-    : { kind: 'topic', content: normalizedTopic }
-  if (definition.requiresSource) {
-    assertDomain(normalizedSource.content, 'SOURCE_REQUIRED', '简历出题模式必须提供简历内容')
+function normalizeConfiguration(definition, config) {
+  assertDomain(config && typeof config === 'object' && !Array.isArray(config), 'CONFIGURATION_REQUIRED', '必须明确提供练习配置')
+  if (definition.configuration === 'topic') {
+    return { topic: requiredText(config.topic, 'INVALID_TOPIC', '必须明确提供练习主题') }
   }
 
-  const difficulty = config.difficulty
-  assertDomain(typeof difficulty === 'string' && difficulty, 'DIFFICULTY_REQUIRED', '必须明确选择练习难度')
+  const resume = requiredText(config.resume, 'RESUME_REQUIRED', '模拟面试必须明确提供简历内容')
+  const interviewerStyle = requiredText(config.interviewerStyle, 'INTERVIEWER_STYLE_REQUIRED', '模拟面试必须明确选择面试官风格')
+  assertDomain(typeof config.coding === 'boolean', 'CODING_REQUIRED', '模拟面试必须明确选择是否手撕代码')
+  const difficulty = requiredText(config.difficulty, 'DIFFICULTY_REQUIRED', '模拟面试必须明确选择面试难度')
   assertDomain(DIFFICULTIES.has(difficulty), 'INVALID_DIFFICULTY', `不支持的难度：${difficulty}`)
-  const targetQuestionCount = Number(config.targetQuestionCount)
-  assertDomain(Number.isInteger(targetQuestionCount) && targetQuestionCount >= 1 && targetQuestionCount <= 100, 'INVALID_QUESTION_COUNT', '目标题数必须是 1–100 的整数')
-  assertDomain(typeof config.followUp === 'boolean', 'FOLLOW_UP_REQUIRED', '必须明确选择是否追问')
+  return { resume, interviewerStyle, coding: config.coding, difficulty }
+}
+
+export function createPractice({ id, mode, config, now }) {
+  const definition = modeDefinition(mode)
+  const normalizedConfig = normalizeConfiguration(definition, config)
+  const topic = definition.configuration === 'topic' ? normalizedConfig.topic : definition.label
 
   return {
     id: requiredText(id, 'INVALID_PRACTICE_ID', '练习 ID 不能为空'),
     mode,
-    topic: normalizedTopic,
-    source: normalizedSource,
-    config: {
-      difficulty,
-      targetQuestionCount,
-      followUp: config.followUp,
-    },
+    topic,
+    source: definition.configuration === 'topic'
+      ? { kind: 'topic', content: normalizedConfig.topic }
+      : { kind: 'resume', content: normalizedConfig.resume },
+    config: normalizedConfig,
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -69,7 +66,6 @@ export function findAttempt(question, attemptId) {
 
 export function askQuestion(practice, { id, prompt, now }) {
   activePractice(practice)
-  assertDomain(practice.questions.length < practice.config.targetQuestionCount, 'QUESTION_LIMIT_REACHED', `练习已达到目标题数 ${practice.config.targetQuestionCount}`)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
   const normalizedPrompt = requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空')
   assertDomain(normalizedPrompt.length <= 120, 'QUESTION_TOO_LONG', '题目必须简单扼要，长度不能超过 120 个字符')

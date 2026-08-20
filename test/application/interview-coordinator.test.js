@@ -10,7 +10,7 @@ test('协调器把应用结果转换为状态驱动的结构化交互', async ()
   const started = await coordinator.execute({
     sessionId: 'session-1',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
-    payload: { mode: 'bagu', topic: '并发编程', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false } },
+    payload: { mode: 'bagu', config: { topic: '并发编程' } },
   })
   const asked = await coordinator.execute({
     sessionId: 'session-1',
@@ -33,7 +33,7 @@ test('协调器把应用结果转换为状态驱动的结构化交互', async ()
 test('协调器把 Agent 协议错误标记为可恢复且不交给 UI', async () => {
   const fixture = applicationFixture()
   const coordinator = new InterviewCoordinator({ application: fixture.application })
-  await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.START_PRACTICE, payload: { mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false } } })
+  await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.START_PRACTICE, payload: { mode: 'bagu', config: { topic: 'JVM' } } })
   const invalid = await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.PRESENT_QUESTION, payload: { prompt: '' } })
 
   assert.equal(invalid.error.audience, 'agent')
@@ -52,7 +52,7 @@ test('UI 入口由协调器统一派发后续生成事件', async () => {
   await coordinator.execute({
     sessionId: 'session-ui',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
-    payload: { mode: 'mock', topic: 'Java', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: true } },
+    payload: { mode: 'mock', config: { resume: 'Java 简历', interviewerStyle: '深挖项目', coding: true, difficulty: 'intermediate' } },
     source: 'ui',
   })
   assert.equal(dispatched[0].type, 'question.generation_requested')

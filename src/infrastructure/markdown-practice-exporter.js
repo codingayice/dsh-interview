@@ -50,10 +50,17 @@ export function renderPracticeMarkdown(practice, include) {
       '',
       `- 模式：${modeLabel}`,
       `- 主题：${practice.topic}`,
-      `- 难度：${practice.config.difficulty}`,
       `- 状态：${practice.status === 'completed' ? '已结束' : '进行中'}`,
       `- 创建时间：${timestamp(practice.createdAt)}`,
     )
+    if (practice.mode === 'mock') {
+      lines.push(
+        `- 简历：${practice.config.resume}`,
+        `- 面试官风格：${practice.config.interviewerStyle}`,
+        `- 是否手撕代码：${practice.config.coding ? '是' : '否'}`,
+        `- 面试难度：${practice.config.difficulty}`,
+      )
+    }
   }
 
   if (sections.has('summary')) {

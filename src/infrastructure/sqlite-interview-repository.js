@@ -128,7 +128,11 @@ export class SqliteInterviewRepository {
     const values = []
     if (filters.mode) { clauses.push('mode = ?'); values.push(filters.mode) }
     if (filters.status) { clauses.push('status = ?'); values.push(filters.status) }
-    if (filters.query) { clauses.push('LOWER(topic) LIKE ?'); values.push(`%${String(filters.query).toLowerCase()}%`) }
+    if (filters.query) {
+      clauses.push('(LOWER(topic) LIKE ? OR LOWER(source_content) LIKE ? OR LOWER(config_json) LIKE ?)')
+      const query = `%${String(filters.query).toLowerCase()}%`
+      values.push(query, query, query)
+    }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
     const rows = this.database.prepare(`SELECT id FROM practices ${where} ORDER BY updated_at DESC`).all(...values)
     return Promise.all(rows.map((row) => this.getPractice(row.id)))

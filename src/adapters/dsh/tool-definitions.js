@@ -51,28 +51,42 @@ const tools = [
     action: INTERVIEW_ACTIONS.START_PRACTICE,
     description: `开始一条全新的面试练习。成功后先调用 interview_read_practice_context 读取已保存配置，再按 nextAction 生成第一题。${PRACTICE_CONFIGURATION_POLICY}`,
     parameters: {
-      type: 'object',
-      properties: {
-        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'], description: '用户明确选择的模式。bagu=八股，mock=模拟面试，scenario=场景题，resume=简历出题；禁止自行推断。' },
-        topic: { type: 'string', minLength: 1, description: '用户明确指定的练习主题，禁止自行扩写或替换。' },
-        source_kind: { type: 'string', enum: ['topic', 'resume', 'job_description'], description: '仅在用户明确提供简历或职位描述时设置。' },
-        source_content: { type: 'string', description: '简历或职位描述原文；普通主题练习无需设置。' },
-        difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'], description: '用户明确选择的难度：初级、中级或高级；禁止默认。' },
-        target_question_count: { type: 'integer', minimum: 1, maximum: 100, description: '用户明确选择的总题数，范围 1–100；禁止默认。' },
-        follow_up: { type: 'boolean', description: '用户明确选择是否根据回答追问；禁止默认。' },
-      },
-      required: ['mode', 'topic', 'difficulty', 'target_question_count', 'follow_up'],
-      additionalProperties: false,
+      oneOf: [
+        {
+          type: 'object',
+          properties: {
+            mode: { const: 'bagu', description: '背八股模式。' },
+            topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' },
+          },
+          required: ['mode', 'topic'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: {
+            mode: { const: 'scenario', description: '场景题模式。' },
+            topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' },
+          },
+          required: ['mode', 'topic'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: {
+            mode: { const: 'mock', description: '模拟面试模式。' },
+            resume: { type: 'string', minLength: 1, description: '用户明确提供的完整简历内容。' },
+            interviewer_style: { type: 'string', minLength: 1, description: '用户明确选择的面试官风格。' },
+            coding: { type: 'boolean', description: '用户明确选择是否包含手撕代码，禁止默认。' },
+            difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'], description: '用户明确选择的面试难度。' },
+          },
+          required: ['mode', 'resume', 'interviewer_style', 'coding', 'difficulty'],
+          additionalProperties: false,
+        },
+      ],
     },
-    payload: (args) => {
-      const sourceKind = args.source_kind || (args.mode === 'resume' ? 'resume' : 'topic')
-      return {
-        mode: args.mode,
-        topic: args.topic,
-        source: { kind: sourceKind, content: args.source_content ?? (sourceKind === 'topic' ? args.topic : '') },
-        config: { difficulty: args.difficulty, targetQuestionCount: args.target_question_count, followUp: args.follow_up },
-      }
-    },
+    payload: (args) => args.mode === 'mock'
+      ? { mode: args.mode, config: { resume: args.resume, interviewerStyle: args.interviewer_style, coding: args.coding, difficulty: args.difficulty } }
+      : { mode: args.mode, config: { topic: args.topic } },
   }),
   atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
   atomicTool({
@@ -159,7 +173,7 @@ const tools = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'] },
+        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario'] },
         status: { type: 'string', enum: ['active', 'completed'] },
       },
       additionalProperties: false,

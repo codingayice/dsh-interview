@@ -16,7 +16,7 @@ export class InMemoryInterviewRepository {
     return [...this.practices.values()]
       .filter((practice) => !filters.mode || practice.mode === filters.mode)
       .filter((practice) => !filters.status || practice.status === filters.status)
-      .filter((practice) => !filters.query || practice.topic.toLowerCase().includes(String(filters.query).toLowerCase()))
+      .filter((practice) => !filters.query || JSON.stringify({ topic: practice.topic, source: practice.source, config: practice.config }).toLowerCase().includes(String(filters.query).toLowerCase()))
       .sort((left, right) => right.updatedAt - left.updatedAt)
       .map(clone)
   }

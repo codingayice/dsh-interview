@@ -16,40 +16,40 @@ function samplePractice() {
   return createPractice({
     id: 'practice-1',
     mode: 'mock',
-    topic: 'Java 后端',
-    source: { kind: 'topic', content: 'Java 后端' },
-    config: { difficulty: 'senior', targetQuestionCount: 5, followUp: true },
+    config: { resume: 'Java 后端工程师简历', interviewerStyle: '深挖项目', coding: true, difficulty: 'senior' },
     now: 1,
   })
 }
 
-test('练习配置必须全部由用户明确选择', () => {
+test('不同模式只接受各自的显式配置', () => {
   const practice = samplePractice()
-  assert.equal(practice.config.followUp, true)
+  assert.deepEqual(practice.config, {
+    resume: 'Java 后端工程师简历', interviewerStyle: '深挖项目', coding: true, difficulty: 'senior',
+  })
   assert.equal(practice.status, 'active')
-  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: {}, now: 1 }), {
-    code: 'DIFFICULTY_REQUIRED',
+  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', config: {}, now: 1 }), {
+    code: 'INVALID_TOPIC',
   })
-  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate' }, now: 1 }), {
-    code: 'INVALID_QUESTION_COUNT',
-  })
-  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10 }, now: 1 }), {
-    code: 'FOLLOW_UP_REQUIRED',
-  })
+  assert.deepEqual(createPractice({ id: 'practice-3', mode: 'scenario', config: { topic: '高并发' }, now: 1 }).config, { topic: '高并发' })
 })
 
 test('八股模式只接受 bagu 标识', () => {
-  const practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false }, now: 1 })
+  const practice = createPractice({ id: 'practice-1', mode: 'bagu', config: { topic: 'JVM' }, now: 1 })
   assert.equal(practice.mode, 'bagu')
-  assert.throws(() => createPractice({ id: 'practice-2', mode: ['bao', 'gu'].join(''), topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false }, now: 1 }), {
+  assert.throws(() => createPractice({ id: 'practice-2', mode: ['bao', 'gu'].join(''), config: { topic: 'JVM' }, now: 1 }), {
     code: 'INVALID_MODE',
   })
 })
 
-test('简历模式必须提供来源内容', () => {
-  assert.throws(() => createPractice({
-    id: 'practice-1', mode: 'resume', topic: '简历面试', source: { kind: 'resume', content: '' }, config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: true }, now: 1,
-  }), (error) => error instanceof DomainError && error.code === 'SOURCE_REQUIRED')
+test('模拟面试的每项配置都禁止默认', () => {
+  const base = { resume: '简历', interviewerStyle: '压力面', coding: false, difficulty: 'intermediate' }
+  for (const [field, code] of [
+    ['resume', 'RESUME_REQUIRED'], ['interviewerStyle', 'INTERVIEWER_STYLE_REQUIRED'], ['coding', 'CODING_REQUIRED'], ['difficulty', 'DIFFICULTY_REQUIRED'],
+  ]) {
+    const config = { ...base }
+    delete config[field]
+    assert.throws(() => createPractice({ id: `practice-${field}`, mode: 'mock', config, now: 1 }), (error) => error instanceof DomainError && error.code === code)
+  }
 })
 
 test('题目、作答、评价和讲解形成结构化聚合', () => {
@@ -104,12 +104,11 @@ test('结束后的练习禁止继续出题，重新打开后恢复写入', () =>
   assert.equal(askQuestion(reopened, { id: 'question-1', prompt: '问题', now: 5 }).practice.questions.length, 1)
 })
 
-test('达到配置的目标题数后禁止继续出题', () => {
-  let practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 1, followUp: false }, now: 1 })
+test('练习题数由用户主动结束控制，不设置隐式上限', () => {
+  let practice = createPractice({ id: 'practice-1', mode: 'bagu', config: { topic: 'JVM' }, now: 1 })
   practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice
-  assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 3 }), {
-    code: 'QUESTION_LIMIT_REACHED',
-  })
+  practice = askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 3 }).practice
+  assert.equal(practice.questions.length, 2)
 })
 
 test('题目必须保持简单扼要', () => {

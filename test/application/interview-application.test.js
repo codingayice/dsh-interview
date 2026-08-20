@@ -5,9 +5,7 @@ import { applicationFixture } from '../support/application-fixture.js'
 async function start(fixture) {
   return fixture.application.startPractice('session-1', {
     mode: 'mock',
-    topic: 'Java 后端',
-    source: { kind: 'topic', content: 'Java 后端' },
-    config: { difficulty: 'intermediate', targetQuestionCount: 3, followUp: true },
+    config: { resume: 'Java 后端简历', interviewerStyle: '循序渐进', coding: true, difficulty: 'intermediate' },
   })
 }
 
@@ -16,7 +14,7 @@ test('创建练习会持久化游标并发布出题请求', async () => {
   const result = await start(fixture)
   assert.equal(result.resource.kind, 'practice-started')
   assert.equal(result.resource.data.phase, 'awaiting_question')
-  assert.deepEqual(result.resource.data.practice.config, { difficulty: 'intermediate', targetQuestionCount: 3, followUp: true })
+  assert.deepEqual(result.resource.data.practice.config, { resume: 'Java 后端简历', interviewerStyle: '循序渐进', coding: true, difficulty: 'intermediate' })
   assert.equal(fixture.published[0].type, 'question.generation_requested')
   assert.equal((await fixture.repository.listPractices()).length, 1)
 })
@@ -84,7 +82,7 @@ test('结束、重新打开、洞察和导出通过独立用例完成', async ()
   await fixture.application.evaluateAnswer('session-1', { score: 6, feedback: '继续加强。' })
   await fixture.application.completePractice('session-1')
   assert.equal((await fixture.application.getSession('session-1')).resource.data.phase, 'completed')
-  assert.equal((await fixture.application.getInsights()).resource.data.weakestTopic.topic, 'Java 后端')
+  assert.equal((await fixture.application.getInsights()).resource.data.weakestTopic.topic, '模拟面试')
   assert.equal((await fixture.application.exportPractices({ practiceIds: [practiceId] })).resource.data[0].token, `download-${practiceId}`)
   assert.equal((await fixture.application.reopenPractice('session-1', practiceId)).resource.data.practice.status, 'active')
 })

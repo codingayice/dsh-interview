@@ -118,7 +118,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
       h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
-        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'resume' }, '简历出题')),
+        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题')),
       h('select', { className: 'di-select', value: status, onChange: (event) => setStatus(event.target.value), 'aria-label': '筛选状态' },
         h('option', { value: '' }, '全部状态'), h('option', { value: 'active' }, '进行中'), h('option', { value: 'completed' }, '已结束'))),
     h(ErrorNotice, null, list.error),
