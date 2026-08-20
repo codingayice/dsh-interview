@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  CONTINUATION_ACTIONS,
+  continuationFor,
   createCursor,
   markAnswerEvaluated,
   markAnswerRevealed,
@@ -13,6 +15,21 @@ import {
   markQuestionRetried,
   WORKFLOW_PHASES,
 } from '../../src/domain/workflow.js'
+
+test('每个工作流阶段都有唯一的继续动作', () => {
+  const cursor = { phase: null }
+  const cases = [
+    [WORKFLOW_PHASES.AWAITING_QUESTION, CONTINUATION_ACTIONS.GENERATE_QUESTION],
+    [WORKFLOW_PHASES.AWAITING_ANSWER, CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION],
+    [WORKFLOW_PHASES.AWAITING_EVALUATION, CONTINUATION_ACTIONS.EVALUATE_ANSWER],
+    [WORKFLOW_PHASES.GENERATING_EXPLANATION, CONTINUATION_ACTIONS.GENERATE_EXPLANATION],
+    [WORKFLOW_PHASES.AWAITING_NEXT, CONTINUATION_ACTIONS.REQUEST_NEXT],
+    [WORKFLOW_PHASES.GENERATING_SUMMARY, CONTINUATION_ACTIONS.GENERATE_SUMMARY],
+    [WORKFLOW_PHASES.COMPLETED, CONTINUATION_ACTIONS.CONFIRM_REOPEN],
+  ]
+  for (const [phase, action] of cases) assert.equal(continuationFor({ ...cursor, phase }), action)
+  assert.throws(() => continuationFor(cursor), { code: 'INVALID_WORKFLOW_PHASE' })
+})
 
 test('完整面试流程只能按状态机顺序推进', () => {
   let cursor = createCursor({ sessionId: 'session-1', practiceId: 'practice-1', now: 1 })

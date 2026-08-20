@@ -146,3 +146,48 @@ test('应用层提供练习与题目 CRUD，切换时返回完整模型上下文
   assert.equal((await fixture.application.getPractice(practiceId)).resource.data.questions.length, 0)
   assert.equal((await fixture.application.getSession('session-2')).resource.data.phase, 'awaiting_question')
 })
+
+test('继续练习根据权威阶段恢复且不重复创建当前题', async () => {
+  const fixture = applicationFixture()
+  const idle = await fixture.application.continuePractice('empty-session')
+  assert.equal(idle.resource.data.resumeAction, 'select_practice')
+
+  await fixture.application.startPractice('session-continue', { mode: 'bagu', config: { topic: 'JMM' } })
+  let resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'generate_question')
+  assert.equal(resumed.events[0].type, 'question.generation_requested')
+
+  const asked = await fixture.application.askQuestion('session-continue', { prompt: '什么是 happens-before？' })
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'show_current_question')
+  assert.equal(resumed.resource.data.question.id, asked.resource.data.id)
+  assert.equal(resumed.events.length, 0)
+
+  const submitted = await fixture.application.submitAnswer('session-continue', { answer: '它描述操作间的可见性顺序。' })
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'evaluate_answer')
+  assert.equal(resumed.resource.data.attempt.id, submitted.resource.data.id)
+  assert.equal(resumed.events[0].type, 'answer.evaluation_requested')
+
+  await fixture.application.evaluateAnswer('session-continue', { score: 8, feedback: '核心方向正确。' })
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'generate_explanation')
+  assert.equal(resumed.events[0].type, 'review.generation_requested')
+
+  await fixture.application.saveExplanation('session-continue', { detail: 'happens-before 保证前序结果对后序可见。', memorizationPoints: '规则先行，结果可见。' })
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'generate_question')
+  assert.equal(resumed.resource.data.phase, 'awaiting_question')
+  assert.equal(resumed.events[0].reason, 'practice_continued')
+
+  await fixture.application.requestPracticeSummary('session-continue')
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'generate_summary')
+
+  await fixture.application.completePractice('session-continue', {
+    overall: '练习完成。', strengths: ['理解可见性。'], improvements: ['补充规则细节。'],
+  })
+  resumed = await fixture.application.continuePractice('session-continue')
+  assert.equal(resumed.resource.data.resumeAction, 'confirm_reopen')
+  assert.equal(resumed.events.length, 0)
+})

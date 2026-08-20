@@ -10,6 +10,32 @@ export const WORKFLOW_PHASES = Object.freeze({
   COMPLETED: 'completed',
 })
 
+export const CONTINUATION_ACTIONS = Object.freeze({
+  GENERATE_QUESTION: 'generate_question',
+  SHOW_CURRENT_QUESTION: 'show_current_question',
+  EVALUATE_ANSWER: 'evaluate_answer',
+  GENERATE_EXPLANATION: 'generate_explanation',
+  REQUEST_NEXT: 'request_next',
+  GENERATE_SUMMARY: 'generate_summary',
+  CONFIRM_REOPEN: 'confirm_reopen',
+})
+
+const CONTINUATION_BY_PHASE = Object.freeze({
+  [WORKFLOW_PHASES.AWAITING_QUESTION]: CONTINUATION_ACTIONS.GENERATE_QUESTION,
+  [WORKFLOW_PHASES.AWAITING_ANSWER]: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
+  [WORKFLOW_PHASES.AWAITING_EVALUATION]: CONTINUATION_ACTIONS.EVALUATE_ANSWER,
+  [WORKFLOW_PHASES.GENERATING_EXPLANATION]: CONTINUATION_ACTIONS.GENERATE_EXPLANATION,
+  [WORKFLOW_PHASES.AWAITING_NEXT]: CONTINUATION_ACTIONS.REQUEST_NEXT,
+  [WORKFLOW_PHASES.GENERATING_SUMMARY]: CONTINUATION_ACTIONS.GENERATE_SUMMARY,
+  [WORKFLOW_PHASES.COMPLETED]: CONTINUATION_ACTIONS.CONFIRM_REOPEN,
+})
+
+export function continuationFor(cursor) {
+  const action = CONTINUATION_BY_PHASE[cursor?.phase]
+  assertDomain(Boolean(action), 'INVALID_WORKFLOW_PHASE', `无法从当前阶段 ${cursor?.phase || 'unknown'} 继续练习`)
+  return action
+}
+
 function requirePhase(cursor, expected) {
   const phases = Array.isArray(expected) ? expected : [expected]
   assertDomain(

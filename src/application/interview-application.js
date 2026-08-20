@@ -13,6 +13,8 @@ import {
   updateQuestion as reviseQuestion,
 } from '../domain/practice.js'
 import {
+  CONTINUATION_ACTIONS,
+  continuationFor,
   createCursor,
   cursorForQuestion,
   markAnswerEvaluated,
@@ -98,6 +100,86 @@ export class InterviewApplication {
     const cursor = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
     const practice = cursor ? await this.repository.getPractice(cursor.practiceId) : null
     return this.#result('session', toSessionDto(cursor, practice), cursor)
+  }
+
+  async continuePractice(sessionId) {
+    const selected = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
+    if (!selected) {
+      return this.#result('continuation', {
+        selected: false,
+        phase: 'idle',
+        resumeAction: 'select_practice',
+      }, null)
+    }
+
+    const practice = await this.#practice(selected.practiceId)
+    let cursor = selected
+    let resumeAction = continuationFor(cursor)
+    let events = []
+    let question = null
+    let attempt = null
+
+    if (resumeAction === CONTINUATION_ACTIONS.REQUEST_NEXT) {
+      cursor = markNextRequested(cursor, this.clock.now())
+      resumeAction = CONTINUATION_ACTIONS.GENERATE_QUESTION
+    }
+
+    if (cursor.questionId) question = findQuestion(practice, cursor.questionId)
+    const questionRequired = [
+      CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
+      CONTINUATION_ACTIONS.EVALUATE_ANSWER,
+      CONTINUATION_ACTIONS.GENERATE_EXPLANATION,
+    ].includes(resumeAction)
+    assertDomain(!questionRequired || Boolean(question), 'QUESTION_NOT_FOCUSED', '找不到当前待恢复题目')
+    if (resumeAction === CONTINUATION_ACTIONS.EVALUATE_ANSWER) {
+      attempt = question?.attempts.find((item) => item.id === cursor.attemptId) || null
+      assertDomain(Boolean(attempt) && !attempt.evaluation, 'ATTEMPT_NOT_FOCUSED', '找不到当前待评价作答')
+    }
+
+    if (resumeAction === CONTINUATION_ACTIONS.GENERATE_QUESTION) {
+      events = [{
+        type: 'question.generation_requested',
+        sessionId,
+        practiceId: practice.id,
+        reason: 'practice_continued',
+      }]
+    } else if (resumeAction === CONTINUATION_ACTIONS.EVALUATE_ANSWER) {
+      events = [{
+        type: 'answer.evaluation_requested',
+        sessionId,
+        practiceId: practice.id,
+        questionId: question.id,
+        attemptId: attempt.id,
+      }]
+    } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION) {
+      events = [{
+        type: 'review.generation_requested',
+        sessionId,
+        practiceId: practice.id,
+        questionId: question.id,
+        attemptId: cursor.attemptId,
+      }]
+    } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_SUMMARY) {
+      events = [{
+        type: 'practice.summary_requested',
+        sessionId,
+        practiceId: practice.id,
+        reason: 'practice_continued',
+      }]
+    }
+
+    if (cursor !== selected) await this.repository.commit({ cursor })
+    await this.#publish(events)
+    return this.#result('continuation', {
+      selected: true,
+      phase: cursor.phase,
+      resumeAction,
+      practiceId: practice.id,
+      questionId: cursor.questionId,
+      attemptId: cursor.attemptId,
+      ...(question ? { question: toQuestionDto(question) } : {}),
+      ...(attempt ? { attempt: { id: attempt.id, sequence: attempt.sequence, answer: attempt.answer } } : {}),
+    }, cursor, events)
   }
 
   async selectPractice(sessionId, practiceId) {
