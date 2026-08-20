@@ -7,7 +7,7 @@ async function start(fixture) {
     mode: 'mock',
     topic: 'Java 后端',
     source: { kind: 'topic', content: 'Java 后端' },
-    config: { targetQuestionCount: 3 },
+    config: { difficulty: 'intermediate', targetQuestionCount: 3, followUp: true },
   })
 }
 
@@ -16,6 +16,7 @@ test('创建练习会持久化游标并发布出题请求', async () => {
   const result = await start(fixture)
   assert.equal(result.resource.kind, 'practice-started')
   assert.equal(result.resource.data.phase, 'awaiting_question')
+  assert.deepEqual(result.resource.data.practice.config, { difficulty: 'intermediate', targetQuestionCount: 3, followUp: true })
   assert.equal(fixture.published[0].type, 'question.generation_requested')
   assert.equal((await fixture.repository.listPractices()).length, 1)
 })

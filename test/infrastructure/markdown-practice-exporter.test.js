@@ -7,7 +7,7 @@ import { askQuestion, createPractice, evaluateAnswer, saveExplanation, submitAns
 import { MarkdownPracticeExporter, renderPracticeMarkdown } from '../../src/infrastructure/markdown-practice-exporter.js'
 
 function practiceFixture() {
-  let practice = createPractice({ id: 'practice-1', mode: 'mock', topic: 'Java/后端', now: 1 })
+  let practice = createPractice({ id: 'practice-1', mode: 'mock', topic: 'Java/后端', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: true }, now: 1 })
   practice = askQuestion(practice, { id: 'question-1', prompt: '什么是 JMM？', now: 2 }).practice
   practice = submitAnswer(practice, { questionId: 'question-1', attemptId: 'attempt-1', answer: 'Java 内存模型。', now: 3 }).practice
   practice = evaluateAnswer(practice, { questionId: 'question-1', attemptId: 'attempt-1', score: 8, feedback: '基本正确。', dimensions: { accuracy: 8 }, now: 4 }).practice

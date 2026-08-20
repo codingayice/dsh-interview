@@ -37,7 +37,13 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   const presentQuestion = fixture.tools.interview_present_question
   assert.deepEqual(presentQuestion.parameters.required, ['prompt'])
   assert.equal(presentQuestion.parameters.properties.prompt.minLength, 1)
+  assert.equal(presentQuestion.parameters.properties.prompt.maxLength, 120)
   assert.equal(presentQuestion.parameters.additionalProperties, false)
+  assert.deepEqual(fixture.tools.interview_start_practice.parameters.required, ['mode', 'topic', 'difficulty', 'target_question_count', 'follow_up'])
+  assert.match(fixture.tools.interview_start_practice.description, /禁止推断、补全或采用默认值/)
+  assert.match(fixture.tools.interview_start_practice.description, /模式、主题、难度、题数、是否追问/)
+  assert.match(fixture.tools.interview_start_practice.description, /不得主动询问技术栈、面试时长、公司、面试官风格、回答格式/)
+  assert.match(fixture.tools.interview_start_practice.description, /开始练习还缺少/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
 })
@@ -45,7 +51,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
 test('原子工具驱动开始、出题、回答和完整复盘流程', async () => {
   const fixture = toolFixture()
   const { tools } = fixture
-  const started = await tools.interview_start_practice.execute({ mode: 'mock', topic: 'Java', target_question_count: 3 }, exec())
+  const started = await tools.interview_start_practice.execute({ mode: 'mock', topic: 'Java', difficulty: 'intermediate', target_question_count: 3, follow_up: true }, exec())
   const question = await tools.interview_present_question.execute({ prompt: '什么是 JMM？' }, exec())
   const attempt = await tools.interview_submit_answer.execute({ answer: 'Java 内存模型。' }, exec())
   const evaluation = await tools.interview_save_evaluation.execute({ score: 8, feedback: '正确。' }, exec())
@@ -73,9 +79,19 @@ test('原子工具驱动开始、出题、回答和完整复盘流程', async ()
 
 test('空题目被归类为 Agent 可恢复协议错误而不生成 UI', async () => {
   const fixture = toolFixture()
-  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
+  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM', difficulty: 'intermediate', target_question_count: 10, follow_up: false }, exec())
   const invalid = await fixture.tools.interview_present_question.execute({ prompt: '' }, exec())
   assert.equal(invalid.error.code, 'INVALID_QUESTION')
+  assert.equal(invalid.error.audience, 'agent')
+  assert.equal(invalid.presentation, null)
+})
+
+test('简历模式不会自行补全缺失的简历内容', async () => {
+  const fixture = toolFixture()
+  const invalid = await fixture.tools.interview_start_practice.execute({
+    mode: 'resume', topic: 'Java 后端', difficulty: 'senior', target_question_count: 5, follow_up: true,
+  }, exec('resume-session'))
+  assert.equal(invalid.error.code, 'SOURCE_REQUIRED')
   assert.equal(invalid.error.audience, 'agent')
   assert.equal(invalid.presentation, null)
 })
@@ -84,6 +100,7 @@ test('UI 命令分发与 Agent 工具复用同一个协调器', async () => {
   const fixture = toolFixture()
   await dispatchCommand(fixture.coordinator, 'session-1', 'session.start', {
     mode: 'bagu', topic: 'JVM', source: { kind: 'topic', content: 'JVM' },
+    config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false },
   })
   const question = await fixture.application.askQuestion('session-1', { prompt: '类加载过程？' })
   const result = await dispatchCommand(fixture.coordinator, 'session-1', 'question.open', { questionId: question.resource.data.id })
@@ -94,7 +111,11 @@ test('UI 命令分发与 Agent 工具复用同一个协调器', async () => {
 test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   const question = instructionFor({ type: 'question.generation_requested', practiceId: 'p1', reason: 'next_requested' })
   assert.match(question, /interview_present_question/)
-  assert.match(question, /非空完整题目作为 prompt/)
+  assert.match(question, /非空题目作为 prompt/)
+  assert.match(question, /每轮只生成一道题/)
+  assert.match(question, /禁止把多个子问题/)
+  assert.match(question, /必须调用 interview_read_practice_context/)
+  assert.match(question, /练习开始后禁止重新询问或自行修改配置/)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 
@@ -108,8 +129,8 @@ test('HTTP 错误响应包含稳定错误码', () => {
 
 test('未指定范围时只导出当前选择的练习', async () => {
   const fixture = toolFixture()
-  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
-  await fixture.tools.interview_start_practice.execute({ mode: 'scenario', topic: 'Redis' }, exec())
+  await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM', difficulty: 'intermediate', target_question_count: 10, follow_up: false }, exec())
+  await fixture.tools.interview_start_practice.execute({ mode: 'scenario', topic: 'Redis', difficulty: 'senior', target_question_count: 10, follow_up: true }, exec())
   const result = await fixture.tools.interview_export_practices.execute({}, exec())
   assert.equal(result.resource.data.length, 1)
   assert.match(result.resource.data[0].name, /Redis/)

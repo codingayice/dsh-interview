@@ -29,7 +29,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
   const exec = { agent: { session: { id: 'session-e2e' } } }
 
   try {
-    const started = await tools.interview_start_practice.execute({ mode: 'scenario', topic: 'Redis 高可用', difficulty: 'senior', target_question_count: 2 }, exec)
+    const started = await tools.interview_start_practice.execute({ mode: 'scenario', topic: 'Redis 高可用', difficulty: 'senior', target_question_count: 2, follow_up: true }, exec)
     const practiceId = started.resource.data.practice.id
     await tools.interview_present_question.execute({ prompt: '缓存击穿时如何保护数据库？' }, exec)
     await tools.interview_submit_answer.execute({ answer: '使用互斥锁、逻辑过期并限制回源并发。' }, exec)

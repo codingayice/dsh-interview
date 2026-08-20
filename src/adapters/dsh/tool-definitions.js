@@ -2,6 +2,7 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 import { toAgentInteractionResult } from '../../application/interaction-result.js'
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
 import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'
+import { PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
 
 const emptyParameters = Object.freeze({ type: 'object', properties: {}, additionalProperties: false })
 
@@ -48,27 +49,30 @@ const tools = [
   atomicTool({
     name: 'interview_start_practice',
     action: INTERVIEW_ACTIONS.START_PRACTICE,
-    description: '开始一条全新的面试练习。成功后必须按 nextAction 继续生成第一题。',
+    description: `开始一条全新的面试练习。成功后先调用 interview_read_practice_context 读取已保存配置，再按 nextAction 生成第一题。${PRACTICE_CONFIGURATION_POLICY}`,
     parameters: {
       type: 'object',
       properties: {
-        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'], description: '练习模式。bagu 表示八股题。' },
-        topic: { type: 'string', minLength: 1, description: '练习主题。' },
-        source_kind: { type: 'string', enum: ['topic', 'resume', 'job_description'] },
-        source_content: { type: 'string' },
-        difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'] },
-        target_question_count: { type: 'integer', minimum: 1, maximum: 100 },
-        follow_up: { type: 'boolean' },
+        mode: { type: 'string', enum: ['bagu', 'mock', 'scenario', 'resume'], description: '用户明确选择的模式。bagu=八股，mock=模拟面试，scenario=场景题，resume=简历出题；禁止自行推断。' },
+        topic: { type: 'string', minLength: 1, description: '用户明确指定的练习主题，禁止自行扩写或替换。' },
+        source_kind: { type: 'string', enum: ['topic', 'resume', 'job_description'], description: '仅在用户明确提供简历或职位描述时设置。' },
+        source_content: { type: 'string', description: '简历或职位描述原文；普通主题练习无需设置。' },
+        difficulty: { type: 'string', enum: ['junior', 'intermediate', 'senior'], description: '用户明确选择的难度：初级、中级或高级；禁止默认。' },
+        target_question_count: { type: 'integer', minimum: 1, maximum: 100, description: '用户明确选择的总题数，范围 1–100；禁止默认。' },
+        follow_up: { type: 'boolean', description: '用户明确选择是否根据回答追问；禁止默认。' },
       },
-      required: ['mode', 'topic'],
+      required: ['mode', 'topic', 'difficulty', 'target_question_count', 'follow_up'],
       additionalProperties: false,
     },
-    payload: (args) => ({
-      mode: args.mode,
-      topic: args.topic,
-      source: { kind: args.source_kind || (args.mode === 'resume' ? 'resume' : 'topic'), content: args.source_content || args.topic },
-      config: { difficulty: args.difficulty, targetQuestionCount: args.target_question_count, followUp: args.follow_up },
-    }),
+    payload: (args) => {
+      const sourceKind = args.source_kind || (args.mode === 'resume' ? 'resume' : 'topic')
+      return {
+        mode: args.mode,
+        topic: args.topic,
+        source: { kind: sourceKind, content: args.source_content ?? (sourceKind === 'topic' ? args.topic : '') },
+        config: { difficulty: args.difficulty, targetQuestionCount: args.target_question_count, followUp: args.follow_up },
+      }
+    },
   }),
   atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
   atomicTool({
@@ -83,10 +87,10 @@ const tools = [
   atomicTool({
     name: 'interview_present_question',
     action: INTERVIEW_ACTIONS.PRESENT_QUESTION,
-    description: '保存并通过 UI 展示一道已经生成完成的面试题。你必须先自行生成完整题目，再把完整题目放入必填 prompt；本工具不会替你生成题目，禁止空参数调用。',
+    description: `保存并通过 UI 展示一道已经生成完成的面试题。你必须先自行生成题目，再把题目放入必填 prompt；本工具不会替你生成题目，禁止空参数调用。${QUESTION_GENERATION_POLICY}`,
     parameters: {
       type: 'object',
-      properties: { prompt: { type: 'string', minLength: 1, description: '已经生成完成、可以直接向候选人展示的完整题目。' } },
+      properties: { prompt: { type: 'string', minLength: 1, maxLength: 120, description: `可以直接向候选人展示的单个简短问题。${QUESTION_GENERATION_POLICY}` } },
       required: ['prompt'],
       additionalProperties: false,
     },
@@ -95,7 +99,7 @@ const tools = [
     name: 'interview_open_question', action: INTERVIEW_ACTIONS.OPEN_QUESTION, description: '打开并通过 UI 展示指定历史题目，不创建新题。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
   }),
-  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: '请求进入下一题。成功后必须按照 nextAction 生成完整题目并调用 interview_present_question。' }),
+  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: `请求进入下一题。成功后必须先调用 interview_read_practice_context 读取已保存配置和历史，再按照 nextAction 生成题目并调用 interview_present_question。${QUESTION_GENERATION_POLICY}` }),
   atomicTool({
     name: 'interview_retry_question', action: INTERVIEW_ACTIONS.RETRY_QUESTION, description: '把指定历史题切换为当前待回答题目。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),

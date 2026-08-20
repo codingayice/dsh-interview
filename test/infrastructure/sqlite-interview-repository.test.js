@@ -20,7 +20,7 @@ function fixture() {
 }
 
 function aggregate() {
-  let practice = createPractice({ id: 'practice-1', mode: 'mock', topic: 'Java 后端', now: 1 })
+  let practice = createPractice({ id: 'practice-1', mode: 'mock', topic: 'Java 后端', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: true }, now: 1 })
   const asked = askQuestion(practice, { id: 'question-1', prompt: '解释 happens-before。', now: 2 })
   practice = asked.practice
   practice = submitAnswer(practice, { questionId: 'question-1', attemptId: 'attempt-1', answer: '它描述可见性顺序。', now: 3 }).practice

@@ -30,10 +30,12 @@ export function createPractice({ id, mode, topic, source, config = {}, now }) {
     assertDomain(normalizedSource.content, 'SOURCE_REQUIRED', '简历出题模式必须提供简历内容')
   }
 
-  const difficulty = config.difficulty || 'intermediate'
+  const difficulty = config.difficulty
+  assertDomain(typeof difficulty === 'string' && difficulty, 'DIFFICULTY_REQUIRED', '必须明确选择练习难度')
   assertDomain(DIFFICULTIES.has(difficulty), 'INVALID_DIFFICULTY', `不支持的难度：${difficulty}`)
-  const targetQuestionCount = Number(config.targetQuestionCount ?? 10)
+  const targetQuestionCount = Number(config.targetQuestionCount)
   assertDomain(Number.isInteger(targetQuestionCount) && targetQuestionCount >= 1 && targetQuestionCount <= 100, 'INVALID_QUESTION_COUNT', '目标题数必须是 1–100 的整数')
+  assertDomain(typeof config.followUp === 'boolean', 'FOLLOW_UP_REQUIRED', '必须明确选择是否追问')
 
   return {
     id: requiredText(id, 'INVALID_PRACTICE_ID', '练习 ID 不能为空'),
@@ -43,7 +45,7 @@ export function createPractice({ id, mode, topic, source, config = {}, now }) {
     config: {
       difficulty,
       targetQuestionCount,
-      followUp: typeof config.followUp === 'boolean' ? config.followUp : definition.defaultFollowUp,
+      followUp: config.followUp,
     },
     status: 'active',
     createdAt: now,
@@ -69,11 +71,15 @@ export function askQuestion(practice, { id, prompt, now }) {
   activePractice(practice)
   assertDomain(practice.questions.length < practice.config.targetQuestionCount, 'QUESTION_LIMIT_REACHED', `练习已达到目标题数 ${practice.config.targetQuestionCount}`)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
+  const normalizedPrompt = requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空')
+  assertDomain(normalizedPrompt.length <= 120, 'QUESTION_TOO_LONG', '题目必须简单扼要，长度不能超过 120 个字符')
+  const questionMarkCount = (normalizedPrompt.match(/[?？]/g) || []).length
+  assertDomain(questionMarkCount <= 1 && !/[\r\n]/.test(normalizedPrompt), 'MULTI_PART_QUESTION', '每轮只能提出一道问题，不能拼接多个子问题')
   assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
   const question = {
     id: questionId,
     sequence: practice.questions.length + 1,
-    prompt: requiredText(prompt, 'INVALID_QUESTION', '题目内容不能为空'),
+    prompt: normalizedPrompt,
     createdAt: now,
     attempts: [],
     explanation: null,

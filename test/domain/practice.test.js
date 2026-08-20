@@ -18,28 +18,37 @@ function samplePractice() {
     mode: 'mock',
     topic: 'Java 后端',
     source: { kind: 'topic', content: 'Java 后端' },
-    config: { difficulty: 'senior', targetQuestionCount: 5 },
+    config: { difficulty: 'senior', targetQuestionCount: 5, followUp: true },
     now: 1,
   })
 }
 
-test('练习配置会应用模式默认策略', () => {
+test('练习配置必须全部由用户明确选择', () => {
   const practice = samplePractice()
   assert.equal(practice.config.followUp, true)
   assert.equal(practice.status, 'active')
+  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: {}, now: 1 }), {
+    code: 'DIFFICULTY_REQUIRED',
+  })
+  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate' }, now: 1 }), {
+    code: 'INVALID_QUESTION_COUNT',
+  })
+  assert.throws(() => createPractice({ id: 'practice-2', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10 }, now: 1 }), {
+    code: 'FOLLOW_UP_REQUIRED',
+  })
 })
 
 test('八股模式只接受 bagu 标识', () => {
-  const practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', now: 1 })
+  const practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false }, now: 1 })
   assert.equal(practice.mode, 'bagu')
-  assert.throws(() => createPractice({ id: 'practice-2', mode: ['bao', 'gu'].join(''), topic: 'JVM', now: 1 }), {
+  assert.throws(() => createPractice({ id: 'practice-2', mode: ['bao', 'gu'].join(''), topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: false }, now: 1 }), {
     code: 'INVALID_MODE',
   })
 })
 
 test('简历模式必须提供来源内容', () => {
   assert.throws(() => createPractice({
-    id: 'practice-1', mode: 'resume', topic: '简历面试', source: { kind: 'resume', content: '' }, now: 1,
+    id: 'practice-1', mode: 'resume', topic: '简历面试', source: { kind: 'resume', content: '' }, config: { difficulty: 'intermediate', targetQuestionCount: 10, followUp: true }, now: 1,
   }), (error) => error instanceof DomainError && error.code === 'SOURCE_REQUIRED')
 })
 
@@ -96,9 +105,18 @@ test('结束后的练习禁止继续出题，重新打开后恢复写入', () =>
 })
 
 test('达到配置的目标题数后禁止继续出题', () => {
-  let practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { targetQuestionCount: 1 }, now: 1 })
+  let practice = createPractice({ id: 'practice-1', mode: 'bagu', topic: 'JVM', config: { difficulty: 'intermediate', targetQuestionCount: 1, followUp: false }, now: 1 })
   practice = askQuestion(practice, { id: 'question-1', prompt: '第一题', now: 2 }).practice
   assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '第二题', now: 3 }), {
     code: 'QUESTION_LIMIT_REACHED',
   })
+})
+
+test('题目必须保持简单扼要', () => {
+  assert.throws(() => askQuestion(samplePractice(), {
+    id: 'question-1', prompt: '请解释'.repeat(80), now: 2,
+  }), (error) => error instanceof DomainError && error.code === 'QUESTION_TOO_LONG')
+  assert.throws(() => askQuestion(samplePractice(), {
+    id: 'question-1', prompt: '什么是线程安全？如何实现？', now: 2,
+  }), (error) => error instanceof DomainError && error.code === 'MULTI_PART_QUESTION')
 })

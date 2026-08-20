@@ -60,7 +60,7 @@ export function toSessionDto(cursor, practice) {
     revision: cursor.revision,
     questionId: cursor.questionId,
     attemptId: cursor.attemptId,
-    practice: toPracticeSummaryDto(practice),
+    practice: { ...toPracticeSummaryDto(practice), config: { ...practice.config } },
     currentQuestion: question ? toQuestionDto(question) : null,
   }
 }
