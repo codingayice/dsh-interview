@@ -43,6 +43,7 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.REQUEST_EXPLANATION: return application.requestExplanation(sessionId)
     case INTERVIEW_ACTIONS.PRESENT_EXPLANATION: return application.saveExplanation(sessionId, payload)
     case INTERVIEW_ACTIONS.LIST_PRACTICES: return application.listPractices(payload)
+    case INTERVIEW_ACTIONS.READ_PRACTICE_CONTEXT: return application.getPractice(payload.practiceId)
     case INTERVIEW_ACTIONS.GET_PRACTICE: return application.getPractice(payload.practiceId)
     case INTERVIEW_ACTIONS.GET_INSIGHTS: return application.getInsights()
     case INTERVIEW_ACTIONS.EXPORT_PRACTICES: {

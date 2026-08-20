@@ -102,6 +102,8 @@ function descriptor(action, result) {
       }
     case INTERVIEW_ACTIONS.LIST_PRACTICES:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library' }, assistantResponse: exact('练习档案已打开。') }
+    case INTERVIEW_ACTIONS.READ_PRACTICE_CONTEXT:
+      return { state: 'reading_context', nextAction: 'continue_workflow', presentation: null, assistantResponse: continueSilently(), context: data }
     case INTERVIEW_ACTIONS.GET_PRACTICE:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', practiceId }, assistantResponse: exact('练习档案已打开。') }
     case INTERVIEW_ACTIONS.GET_INSIGHTS:
@@ -140,7 +142,7 @@ export function createAgentProtocolError(action, error) {
       code: error.code || 'AGENT_PROTOCOL_ERROR',
       message: error.message || '工具参数或工作流状态无效',
       recoverable: true,
-      details: error.details,
+      ...(error.details !== undefined ? { details: error.details } : {}),
     },
     resource: null,
     events: [],

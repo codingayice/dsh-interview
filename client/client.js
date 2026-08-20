@@ -163,6 +163,10 @@ function toolErrorMessage(block) {
   const text = resultText(block).trim();
   return text || block?.error?.message || block?.error?.code || "\u5DE5\u5177\u6267\u884C\u5931\u8D25";
 }
+function toolErrorAudience(block) {
+  const code = block?.error?.code || block?.error?.info?.code;
+  return code === "INVALID_ARGS" ? "agent" : "user";
+}
 function PhaseBadge({ phase }) {
   const labels = {
     awaiting_question: "\u51C6\u5907\u51FA\u9898",
@@ -625,6 +629,7 @@ var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_request_explanation",
   "interview_present_explanation",
   "interview_list_practices",
+  "interview_read_practice_context",
   "interview_get_practice",
   "interview_get_insights",
   "interview_export_practices",
@@ -663,6 +668,7 @@ var inject = ["slots"];
 function resolveToolView(toolName, block) {
   const state = toolCallState(block);
   if (state === "running") return { kind: "hidden" };
+  if (state === "error" && toolErrorAudience(block) === "agent") return { kind: "hidden" };
   if (state === "error") return { kind: "error", message: toolErrorMessage(block) };
   const result = parseInteractionResult(block);
   if (!result || result.error?.audience === "agent" || !result.presentation) return { kind: "hidden" };

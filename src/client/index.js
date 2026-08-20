@@ -11,7 +11,7 @@ import { InsightsCard, PracticeLibrary } from './features/practice-library.js'
 import { TimelinePanel } from './features/timeline.js'
 import { INTERVIEW_TOOL_NAMES } from '../protocol/interview-tool-names.js'
 import { installStyles } from './shared/styles.js'
-import { h, parseInteractionResult, toolCallState, toolErrorMessage } from './shared/ui.js'
+import { h, parseInteractionResult, toolCallState, toolErrorAudience, toolErrorMessage } from './shared/ui.js'
 
 export const name = 'dsh-interview'
 export const inject = ['slots']
@@ -19,6 +19,7 @@ export const inject = ['slots']
 export function resolveToolView(toolName, block) {
   const state = toolCallState(block)
   if (state === 'running') return { kind: 'hidden' }
+  if (state === 'error' && toolErrorAudience(block) === 'agent') return { kind: 'hidden' }
   if (state === 'error') return { kind: 'error', message: toolErrorMessage(block) }
   const result = parseInteractionResult(block)
   if (!result || result.error?.audience === 'agent' || !result.presentation) return { kind: 'hidden' }

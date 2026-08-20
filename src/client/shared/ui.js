@@ -36,6 +36,11 @@ export function toolErrorMessage(block) {
   return text || block?.error?.message || block?.error?.code || '工具执行失败'
 }
 
+export function toolErrorAudience(block) {
+  const code = block?.error?.code || block?.error?.info?.code
+  return code === 'INVALID_ARGS' ? 'agent' : 'user'
+}
+
 export function PhaseBadge({ phase }) {
   const labels = {
     awaiting_question: '准备出题',

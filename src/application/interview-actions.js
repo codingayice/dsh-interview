@@ -13,6 +13,7 @@ export const INTERVIEW_ACTIONS = Object.freeze({
   REQUEST_EXPLANATION: 'explanation.request',
   PRESENT_EXPLANATION: 'explanation.present',
   LIST_PRACTICES: 'library.list',
+  READ_PRACTICE_CONTEXT: 'library.read_context',
   GET_PRACTICE: 'library.get',
   GET_INSIGHTS: 'library.insights',
   EXPORT_PRACTICES: 'library.export',

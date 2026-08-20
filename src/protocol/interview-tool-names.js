@@ -13,6 +13,7 @@ export const INTERVIEW_TOOL_NAMES = Object.freeze([
   'interview_request_explanation',
   'interview_present_explanation',
   'interview_list_practices',
+  'interview_read_practice_context',
   'interview_get_practice',
   'interview_get_insights',
   'interview_export_practices',

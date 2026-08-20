@@ -163,6 +163,10 @@ const tools = [
     },
   }),
   atomicTool({
+    name: 'interview_read_practice_context', action: INTERVIEW_ACTIONS.READ_PRACTICE_CONTEXT, description: '仅供生成题目、评价或讲解时静默读取指定练习的完整上下文；不会打开 UI。读取后必须继续当前工作流。',
+    parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
+  }),
+  atomicTool({
     name: 'interview_get_practice', action: INTERVIEW_ACTIONS.GET_PRACTICE, description: '打开指定练习的完整档案。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),

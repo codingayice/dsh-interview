@@ -80,4 +80,12 @@ test('工具视图只按结构化 presentation 渲染用户可见卡片', () => 
     kind: 'tool-result', isError: true, content: [{ type: 'text', text: 'schema validation failed' }],
   })
   assert.equal(failed.kind, 'error')
+
+  const invalidArguments = plugin.resolveToolView('interview_present_question', {
+    kind: 'tool-result',
+    isError: true,
+    error: { code: 'INVALID_ARGS' },
+    content: [{ type: 'text', text: 'Error: invalid arguments: prompt is required' }],
+  })
+  assert.equal(invalidArguments.kind, 'hidden')
 })
