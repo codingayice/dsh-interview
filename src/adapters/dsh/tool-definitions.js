@@ -3,6 +3,7 @@ import { toAgentInteractionResult } from '../../application/interaction-result.j
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
 import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'
 import { CONTINUE_PRACTICE_POLICY, LEETCODE_EXPLANATION_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
+import { LEETCODE_LANGUAGE_IDS } from '../../domain/leetcode-languages.js'
 
 const emptyParameters = Object.freeze({ type: 'object', properties: {}, additionalProperties: false })
 
@@ -31,7 +32,9 @@ function practiceConfigurationParameters({ includePracticeId = false } = {}) {
     oneOf: [
       variant('bagu', { topic: { type: 'string', minLength: 1, description: '用户明确提供的八股主题原文。' } }, ['topic']),
       variant('scenario', { topic: { type: 'string', minLength: 1, description: '用户明确提供的场景题主题原文。' } }, ['topic']),
-      variant('leetcode', {}, []),
+      variant('leetcode', {
+        language: { type: 'string', enum: LEETCODE_LANGUAGE_IDS, description: '用户明确选择的刷题语言，禁止默认。' },
+      }, ['language']),
       variant('mock', {
         resume: { type: 'string', minLength: 1, description: '用户明确提供的完整简历内容。' },
         interviewer_style: { type: 'string', minLength: 1, description: '用户明确选择的面试官风格。' },
@@ -48,7 +51,7 @@ function practiceConfigurationPayload(args) {
     mode: args.mode,
     config: args.mode === 'mock'
       ? { resume: args.resume, interviewerStyle: args.interviewer_style, coding: args.coding, difficulty: args.difficulty }
-      : args.mode === 'leetcode' ? {} : { topic: args.topic },
+      : args.mode === 'leetcode' ? { language: args.language } : { topic: args.topic },
   }
 }
 
@@ -188,7 +191,7 @@ const tools = [
   }),
   atomicTool({
     name: 'interview_reveal_answer', action: INTERVIEW_ACTIONS.REVEAL_ANSWER,
-    description: `用户明确选择查看当前面试题答案或讲解当前力扣题时调用。不得伪造作答或评价；nextAction=generate_explanation 时生成面试知识讲解和直接背；nextAction=generate_leetcode_explanation 时严格生成算法教学讲解与 C++、Java、Python、C、Go 五种完整答案代码；最后调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
+    description: `用户明确选择查看当前面试题答案或讲解当前力扣题时调用。不得伪造作答或评价；nextAction=generate_explanation 时生成面试知识讲解和直接背；nextAction=generate_leetcode_explanation 时读取练习配置并只生成指定语言的一份完整答案代码；最后调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
     parameters: {
       type: 'object',
       properties: { question_id: { type: 'string', minLength: 1, description: '当前题目 ID；省略时使用会话当前题。' } },
@@ -232,7 +235,7 @@ const tools = [
   atomicTool({
     name: 'interview_complete_review',
     action: INTERVIEW_ACTIONS.COMPLETE_REVIEW,
-    description: '保存当前题目的完整讲解。面试题的 memorization_points 是直接背；力扣题的 detail 必须包含算法教学与 C++、Java、Python、C、Go 完整代码，memorization_points 是解题要点。',
+    description: `保存当前题目的完整讲解。面试题的 memorization_points 是直接背；力扣题的 detail 必须包含算法教学与练习配置语言的一份完整代码，禁止输出其他语言，memorization_points 是解题要点。${LEETCODE_EXPLANATION_POLICY}`,
     parameters: {
       type: 'object',
       properties: {

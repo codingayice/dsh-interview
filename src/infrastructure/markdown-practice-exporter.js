@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { INTERVIEW_MODES } from '../domain/modes.js'
 import { leetcodeDifficultyLabel } from '../domain/leetcode-top-100.js'
+import { leetcodeLanguageLabel } from '../domain/leetcode-languages.js'
 import { summarizePractice } from '../domain/practice.js'
 import { defaultDataDirectory } from './paths.js'
 
@@ -62,7 +63,10 @@ export function renderPracticeMarkdown(practice, include) {
         `- 面试难度：${practice.config.difficulty}`,
       )
     }
-    if (practice.mode === 'leetcode') lines.push(`- 官方题库：${practice.source.content}`)
+    if (practice.mode === 'leetcode') lines.push(
+      `- 编程语言：${leetcodeLanguageLabel(practice.config.language)}`,
+      `- 官方题库：${practice.source.content}`,
+    )
   }
 
   if (sections.has('summary')) {

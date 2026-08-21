@@ -3,6 +3,7 @@ import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, ErrorNotice, h, Loading, Markdown } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
+import { leetcodeLanguageLabel } from '../../domain/leetcode-languages.js'
 
 const DIFFICULTY = Object.freeze({
   easy: { label: '简单', tone: 'easy' },
@@ -82,7 +83,7 @@ export function LeetcodeCatalog({ sessionId }) {
     })))
 }
 
-function LeetcodeQuestionCard({ question, catalog, active, expanded, command, phase, onRun, onExplain }) {
+function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, onRun, onExplain }) {
   const saved = catalogProblem(catalog, question.leetcode.slug)
   const problem = { ...question.leetcode, completed: saved?.completed === true }
   return h('article', { className: `di-card di-lc-problem-card${active ? ' is-active' : ' is-history'}`, 'aria-label': active ? '当前力扣题目' : '历史力扣题目' },
@@ -91,6 +92,7 @@ function LeetcodeQuestionCard({ question, catalog, active, expanded, command, ph
         h('div', { className: 'di-lc-problem-meta' },
           h('span', null, problem.category),
           h(DifficultyBadge, { difficulty: problem.difficulty }),
+          language ? h('span', null, leetcodeLanguageLabel(language)) : null,
           h('span', { className: problem.completed ? 'is-complete' : '' }, problem.completed ? '已完成' : '未完成'))),
       h('div', { className: 'di-lc-problem-actions' },
         h('a', { className: 'di-button is-primary', href: problem.url, target: '_blank', rel: 'noreferrer' }, '打开题目 ↗'),
@@ -118,7 +120,7 @@ function LeetcodeQuestionCard({ question, catalog, active, expanded, command, ph
         : null)
 }
 
-export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+export function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = '' }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
   const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
   const command = useCommand(sessionId)
@@ -161,6 +163,7 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
   return h(LeetcodeQuestionCard, {
     question: current,
     catalog,
+    language: language || session?.practice?.config?.language,
     active,
     expanded: showExplanation,
     command,

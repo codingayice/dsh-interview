@@ -30,7 +30,7 @@ test('Markdown 导出支持内容筛选', () => {
 })
 
 test('Markdown 导出力扣题目地址、题型和难度', () => {
-  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: {}, now: 1 })
+  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: { language: 'cpp' }, now: 1 })
   practice = askQuestion(practice, {
     id: 'question-1', prompt: '1. 两数之和', leetcode: { slug: 'two-sum' }, now: 2,
   }).practice
@@ -39,15 +39,12 @@ test('Markdown 导出力扣题目地址、题型和难度', () => {
     detail: [
       '使用哈希表一次遍历。',
       '```cpp\nvector<int> twoSum() { return {}; }\n```',
-      '```java\nclass Solution {}\n```',
-      '```python\nclass Solution: pass\n```',
-      '```c\nint* twoSum() { return 0; }\n```',
-      '```go\nfunc twoSum() []int { return nil }\n```',
     ].join('\n\n'),
     memorizationPoints: '查找 target - x，时间 O(n)，空间 O(n)。',
     now: 3,
   }).practice
   const markdown = renderPracticeMarkdown(practice).markdown
+  assert.match(markdown, /编程语言：C\+\+/)
   assert.match(markdown, /官方题库：https:\/\/leetcode\.cn\/studyplan\/top-100-liked\//)
   assert.match(markdown, /\[1\. 两数之和\]\(https:\/\/leetcode\.cn\/problems\/two-sum\/\) · 哈希 · 简单/)
   assert.match(markdown, /### 算法讲解/)

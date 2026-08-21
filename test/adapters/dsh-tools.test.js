@@ -48,9 +48,10 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.deepEqual(startVariants.map((schema) => schema.required), [
     ['mode', 'topic'],
     ['mode', 'topic'],
-    ['mode'],
+    ['mode', 'language'],
     ['mode', 'resume', 'interviewer_style', 'coding', 'difficulty'],
   ])
+  assert.deepEqual(startVariants[2].properties.language.enum, ['cpp', 'java', 'python', 'c', 'go'])
   assert.match(fixture.tools.interview_start_practice.description, /禁止根据上下文、历史练习或常识推断、补全和采用默认值/)
   assert.match(fixture.tools.interview_start_practice.description, /第一步只确认模式/)
   assert.match(fixture.tools.interview_start_practice.description, /简历、面试官风格、是否手撕代码、面试难度/)
@@ -58,7 +59,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_continue_practice.description, /不把“继续”简单等同于“下一题”/)
   assert.match(fixture.tools.interview_continue_practice.description, /必须严格执行工具返回的 nextAction/)
   assert.match(fixture.tools.interview_reveal_answer.description, /generate_leetcode_explanation/)
-  assert.match(fixture.tools.interview_reveal_answer.description, /C\+\+、Java、Python、C、Go/)
+  assert.match(fixture.tools.interview_reveal_answer.description, /只生成指定语言的一份完整答案代码/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
   assert.deepEqual(fixture.tools.interview_complete_summary.parameters.required, ['overall', 'strengths', 'improvements'])
@@ -67,7 +68,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
 
 test('力扣工具直接抽题、展示目录并保存显式完成状态', async () => {
   const fixture = toolFixture()
-  const started = await fixture.tools.interview_start_practice.execute({ mode: 'leetcode' }, exec('leetcode-session'))
+  const started = await fixture.tools.interview_start_practice.execute({ mode: 'leetcode', language: 'java' }, exec('leetcode-session'))
   assert.equal(started.state, 'awaiting_solution')
   assert.equal(started.nextAction, 'wait_for_user')
   assert.equal(started.presentation.kind, 'question')
@@ -81,12 +82,8 @@ test('力扣工具直接抽题、展示目录并保存显式完成状态', async
   assert.equal(explanationStatus.nextAction, 'generate_leetcode_explanation')
   const explained = await fixture.tools.interview_complete_review.execute({
     detail: [
-      '算法推导与五种语言完整代码。',
-      '```cpp\nvector<int> twoSum() { return {}; }\n```',
+      '算法推导与配置语言完整代码。',
       '```java\nclass Solution {}\n```',
-      '```python\nclass Solution: pass\n```',
-      '```c\nint* twoSum() { return 0; }\n```',
-      '```go\nfunc twoSum() []int { return nil }\n```',
     ].join('\n\n'),
     memorization_points: '哈希表查找差值，时间 O(n)，空间 O(n)。',
   }, exec('leetcode-session'))
@@ -218,8 +215,8 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.match(reveal, /interview_complete_review/)
   const leetcodeExplanation = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION, practiceId: 'p2', questionId: 'q2' })
   assert.match(leetcodeExplanation, /从零教会用户独立解决当前题目/)
-  assert.match(leetcodeExplanation, /C\+\+、Java、Python、C、Go/)
-  assert.match(leetcodeExplanation, /cpp、java、python、c、go Markdown 代码块/)
+  assert.match(leetcodeExplanation, /config\.language/)
+  assert.match(leetcodeExplanation, /禁止输出其他语言代码/)
   assert.match(leetcodeExplanation, /interview_complete_review/)
   assert.doesNotMatch(leetcodeExplanation, /可直接背诵/)
   const leetcodePresentation = instructionFor({ type: AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, practiceId: 'p2', questionId: 'q3' })

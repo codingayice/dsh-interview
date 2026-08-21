@@ -162,7 +162,7 @@ export function QuestionResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
   return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question
     ? question.leetcode
-      ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question })
+      ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language })
       : h(QuestionResultCard, { sessionId, question })
     : null)
 }

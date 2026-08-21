@@ -3,6 +3,7 @@ import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
+import { LEETCODE_LANGUAGES, leetcodeLanguageLabel } from '../../domain/leetcode-languages.js'
 
 function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const [mode, setMode] = React.useState(initial?.mode || '')
@@ -11,15 +12,16 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const [interviewerStyle, setInterviewerStyle] = React.useState(initial?.config?.interviewerStyle || '')
   const [coding, setCoding] = React.useState(typeof initial?.config?.coding === 'boolean' ? String(initial.config.coding) : '')
   const [difficulty, setDifficulty] = React.useState(initial?.config?.difficulty || '')
+  const [language, setLanguage] = React.useState(initial?.config?.language || '')
   const topicMode = mode === 'bagu' || mode === 'scenario'
   const valid = topicMode
     ? Boolean(topic.trim())
-    : mode === 'leetcode' || (mode === 'mock' && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty))
+    : mode === 'leetcode' ? Boolean(language) : mode === 'mock' && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty)
   const submit = () => {
     if (!valid) return
     onSubmit(mode === 'mock'
       ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === 'true', difficulty } }
-      : mode === 'leetcode' ? { mode, config: {} } : { mode, config: { topic: topic.trim() } })
+      : mode === 'leetcode' ? { mode, config: { language } } : { mode, config: { topic: topic.trim() } })
   }
   return h('div', { className: 'di-practice-form' },
     h('label', { className: 'di-field' }, h('span', null, '模式'),
@@ -31,6 +33,10 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
         h('option', { value: 'leetcode' }, '刷力扣'))),
     topicMode ? h('label', { className: 'di-field' }, h('span', null, '主题'),
       h('input', { className: 'di-input', value: topic, onChange: (event) => setTopic(event.target.value) })) : null,
+    mode === 'leetcode' ? h('label', { className: 'di-field' }, h('span', null, '编程语言'),
+      h('select', { className: 'di-select', value: language, onChange: (event) => setLanguage(event.target.value) },
+        h('option', { value: '' }, '请选择'),
+        LEETCODE_LANGUAGES.map((item) => h('option', { key: item.id, value: item.id }, item.label)))) : null,
     mode === 'mock' ? h(React.Fragment, null,
       h('label', { className: 'di-field di-field-wide' }, h('span', null, '简历'),
         h('textarea', { className: 'di-input di-textarea', value: resume, onChange: (event) => setResume(event.target.value) })),
@@ -91,7 +97,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     h('div', { className: 'di-detail-heading' },
       h('h3', { className: 'di-ledger-title' }, practice.topic),
       h('span', { className: 'di-meta' }, practice.mode === 'leetcode'
-        ? `${practice.modeLabel} · ${practice.questionCount} 道已抽取题目`
+        ? `${practice.modeLabel} · ${leetcodeLanguageLabel(practice.config.language)} · ${practice.questionCount} 道已抽取题目`
         : `${practice.modeLabel} · ${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`)),
     h('div', { className: 'di-actions' },
       h(Button, { tone: 'primary', busy: Boolean(command.busy?.startsWith('session.')), onClick: activate }, practice.status === 'completed' ? '重新打开' : '切换到练习'),

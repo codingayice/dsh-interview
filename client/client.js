@@ -416,6 +416,23 @@ var LEETCODE_TOP_100_GROUPS = Object.freeze(GROUPS.map((group) => Object.freeze(
 var LEETCODE_TOP_100 = Object.freeze(LEETCODE_TOP_100_GROUPS.flatMap((group) => group.problems));
 var PROBLEM_BY_SLUG = new Map(LEETCODE_TOP_100.map((problem) => [problem.slug, problem]));
 
+// src/domain/leetcode-languages.js
+var DEFINITIONS = [
+  { id: "cpp", label: "C++", fence: "cpp", pattern: /```(?:cpp|c\+\+)\s*\r?\n[\s\S]+?```/i },
+  { id: "java", label: "Java", fence: "java", pattern: /```java\s*\r?\n[\s\S]+?```/i },
+  { id: "python", label: "Python", fence: "python", pattern: /```python\s*\r?\n[\s\S]+?```/i },
+  { id: "c", label: "C", fence: "c", pattern: /```c\s*\r?\n[\s\S]+?```/i },
+  { id: "go", label: "Go", fence: "go", pattern: /```(?:go|golang)\s*\r?\n[\s\S]+?```/i }
+];
+var LEETCODE_LANGUAGES = Object.freeze(DEFINITIONS.map((item) => Object.freeze(item)));
+var LEETCODE_LANGUAGE_IDS = Object.freeze(LEETCODE_LANGUAGES.map((item) => item.id));
+function leetcodeLanguageDefinition(id) {
+  return LEETCODE_LANGUAGES.find((item) => item.id === id) || null;
+}
+function leetcodeLanguageLabel(id) {
+  return leetcodeLanguageDefinition(id)?.label || String(id || "");
+}
+
 // src/client/features/leetcode.js
 var DIFFICULTY = Object.freeze({
   easy: { label: "\u7B80\u5355", tone: "easy" },
@@ -514,7 +531,7 @@ function LeetcodeCatalog({ sessionId }) {
     }))
   );
 }
-function LeetcodeQuestionCard({ question, catalog, active, expanded, command, phase, onRun, onExplain }) {
+function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, onRun, onExplain }) {
   const saved = catalogProblem(catalog, question.leetcode.slug);
   const problem = { ...question.leetcode, completed: saved?.completed === true };
   return h(
@@ -529,6 +546,7 @@ function LeetcodeQuestionCard({ question, catalog, active, expanded, command, ph
         { className: "di-lc-problem-meta" },
         h("span", null, problem.category),
         h(DifficultyBadge, { difficulty: problem.difficulty }),
+        language ? h("span", null, leetcodeLanguageLabel(language)) : null,
         h("span", { className: problem.completed ? "is-complete" : "" }, problem.completed ? "\u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210")
       )
     ),
@@ -566,7 +584,7 @@ function LeetcodeQuestionCard({ question, catalog, active, expanded, command, ph
     ) : null
   );
 }
-function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "" }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
   const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
   const command = useCommand(sessionId);
@@ -599,6 +617,7 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
   return h(LeetcodeQuestionCard, {
     question: current,
     catalog,
+    language: language || session?.practice?.config?.language,
     active,
     expanded: showExplanation,
     command,
@@ -819,7 +838,7 @@ function QuestionResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question }) : h(QuestionResultCard, { sessionId, question }) : null);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
@@ -872,11 +891,12 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const [interviewerStyle, setInterviewerStyle] = import_react5.default.useState(initial?.config?.interviewerStyle || "");
   const [coding, setCoding] = import_react5.default.useState(typeof initial?.config?.coding === "boolean" ? String(initial.config.coding) : "");
   const [difficulty, setDifficulty] = import_react5.default.useState(initial?.config?.difficulty || "");
+  const [language, setLanguage] = import_react5.default.useState(initial?.config?.language || "");
   const topicMode = mode === "bagu" || mode === "scenario";
-  const valid = topicMode ? Boolean(topic.trim()) : mode === "leetcode" || mode === "mock" && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty);
+  const valid = topicMode ? Boolean(topic.trim()) : mode === "leetcode" ? Boolean(language) : mode === "mock" && Boolean(resume.trim() && interviewerStyle.trim() && coding && difficulty);
   const submit = () => {
     if (!valid) return;
-    onSubmit(mode === "mock" ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === "true", difficulty } } : mode === "leetcode" ? { mode, config: {} } : { mode, config: { topic: topic.trim() } });
+    onSubmit(mode === "mock" ? { mode, config: { resume: resume.trim(), interviewerStyle: interviewerStyle.trim(), coding: coding === "true", difficulty } } : mode === "leetcode" ? { mode, config: { language } } : { mode, config: { topic: topic.trim() } });
   };
   return h(
     "div",
@@ -900,6 +920,17 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
       { className: "di-field" },
       h("span", null, "\u4E3B\u9898"),
       h("input", { className: "di-input", value: topic, onChange: (event) => setTopic(event.target.value) })
+    ) : null,
+    mode === "leetcode" ? h(
+      "label",
+      { className: "di-field" },
+      h("span", null, "\u7F16\u7A0B\u8BED\u8A00"),
+      h(
+        "select",
+        { className: "di-select", value: language, onChange: (event) => setLanguage(event.target.value) },
+        h("option", { value: "" }, "\u8BF7\u9009\u62E9"),
+        LEETCODE_LANGUAGES.map((item) => h("option", { key: item.id, value: item.id }, item.label))
+      )
     ) : null,
     mode === "mock" ? h(
       import_react5.default.Fragment,
@@ -1000,7 +1031,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       "div",
       { className: "di-detail-heading" },
       h("h3", { className: "di-ledger-title" }, practice.topic),
-      h("span", { className: "di-meta" }, practice.mode === "leetcode" ? `${practice.modeLabel} \xB7 ${practice.questionCount} \u9053\u5DF2\u62BD\u53D6\u9898\u76EE` : `${practice.modeLabel} \xB7 ${practice.questionCount} \u9898 \xB7 ${practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7 \xB7 \u5747\u5206 ${practice.averageScore ?? "\u2014"}`)
+      h("span", { className: "di-meta" }, practice.mode === "leetcode" ? `${practice.modeLabel} \xB7 ${leetcodeLanguageLabel(practice.config.language)} \xB7 ${practice.questionCount} \u9053\u5DF2\u62BD\u53D6\u9898\u76EE` : `${practice.modeLabel} \xB7 ${practice.questionCount} \u9898 \xB7 ${practice.evaluatedCount} \u6B21\u5DF2\u8BC4\u4EF7 \xB7 \u5747\u5206 ${practice.averageScore ?? "\u2014"}`)
     ),
     h(
       "div",

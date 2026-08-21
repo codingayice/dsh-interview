@@ -153,6 +153,14 @@ test('力扣题目卡使用讲解入口且不重复展示题目列表入口', ()
   assert.match(liveInterview, /!isLeetcode \? h\(Button/)
 })
 
+test('力扣练习表单必须显式选择编程语言', () => {
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+  assert.match(library, /initial\?\.config\?\.language \|\| ''/)
+  assert.match(library, /mode === 'leetcode' \? Boolean\(language\)/)
+  assert.match(library, /h\('span', null, '编程语言'\)/)
+  assert.match(library, /config: \{ language \}/)
+})
+
 test('力扣切题不使用本地临时卡片槽位', () => {
   const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
   const api = readFileSync(new URL('../../src/client/shared/api.js', import.meta.url), 'utf8')

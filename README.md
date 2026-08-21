@@ -46,7 +46,7 @@ dsh plugin --profile web update dsh-interview
 - 背八股：主题
 - 场景题：主题
 - 模拟面试：简历、面试官风格、是否手撕代码、面试难度（初级、中级或高级）
-- 刷力扣：无需额外配置，由插件从固定的热题 100 中随机抽题
+- 刷力扣：编程语言（C++、Java、Python、C 或 Go），由插件从固定的热题 100 中随机抽题
 
 模式没有明确时，Agent 只询问模式；模式明确后，只询问该模式缺少的字段。Agent 不得沿用历史配置、把缺少的布尔值当作 `false`，也不得增加题数、追问策略或面试时长等配置。
 
@@ -56,12 +56,12 @@ dsh plugin --profile web update dsh-interview
 开始 JVM 八股练习
 开始 Redis 高可用场景题练习
 根据下面这份简历进行高级模拟面试，面试官风格是深挖项目，需要手撕代码：……
-开始刷力扣
+使用 Java 开始刷力扣
 ```
 
 创建后，Agent 每次只生成一道简单、明确、简短的问题，并在聊天流中展示题目卡片。
 
-刷力扣模式例外：题目不由 Agent 生成，而是由插件从本地固定题库随机抽取。抽题优先选择本次练习尚未出现且尚未完成的题；当前候选池用尽后再逐级回退。题目卡可以打开力扣原题、标记完成或未完成、随机下一题、查看完整题目列表和结束练习。完成状态独立于单次练习，保存在本地 SQLite 中。
+刷力扣模式例外：题目不由 Agent 生成，而是由插件从本地固定题库随机抽取。抽题优先选择本次练习尚未出现且尚未完成的题；当前候选池用尽后再逐级回退。算法讲解只生成练习配置语言的一份完整可提交代码，不会同时输出其他语言。题目卡可以打开力扣原题、标记完成或未完成、随机下一题、讲解和结束练习。完成状态独立于单次练习，保存在本地 SQLite 中。
 
 ### 回答和点评讲解
 
@@ -140,7 +140,7 @@ dsh plugin --profile web update dsh-interview
 
 插件使用无 `command` 联合的原子工具。每个工具只执行一个业务动作，并通过 JSON Schema 硬性声明必填参数：
 
-练习模式标识为 `bagu`（背八股）、`mock`（模拟面试）、`scenario`（场景题）和 `leetcode`（刷力扣）。
+练习模式标识为 `bagu`（背八股）、`mock`（模拟面试）、`scenario`（场景题）和 `leetcode`（刷力扣）。刷力扣的 `language` 必须显式指定为 `cpp`、`java`、`python`、`c` 或 `go`。
 
 | 范围 | 工具 |
 | --- | --- |
@@ -152,7 +152,7 @@ dsh plugin --profile web update dsh-interview
 
 工具返回 `dsh-interview/interaction-v1` 结构化交互结果，包含 `state`、`nextAction`、`presentation` 和 `assistantResponse`。评价保存后必须继续完成点评讲解；参考讲解和“直接背”均由 Schema 设置为非空必填，无效调用不会进入领域写入。
 
-UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具先进入同一个 `InterviewCoordinator`，再调用 `InterviewApplication`。应用结果中的 `events` 只表示已发生的业务事实，`agentTasks` 只表示确实需要模型生成内容的任务；协调器不会根据事件名称猜测是否唤醒 Agent。
+UI 按钮不会绕过业务层。所有 UI 命令与 Agent 工具先进入同一个 `InterviewCoordinator`，再调用 `InterviewApplication`。应用结果中的 `events` 只表示已发生的业务事实，`agentTasks` 表示需要 Agent 生成内容或在正式会话中展示卡片的任务；协调器不会根据事件名称猜测是否唤醒 Agent。
 
 ## 架构
 

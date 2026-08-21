@@ -34,9 +34,15 @@ test('不同模式只接受各自的显式配置', () => {
     code: 'INVALID_TOPIC',
   })
   assert.deepEqual(createPractice({ id: 'practice-3', mode: 'scenario', config: { topic: '高并发' }, now: 1 }).config, { topic: '高并发' })
-  const leetcode = createPractice({ id: 'practice-4', mode: 'leetcode', config: {}, now: 1 })
+  assert.throws(() => createPractice({ id: 'practice-4', mode: 'leetcode', config: {}, now: 1 }), {
+    code: 'LEETCODE_LANGUAGE_REQUIRED',
+  })
+  assert.throws(() => createPractice({ id: 'practice-4', mode: 'leetcode', config: { language: 'rust' }, now: 1 }), {
+    code: 'INVALID_LEETCODE_LANGUAGE',
+  })
+  const leetcode = createPractice({ id: 'practice-4', mode: 'leetcode', config: { language: 'cpp' }, now: 1 })
   assert.equal(leetcode.topic, 'LeetCode 热题 100')
-  assert.deepEqual(leetcode.config, {})
+  assert.deepEqual(leetcode.config, { language: 'cpp' })
   assert.deepEqual(leetcode.source, { kind: 'catalog', content: 'https://leetcode.cn/studyplan/top-100-liked/' })
 })
 
@@ -130,7 +136,7 @@ test('题目必须保持简单扼要', () => {
 })
 
 test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
-  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: {}, now: 1 })
+  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: { language: 'cpp' }, now: 1 })
   const asked = askQuestion(practice, {
     id: 'question-1',
     prompt: '1. 两数之和',
@@ -154,12 +160,25 @@ test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
   })
   assert.throws(() => saveExplanation(practice, {
     questionId: 'question-1',
-    detail: '只给出一种语言。\n\n```cpp\nvector<int> twoSum() { return {}; }\n```',
+    detail: '错误语言。\n\n```java\nclass Solution {}\n```',
     memorizationPoints: '哈希表查找差值。',
     now: 3,
   }), {
-    code: 'LEETCODE_SOLUTION_LANGUAGES_REQUIRED',
+    code: 'LEETCODE_SOLUTION_LANGUAGE_REQUIRED',
   })
+  assert.throws(() => saveExplanation(practice, {
+    questionId: 'question-1',
+    detail: '混入其他语言。\n\n```cpp\nvector<int> twoSum() { return {}; }\n```\n\n```java\nclass Solution {}\n```',
+    memorizationPoints: '哈希表查找差值。',
+    now: 3,
+  }), { code: 'LEETCODE_SOLUTION_LANGUAGE_MISMATCH' })
+  practice = saveExplanation(practice, {
+    questionId: 'question-1',
+    detail: '只给配置语言。\n\n```cpp\nvector<int> twoSum() { return {}; }\n```',
+    memorizationPoints: '哈希表查找差值。',
+    now: 3,
+  }).practice
+  assert.match(practice.questions[0].explanation.detail, /```cpp/)
 })
 
 test('练习和题目修改经过领域校验，删除题目后连续重排', () => {

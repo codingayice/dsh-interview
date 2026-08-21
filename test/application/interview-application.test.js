@@ -231,7 +231,9 @@ test('力扣热题目录按官方题型分组并持久化完成状态', async ()
 
 test('刷力扣模式由应用层随机抽题并根据完成状态继续', async () => {
   const fixture = applicationFixture()
-  const started = await fixture.application.startPractice('leetcode-session', { mode: 'leetcode', config: {} })
+  const started = await fixture.application.startPractice('leetcode-session', { mode: 'leetcode', config: { language: 'cpp' } })
+  const startedPractice = await fixture.application.getPractice(started.references.practiceId)
+  assert.equal(startedPractice.resource.data.config.language, 'cpp')
   assert.equal(started.resource.kind, 'question')
   assert.equal(started.resource.data.leetcode.slug, 'two-sum')
   assert.equal(started.resource.data.leetcode.category, '哈希')
@@ -252,10 +254,6 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
     detail: [
       '使用哈希表保存已访问元素及其下标，一次遍历查找目标差值。',
       '```cpp\nvector<int> twoSum(vector<int>& nums, int target) { return {}; }\n```',
-      '```java\nclass Solution { public int[] twoSum(int[] nums, int target) { return new int[0]; } }\n```',
-      '```python\nclass Solution:\n    def twoSum(self, nums, target): return []\n```',
-      '```c\nint* twoSum(int* nums, int numsSize, int target, int* returnSize) { return 0; }\n```',
-      '```go\nfunc twoSum(nums []int, target int) []int { return nil }\n```',
     ].join('\n\n'),
     memorizationPoints: '边遍历边查差值，哈希表把查找降为常数时间。',
   })

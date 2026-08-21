@@ -1,15 +1,9 @@
 import { assertDomain } from './errors.js'
 import { LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from './leetcode-top-100.js'
+import { LEETCODE_LANGUAGES, leetcodeLanguageDefinition } from './leetcode-languages.js'
 import { modeDefinition } from './modes.js'
 
 const DIFFICULTIES = new Set(['junior', 'intermediate', 'senior'])
-const LEETCODE_CODE_BLOCKS = Object.freeze([
-  ['C++', /```(?:cpp|c\+\+)\s*\r?\n[\s\S]+?```/i],
-  ['Java', /```java\s*\r?\n[\s\S]+?```/i],
-  ['Python', /```python\s*\r?\n[\s\S]+?```/i],
-  ['C', /```c\s*\r?\n[\s\S]+?```/i],
-  ['Go', /```(?:go|golang)\s*\r?\n[\s\S]+?```/i],
-])
 
 function requiredText(value, code, message) {
   const text = typeof value === 'string' ? value.trim() : ''
@@ -38,7 +32,11 @@ function normalizeConfiguration(definition, config) {
   if (definition.configuration === 'topic') {
     return { topic: requiredText(config.topic, 'INVALID_TOPIC', '必须明确提供练习主题') }
   }
-  if (definition.configuration === 'catalog') return {}
+  if (definition.configuration === 'catalog') {
+    const language = requiredText(config.language, 'LEETCODE_LANGUAGE_REQUIRED', '刷力扣必须明确选择编程语言')
+    assertDomain(leetcodeLanguageDefinition(language), 'INVALID_LEETCODE_LANGUAGE', `不支持的力扣编程语言：${language}`)
+    return { language }
+  }
 
   const resume = requiredText(config.resume, 'RESUME_REQUIRED', '模拟面试必须明确提供简历内容')
   const interviewerStyle = requiredText(config.interviewerStyle, 'INTERVIEWER_STYLE_REQUIRED', '模拟面试必须明确选择面试官风格')
@@ -199,14 +197,22 @@ export function saveExplanation(practice, { questionId, detail, memorizationPoin
   assertDomain(!target.explanation, 'EXPLANATION_ALREADY_EXISTS', '该题已经存在讲解')
   const normalizedDetail = requiredText(detail, 'INVALID_EXPLANATION', '讲解内容不能为空')
   if (target.leetcode) {
-    const missingLanguages = LEETCODE_CODE_BLOCKS
-      .filter(([, pattern]) => !pattern.test(normalizedDetail))
-      .map(([language]) => language)
+    const selectedLanguage = leetcodeLanguageDefinition(practice.config.language)
+    assertDomain(selectedLanguage, 'INVALID_LEETCODE_LANGUAGE', `不支持的力扣编程语言：${String(practice.config.language)}`)
     assertDomain(
-      missingLanguages.length === 0,
-      'LEETCODE_SOLUTION_LANGUAGES_REQUIRED',
-      `力扣讲解缺少完整代码：${missingLanguages.join('、')}`,
-      { missingLanguages },
+      selectedLanguage.pattern.test(normalizedDetail),
+      'LEETCODE_SOLUTION_LANGUAGE_REQUIRED',
+      `力扣讲解必须包含 ${selectedLanguage.label} 完整代码`,
+      { language: selectedLanguage.id },
+    )
+    const unexpectedLanguages = LEETCODE_LANGUAGES
+      .filter((language) => language.id !== selectedLanguage.id && language.pattern.test(normalizedDetail))
+      .map((language) => language.id)
+    assertDomain(
+      unexpectedLanguages.length === 0,
+      'LEETCODE_SOLUTION_LANGUAGE_MISMATCH',
+      `力扣讲解只能包含配置的 ${selectedLanguage.label} 代码`,
+      { language: selectedLanguage.id, unexpectedLanguages },
     )
   }
   const explanation = {

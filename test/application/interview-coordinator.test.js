@@ -122,7 +122,7 @@ test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型�
   })
   const executeUi = (sessionId, action, payload = {}) => coordinator.execute({ sessionId, action, payload, source: 'ui' })
 
-  const leetcode = await executeUi('leetcode-local', INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'leetcode', config: {} })
+  const leetcode = await executeUi('leetcode-local', INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'leetcode', config: { language: 'java' } })
   assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION])
   dispatched.length = 0
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION, { slug: 'two-sum', completed: true })
@@ -136,7 +136,7 @@ test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型�
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.SELECT_PRACTICE, { practiceId })
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.OPEN_QUESTION, { questionId })
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.RETRY_QUESTION, { questionId })
-  await executeUi('leetcode-local', INTERVIEW_ACTIONS.UPDATE_PRACTICE, { practiceId, mode: 'leetcode', config: {} })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.UPDATE_PRACTICE, { practiceId, mode: 'leetcode', config: { language: 'java' } })
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG)
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.EXPORT_PRACTICES, { practiceIds: [practiceId] })
   assert.equal(dispatched.length, 0, '切换、打开、重答、修改、查询和导出均为本地操作')
