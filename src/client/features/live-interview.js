@@ -102,6 +102,19 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation
   const isLeetcode = Boolean(question.leetcode)
+  const nextRequestedRef = React.useRef(false)
+  const [nextRequested, setNextRequested] = React.useState(false)
+  const next = async () => {
+    if (nextRequestedRef.current) return
+    nextRequestedRef.current = true
+    setNextRequested(true)
+    try {
+      await command.run('question.next')
+    } catch {
+      nextRequestedRef.current = false
+      setNextRequested(false)
+    }
+  }
   return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': isLeetcode ? '题目讲解' : '点评讲解' },
     evaluation ? h('header', { className: 'di-review-score' },
       h('span', { className: 'di-review-check' }, h(Icon, { name: 'check', size: 22 })),
@@ -127,9 +140,11 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
           h(Markdown, null, explanation.memorizationPoints))),
       h(ErrorNotice, null, command.error),
       h('div', { className: 'di-review-actions' },
-        h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
+        isLeetcode
+          ? h(Button, { tone: 'primary', disabled: nextRequested, onClick: next }, nextRequested ? '已出下一题' : '随机下一题')
+          : h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
         !isLeetcode ? h(Button, { busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答') : null,
-        h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习'))))
+        !isLeetcode ? h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习') : null)))
 }
 
 export function ToolErrorCard({ message }) {

@@ -531,7 +531,7 @@ function LeetcodeCatalog({ sessionId }) {
     }))
   );
 }
-function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, onRun, onExplain }) {
+function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, nextRequested, onRun, onNext, onExplain }) {
   const saved = catalogProblem(catalog, question.leetcode.slug);
   const problem = { ...question.leetcode, completed: saved?.completed === true };
   return h(
@@ -561,12 +561,11 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
           busy: command.busy === "leetcode.set-completion",
           onClick: () => onRun("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
         }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
-        h(Button, { busy: command.busy === "question.next", onClick: () => onRun("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
+        h(Button, { disabled: nextRequested, onClick: onNext }, nextRequested ? "\u5DF2\u51FA\u4E0B\u4E00\u9898" : "\u968F\u673A\u4E0B\u4E00\u9898"),
         h(Button, {
           busy: command.busy === "question.reveal" || phase === "generating_explanation",
           onClick: () => onExplain(question)
-        }, "\u8BB2\u89E3"),
-        h(Button, { busy: command.busy === "session.finish", onClick: () => onRun("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+        }, "\u8BB2\u89E3")
       ) : null
     ),
     active ? h(ErrorNotice, null, command.error) : null,
@@ -592,7 +591,13 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "",
   const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null;
   const current = live ? sessionQuestion || initialQuestion : initialQuestion;
   const [showExplanation, setShowExplanation] = import_react3.default.useState(false);
-  import_react3.default.useEffect(() => setShowExplanation(false), [current?.id]);
+  const nextRequestedRef = import_react3.default.useRef(false);
+  const [nextRequested, setNextRequested] = import_react3.default.useState(false);
+  import_react3.default.useEffect(() => {
+    setShowExplanation(false);
+    nextRequestedRef.current = false;
+    setNextRequested(false);
+  }, [current?.id]);
   if (sessionQuery.loading && !current) return h("div", { className: "di-card" }, h(Loading));
   if (!current?.leetcode) return null;
   const run = async (name2, payload) => {
@@ -612,6 +617,16 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "",
     const result = await run("question.reveal", { questionId: current.id });
     if (result) setShowExplanation(true);
   };
+  const next = async () => {
+    if (nextRequestedRef.current) return;
+    nextRequestedRef.current = true;
+    setNextRequested(true);
+    const result = await run("question.next");
+    if (!result) {
+      nextRequestedRef.current = false;
+      setNextRequested(false);
+    }
+  };
   const catalog = catalogQuery.data?.resource?.data;
   const active = live ? sessionQuery.loading || Boolean(session?.selected && session?.phase !== "completed" && sessionQuestion?.id === current.id) : true;
   return h(LeetcodeQuestionCard, {
@@ -622,7 +637,9 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "",
     expanded: showExplanation,
     command,
     phase: live ? session?.phase : null,
+    nextRequested,
     onRun: run,
+    onNext: next,
     onExplain: explain
   });
 }
@@ -752,6 +769,19 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
   const isLeetcode = Boolean(question.leetcode);
+  const nextRequestedRef = import_react4.default.useRef(false);
+  const [nextRequested, setNextRequested] = import_react4.default.useState(false);
+  const next = async () => {
+    if (nextRequestedRef.current) return;
+    nextRequestedRef.current = true;
+    setNextRequested(true);
+    try {
+      await command.run("question.next");
+    } catch {
+      nextRequestedRef.current = false;
+      setNextRequested(false);
+    }
+  };
   return h(
     "article",
     { id: `di-review-${question.id}`, className: "di-card di-review-card", "aria-label": isLeetcode ? "\u9898\u76EE\u8BB2\u89E3" : "\u70B9\u8BC4\u8BB2\u89E3" },
@@ -802,9 +832,9 @@ function ReviewResultCard({ sessionId, question, attempt }) {
       h(
         "div",
         { className: "di-review-actions" },
-        h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
+        isLeetcode ? h(Button, { tone: "primary", disabled: nextRequested, onClick: next }, nextRequested ? "\u5DF2\u51FA\u4E0B\u4E00\u9898" : "\u968F\u673A\u4E0B\u4E00\u9898") : h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
         !isLeetcode ? h(Button, { busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54") : null,
-        h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+        !isLeetcode ? h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
       )
     )
   );

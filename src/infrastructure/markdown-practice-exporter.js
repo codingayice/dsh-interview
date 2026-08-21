@@ -65,7 +65,7 @@ export function renderPracticeMarkdown(practice, include) {
     }
     if (practice.mode === 'leetcode') lines.push(
       `- 编程语言：${leetcodeLanguageLabel(practice.config.language)}`,
-      `- 官方题库：${practice.source.content}`,
+      `- 题目地址：${practice.source.content}`,
     )
   }
 

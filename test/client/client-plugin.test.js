@@ -174,7 +174,7 @@ test('力扣切题不使用本地临时卡片槽位', () => {
   const api = readFileSync(new URL('../../src/client/shared/api.js', import.meta.url), 'utf8')
   const index = readFileSync(new URL('../../src/client/index.js', import.meta.url), 'utf8')
 
-  assert.match(leetcode, /onRun\('question\.next'\)/)
+  assert.match(leetcode, /run\('question\.next'\)/)
   assert.match(leetcode, /const current = live/)
   assert.match(leetcode, /: initialQuestion/)
   assert.match(leetcode, /const active = live/)
@@ -198,4 +198,11 @@ test('重新作答只切换题目状态且不主动打开练习工作台', () =>
 
   assert.doesNotMatch(liveInterview, /navigateWorkspace\('active'\)/)
   assert.doesNotMatch(library, /question\.retry[\s\S]{0,160}navigateWorkspace/)
+})
+
+test('力扣随机下一题点击后立即锁定为已出下一题', () => {
+  const leetcodeSource = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  assert.match(leetcodeSource, /nextRequestedRef\.current = true/)
+  assert.match(leetcodeSource, /nextRequested \? '已出下一题' : '随机下一题'/)
+  assert.match(leetcodeSource, /disabled: nextRequested/)
 })

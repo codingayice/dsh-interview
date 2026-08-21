@@ -234,6 +234,7 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   const started = await fixture.application.startPractice('leetcode-session', { mode: 'leetcode', config: { language: 'cpp' } })
   const startedPractice = await fixture.application.getPractice(started.references.practiceId)
   assert.equal(startedPractice.resource.data.config.language, 'cpp')
+  assert.equal(startedPractice.resource.data.topic, '两数之和')
   assert.equal(started.resource.kind, 'question')
   assert.equal(started.resource.data.leetcode.slug, 'two-sum')
   assert.equal(started.resource.data.leetcode.category, '哈希')
@@ -267,13 +268,24 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   assert.equal(continued.resource.data.resumeAction, 'show_current_question')
   assert.equal(continued.resource.data.question.leetcode.slug, 'group-anagrams')
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_solution')
+  assert.equal((await fixture.application.getPractice(started.references.practiceId)).resource.data.status, 'completed')
+  const continuedPracticeId = continued.references.practiceId
+  assert.notEqual(continuedPracticeId, started.references.practiceId)
+  assert.equal((await fixture.application.getPractice(continuedPracticeId)).resource.data.questions.length, 1)
 
-  const next = await fixture.application.requestNextQuestion('leetcode-session')
+  const [next, duplicateNext] = await Promise.all([
+    fixture.application.requestNextQuestion('leetcode-session'),
+    fixture.application.requestNextQuestion('leetcode-session'),
+  ])
   assert.equal(next.resource.data.leetcode.slug, 'longest-consecutive-sequence')
+  assert.equal(duplicateNext.references.practiceId, next.references.practiceId)
+  assert.equal(duplicateNext.references.questionId, next.references.questionId)
   assert.equal(next.agentTasks[0].type, AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION)
   assert.equal(next.agentTasks[0].questionId, next.resource.data.id)
   assert.equal(next.agentTasks[0].reason, 'next_requested')
-  assert.equal((await fixture.application.getPractice(next.references.practiceId)).resource.data.questions.length, 3)
+  assert.notEqual(next.references.practiceId, continuedPracticeId)
+  assert.equal((await fixture.application.getPractice(next.references.practiceId)).resource.data.questions.length, 1)
+  assert.equal((await fixture.application.getPractice(continuedPracticeId)).resource.data.status, 'completed')
 
   await fixture.application.selectPractice('leetcode-session-2', next.references.practiceId)
   assert.equal((await fixture.application.getSession('leetcode-session-2')).resource.data.phase, 'awaiting_solution')
@@ -281,9 +293,7 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   const finished = await fixture.application.requestPracticeSummary('leetcode-session-2')
   assert.equal(finished.resource.data.status, 'completed')
   assert.equal(finished.resource.data.summary.kind, 'leetcode')
-  assert.deepEqual(finished.resource.data.summary.problems.map((problem) => problem.slug), [
-    'two-sum', 'group-anagrams', 'longest-consecutive-sequence',
-  ])
+  assert.deepEqual(finished.resource.data.summary.problems.map((problem) => problem.slug), ['longest-consecutive-sequence'])
   assert.deepEqual(finished.agentTasks, [])
   assert.equal(await fixture.repository.getCursor('leetcode-session-2'), null)
   assert.equal(fixture.published.at(-1).type, 'practice.completed')

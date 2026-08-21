@@ -260,10 +260,10 @@ export class SqliteInterviewRepository {
     )
   }
 
-  async commit({ practice, cursor, unbindSessionId }) {
+  async commit({ practice, practices = [], cursor, unbindSessionId }) {
     this.database.exec('BEGIN IMMEDIATE')
     try {
-      if (practice) this.#writePractice(practice)
+      for (const item of [...practices, ...(practice ? [practice] : [])]) this.#writePractice(item)
       if (unbindSessionId) this.database.prepare('DELETE FROM session_cursors WHERE session_id = ?').run(unbindSessionId)
       if (cursor) this.#writeCursor(cursor)
       this.database.exec('COMMIT')

@@ -172,6 +172,8 @@ test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
     now: 2,
   })
   practice = asked.practice
+  assert.equal(practice.topic, '两数之和')
+  assert.deepEqual(practice.source, { kind: 'leetcode', content: 'https://leetcode.cn/problems/two-sum/' })
   assert.deepEqual(asked.question.leetcode, {
     id: '1',
     title: '两数之和',
@@ -180,8 +182,8 @@ test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
     category: '哈希',
     url: 'https://leetcode.cn/problems/two-sum/',
   })
-  assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '未知题目', now: 3 }), {
-    code: 'LEETCODE_PROBLEM_REQUIRED',
+  assert.throws(() => askQuestion(practice, { id: 'question-2', prompt: '49. 字母异位词分组', leetcode: { slug: 'group-anagrams' }, now: 3 }), {
+    code: 'LEETCODE_PRACTICE_ALREADY_HAS_QUESTION',
   })
   assert.throws(() => updateQuestion(practice, { questionId: 'question-1', prompt: '篡改题目', now: 3 }), {
     code: 'LEETCODE_QUESTION_IMMUTABLE',

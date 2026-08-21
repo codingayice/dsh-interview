@@ -80,7 +80,10 @@ export function updatePractice(practice, { mode, config, now }) {
   assertDomain(practice && typeof practice === 'object', 'PRACTICE_REQUIRED', '练习不能为空')
   const definition = modeDefinition(mode)
   const normalizedConfig = normalizeConfiguration(definition, config)
-  const identity = practiceIdentity(definition, normalizedConfig)
+  const currentLeetcode = mode === 'leetcode' ? practice.questions?.[0]?.leetcode : null
+  const identity = currentLeetcode
+    ? { topic: currentLeetcode.title, source: { kind: 'leetcode', content: currentLeetcode.url } }
+    : practiceIdentity(definition, normalizedConfig)
   return withUpdatedAt(practice, now, {
     mode,
     topic: identity.topic,
@@ -112,6 +115,11 @@ export function askQuestion(practice, { id, prompt, leetcode, now }) {
   activePractice(practice)
   const questionId = requiredText(id, 'INVALID_QUESTION_ID', '题目 ID 不能为空')
   const normalizedPrompt = normalizeQuestionPrompt(prompt)
+  assertDomain(
+    practice.mode !== 'leetcode' || practice.questions.length === 0,
+    'LEETCODE_PRACTICE_ALREADY_HAS_QUESTION',
+    '每条力扣练习只能包含一道题',
+  )
   const normalizedLeetcode = normalizeLeetcodeProblem(practice, leetcode)
   assertDomain(!practice.questions.some((item) => item.id === questionId), 'DUPLICATE_QUESTION', `题目已存在：${questionId}`)
   const question = {
@@ -124,7 +132,13 @@ export function askQuestion(practice, { id, prompt, leetcode, now }) {
     ...(normalizedLeetcode ? { leetcode: normalizedLeetcode } : {}),
   }
   return {
-    practice: withUpdatedAt(practice, now, { questions: [...practice.questions, question] }),
+    practice: withUpdatedAt(practice, now, {
+      questions: [...practice.questions, question],
+      ...(normalizedLeetcode ? {
+        topic: normalizedLeetcode.title,
+        source: { kind: 'leetcode', content: normalizedLeetcode.url },
+      } : {}),
+    }),
     question,
   }
 }

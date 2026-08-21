@@ -46,7 +46,7 @@ test('Markdown 导出力扣题目地址、题型和难度', () => {
   practice = completeLeetcodePractice(practice, { now: 4 })
   const markdown = renderPracticeMarkdown(practice).markdown
   assert.match(markdown, /编程语言：C\+\+/)
-  assert.match(markdown, /官方题库：https:\/\/leetcode\.cn\/studyplan\/top-100-liked\//)
+  assert.match(markdown, /题目地址：https:\/\/leetcode\.cn\/problems\/two-sum\//)
   assert.match(markdown, /\[1\. 两数之和\]\(https:\/\/leetcode\.cn\/problems\/two-sum\/\) · 哈希 · 简单/)
   assert.match(markdown, /### 算法讲解/)
   assert.match(markdown, /### 解题要点/)

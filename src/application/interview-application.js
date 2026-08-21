@@ -51,6 +51,7 @@ export class InterviewApplication {
     this.clock = validated.clock
     this.ids = validated.ids
     this.random = validated.random
+    this.pendingNextRequests = new Map()
   }
 
   async #practice(practiceId) {
@@ -82,10 +83,13 @@ export class InterviewApplication {
     })
   }
 
-  async #drawLeetcodeProblem(practice, cursor, now) {
+  async #drawLeetcodeProblem(practice, cursor, now, { excludedSlugs = [] } = {}) {
     assertDomain(practice.mode === 'leetcode', 'INVALID_PRACTICE_MODE', '只有刷力扣模式可以从题库抽题')
     const progress = await this.#leetcodeProgress()
-    const used = new Set(practice.questions.map((question) => question.leetcode?.slug).filter(Boolean))
+    const used = new Set([
+      ...practice.questions.map((question) => question.leetcode?.slug).filter(Boolean),
+      ...excludedSlugs,
+    ])
     const incomplete = (problem) => progress.get(problem.slug)?.completed !== true
     const pools = [
       LEETCODE_TOP_100.filter((problem) => !used.has(problem.slug) && incomplete(problem)),
@@ -105,6 +109,34 @@ export class InterviewApplication {
     })
     const nextCursor = markLeetcodeProblemPresented(cursor, added.question.id, now)
     return { ...added, cursor: nextCursor }
+  }
+
+  async #replaceLeetcodePractice(sessionId, cursor, practice, now) {
+    const previousSlug = practice.questions[0]?.leetcode?.slug
+    const completed = completeLeetcodePractice(practice, { now })
+    let nextPractice = createPractice({
+      id: this.ids.next('practice'),
+      mode: 'leetcode',
+      config: practice.config,
+      now,
+    })
+    let nextCursor = createCursor({ sessionId, practiceId: nextPractice.id, now })
+    const drawn = await this.#drawLeetcodeProblem(nextPractice, nextCursor, now, {
+      excludedSlugs: previousSlug ? [previousSlug] : [],
+    })
+    nextPractice = drawn.practice
+    nextCursor = drawn.cursor
+    const events = [
+      { type: 'practice.completed', sessionId, practiceId: practice.id, summaryKind: 'leetcode' },
+      { type: 'practice.started', sessionId, practiceId: nextPractice.id, mode: 'leetcode' },
+      { type: 'leetcode.problem_drawn', sessionId, practiceId: nextPractice.id, questionId: drawn.question.id },
+    ]
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
+      sessionId, practiceId: nextPractice.id, questionId: drawn.question.id, reason: 'next_requested',
+    })]
+    await this.repository.commit({ practices: [completed, nextPractice], cursor: nextCursor })
+    await this.#publish(events)
+    return this.#result('question', toQuestionDto(drawn.question), nextCursor, { events, agentTasks })
   }
 
   #result(kind, data, cursor, { events = [], agentTasks = [], references: explicitReferences = {} } = {}) {
@@ -176,21 +208,21 @@ export class InterviewApplication {
     let question = null
     let attempt = null
 
-    if (practice.mode === 'leetcode' && [CONTINUATION_ACTIONS.GENERATE_QUESTION, CONTINUATION_ACTIONS.REQUEST_NEXT].includes(resumeAction)) {
+    if (practice.mode === 'leetcode' && resumeAction === CONTINUATION_ACTIONS.REQUEST_NEXT) {
       const now = this.clock.now()
-      const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
-      const drawnEvents = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
-      await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
-      await this.#publish(drawnEvents)
+      const next = await this.#replaceLeetcodePractice(sessionId, cursor, practice, now)
+      const nextCursor = await this.repository.getCursor(sessionId)
       return this.#result('continuation', {
         selected: true,
-        phase: drawn.cursor.phase,
+        phase: nextCursor.phase,
         resumeAction: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
         trigger: trigger || 'next_requested',
-        practiceId: practice.id,
-        questionId: drawn.question.id,
-        question: toQuestionDto(drawn.question),
-      }, drawn.cursor, { events: drawnEvents })
+        practiceId: next.references.practiceId,
+        questionId: next.references.questionId,
+        question: next.resource.data,
+      }, nextCursor, {
+        events: next.events,
+      })
     }
 
     if (resumeAction === CONTINUATION_ACTIONS.REQUEST_NEXT) {
@@ -396,18 +428,21 @@ export class InterviewApplication {
     }, nextCursor, { events })
   }
 
-  async requestNextQuestion(sessionId) {
+  requestNextQuestion(sessionId) {
+    const normalizedSessionId = requiredId(sessionId, 'sessionId')
+    const pending = this.pendingNextRequests.get(normalizedSessionId)
+    if (pending) return pending
+    const operation = this.#requestNextQuestion(normalizedSessionId)
+      .finally(() => this.pendingNextRequests.delete(normalizedSessionId))
+    this.pendingNextRequests.set(normalizedSessionId, operation)
+    return operation
+  }
+
+  async #requestNextQuestion(sessionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
     if (practice.mode === 'leetcode') {
-      const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
-      const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
-      const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
-        sessionId, practiceId: practice.id, questionId: drawn.question.id, reason: 'next_requested',
-      })]
-      await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
-      await this.#publish(events)
-      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, { events, agentTasks })
+      return this.#replaceLeetcodePractice(sessionId, cursor, practice, now)
     }
     const nextCursor = markNextRequested(cursor, now)
     const events = [{ type: 'question.next_requested', sessionId, practiceId: practice.id }]

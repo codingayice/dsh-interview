@@ -83,7 +83,7 @@ export function LeetcodeCatalog({ sessionId }) {
     })))
 }
 
-function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, onRun, onExplain }) {
+function LeetcodeQuestionCard({ question, catalog, language, active, expanded, command, phase, nextRequested, onRun, onNext, onExplain }) {
   const saved = catalogProblem(catalog, question.leetcode.slug)
   const problem = { ...question.leetcode, completed: saved?.completed === true }
   return h('article', { className: `di-card di-lc-problem-card${active ? ' is-active' : ' is-history'}`, 'aria-label': active ? '当前力扣题目' : '历史力扣题目' },
@@ -101,12 +101,11 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
             busy: command.busy === 'leetcode.set-completion',
             onClick: () => onRun('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed }),
           }, problem.completed ? '标记未完成' : '标记完成'),
-          h(Button, { busy: command.busy === 'question.next', onClick: () => onRun('question.next') }, '随机下一题'),
+          h(Button, { disabled: nextRequested, onClick: onNext }, nextRequested ? '已出下一题' : '随机下一题'),
           h(Button, {
             busy: command.busy === 'question.reveal' || phase === 'generating_explanation',
             onClick: () => onExplain(question),
-          }, '讲解'),
-          h(Button, { busy: command.busy === 'session.finish', onClick: () => onRun('session.finish') }, '结束练习')) : null),
+          }, '讲解')) : null),
       active ? h(ErrorNotice, null, command.error) : null,
       expanded && question.explanation
         ? h('section', { className: 'di-section', 'aria-label': '题目讲解' },
@@ -130,8 +129,14 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null, languag
     ? sessionQuestion || initialQuestion
     : initialQuestion
   const [showExplanation, setShowExplanation] = React.useState(false)
+  const nextRequestedRef = React.useRef(false)
+  const [nextRequested, setNextRequested] = React.useState(false)
 
-  React.useEffect(() => setShowExplanation(false), [current?.id])
+  React.useEffect(() => {
+    setShowExplanation(false)
+    nextRequestedRef.current = false
+    setNextRequested(false)
+  }, [current?.id])
 
   if (sessionQuery.loading && !current) return h('div', { className: 'di-card' }, h(Loading))
   if (!current?.leetcode) return null
@@ -156,6 +161,17 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null, languag
     if (result) setShowExplanation(true)
   }
 
+  const next = async () => {
+    if (nextRequestedRef.current) return
+    nextRequestedRef.current = true
+    setNextRequested(true)
+    const result = await run('question.next')
+    if (!result) {
+      nextRequestedRef.current = false
+      setNextRequested(false)
+    }
+  }
+
   const catalog = catalogQuery.data?.resource?.data
   const active = live
     ? sessionQuery.loading || Boolean(session?.selected && session?.phase !== 'completed' && sessionQuestion?.id === current.id)
@@ -168,7 +184,9 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null, languag
     expanded: showExplanation,
     command,
     phase: live ? session?.phase : null,
+    nextRequested,
     onRun: run,
+    onNext: next,
     onExplain: explain,
   })
 }

@@ -28,8 +28,8 @@ export class InMemoryInterviewRepository {
     return clone([...this.cursors.values()].find((cursor) => cursor.practiceId === practiceId) || null)
   }
 
-  async commit({ practice, cursor, unbindSessionId }) {
-    if (practice) this.practices.set(practice.id, clone(practice))
+  async commit({ practice, practices = [], cursor, unbindSessionId }) {
+    for (const item of [...practices, ...(practice ? [practice] : [])]) this.practices.set(item.id, clone(item))
     if (unbindSessionId) this.cursors.delete(unbindSessionId)
     if (cursor) {
       for (const [sessionId, selected] of this.cursors) {
