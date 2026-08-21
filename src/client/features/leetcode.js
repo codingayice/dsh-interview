@@ -3,7 +3,6 @@ import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, ErrorNotice, h, Loading, Markdown } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
-import { createLeetcodeCardStack, upsertLeetcodeCard } from './leetcode-card-stack.js'
 
 const DIFFICULTY = Object.freeze({
   easy: { label: '简单', tone: 'easy' },
@@ -125,25 +124,19 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
   const command = useCommand(sessionId)
   const session = sessionQuery.data?.resource?.data
   const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null
-  const sourceQuestion = initialQuestion?.leetcode ? initialQuestion : sessionQuestion
-  const [cards, setCards] = React.useState(() => createLeetcodeCardStack(sourceQuestion))
-  const [expandedQuestionId, setExpandedQuestionId] = React.useState('')
+  const current = initialQuestion?.leetcode
+    ? sessionQuestion?.id === initialQuestion.id ? sessionQuestion : initialQuestion
+    : sessionQuestion
+  const [showExplanation, setShowExplanation] = React.useState(false)
 
-  React.useEffect(() => {
-    if (sourceQuestion) setCards((current) => upsertLeetcodeCard(current, sourceQuestion))
-  }, [sourceQuestion])
+  React.useEffect(() => setShowExplanation(false), [current?.id])
 
-  if (sessionQuery.loading && cards.length === 0) return h('div', { className: 'di-card' }, h(Loading))
-  if (cards.length === 0) return null
+  if (sessionQuery.loading && !current) return h('div', { className: 'di-card' }, h(Loading))
+  if (!current?.leetcode) return null
 
   const run = async (name, payload) => {
     try {
       const result = await command.run(name, payload)
-      const returnedQuestion = result?.resource?.kind === 'question' && result.resource.data?.leetcode
-        ? result.resource.data
-        : null
-      if (returnedQuestion) setCards((current) => upsertLeetcodeCard(current, returnedQuestion))
-      if (name === 'question.next') setExpandedQuestionId('')
       await Promise.all([sessionQuery.reload(), catalogQuery.reload()])
       return result
     } catch {
@@ -152,28 +145,27 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
     }
   }
 
-  const explain = async (question) => {
-    if (question.explanation) {
-      setExpandedQuestionId((current) => current === question.id ? '' : question.id)
+  const explain = async () => {
+    if (current.explanation) {
+      setShowExplanation((value) => !value)
       return
     }
-    const result = await run('question.reveal', { questionId: question.id })
-    if (result) setExpandedQuestionId(question.id)
+    const result = await run('question.reveal', { questionId: current.id })
+    if (result) setShowExplanation(true)
   }
 
   const catalog = catalogQuery.data?.resource?.data
-  return h('section', { className: 'di-lc-card-stack', 'aria-label': '力扣题目卡片' }, cards.map((question, index) => {
-    const liveQuestion = sessionQuestion?.id === question.id ? sessionQuestion : question
-    return h(LeetcodeQuestionCard, {
-      key: question.id,
-      question: liveQuestion,
-      catalog,
-      active: index === cards.length - 1,
-      expanded: expandedQuestionId === question.id,
-      command,
-      phase: session?.phase,
-      onRun: run,
-      onExplain: explain,
-    })
-  }))
+  const active = sessionQuery.loading
+    ? true
+    : Boolean(session?.selected && session?.phase !== 'completed' && sessionQuestion?.id === current.id)
+  return h(LeetcodeQuestionCard, {
+    question: current,
+    catalog,
+    active,
+    expanded: showExplanation,
+    command,
+    phase: session?.phase,
+    onRun: run,
+    onExplain: explain,
+  })
 }

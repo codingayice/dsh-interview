@@ -40,7 +40,7 @@ export function LiveInterviewCard({ sessionId }) {
   if (!session?.selected) return h('div', { className: 'di-card' }, h(Empty, { title: '还没有开始练习', detail: '用自然语言描述面试模式和主题即可开始。' }))
 
   const question = session.currentQuestion
-  if (question?.leetcode) return h(LeetcodeProblemCard, { sessionId, initialQuestion: question })
+  if (question?.leetcode) return h(LeetcodeProblemCard, { key: question.id, sessionId, initialQuestion: question })
   const latestAttempt = question?.attempts?.at(-1) || null
   const run = (name, payload) => command.run(name, payload).catch(() => {})
 

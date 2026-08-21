@@ -2,6 +2,7 @@ const cache = new Map()
 const listeners = new Set()
 const notificationListeners = new Set()
 const workspaceNavigationListeners = new Set()
+const localQuestionListeners = new Set()
 
 async function jsonRequest(url, options) {
   const response = await fetch(url, options)
@@ -43,6 +44,10 @@ export const interviewApi = {
       body: JSON.stringify({ session: sessionId, command, payload }),
     })
     cache.clear()
+    if (value?.resource?.kind === 'question' && value.resource.data?.leetcode) {
+      const event = { sessionId, question: value.resource.data, revision: value.revision }
+      for (const listener of localQuestionListeners) listener(event)
+    }
     for (const listener of listeners) listener(value.revision)
     const message = value?.assistantResponse?.mode === 'exact' ? value.assistantResponse.text : ''
     if (message) for (const listener of notificationListeners) listener(message)
@@ -65,6 +70,10 @@ export const interviewApi = {
   subscribeWorkspaceNavigation(listener) {
     workspaceNavigationListeners.add(listener)
     return () => workspaceNavigationListeners.delete(listener)
+  },
+  subscribeLocalQuestions(listener) {
+    localQuestionListeners.add(listener)
+    return () => localQuestionListeners.delete(listener)
   },
   cached(key, loader) {
     if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => { cache.delete(key); throw error }))
