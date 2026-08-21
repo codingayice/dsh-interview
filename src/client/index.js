@@ -10,6 +10,7 @@ import {
 import { InsightsCard, PracticeLibrary } from './features/practice-library.js'
 import { TimelinePanel } from './features/timeline.js'
 import { LeetcodeCatalog } from './features/leetcode.js'
+import { WorkspaceDock } from './features/workspace-dock.js'
 import { INTERVIEW_TOOL_NAMES } from '../protocol/interview-tool-names.js'
 import { installStyles } from './shared/styles.js'
 import { h, parseInteractionResult, toolCallState, toolErrorAudience, toolErrorMessage } from './shared/ui.js'
@@ -55,6 +56,11 @@ export function apply(ctx) {
       (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId || 'global', block: props.block }),
     ))
   }
+
+  slots.inject('conversation.input.dock', () => slots.register(
+    { name: 'conversation.input.dock', id: 'interview-workspace', order: 24 },
+    (props) => h(WorkspaceDock, { sessionId: props.sessionId || 'global' }),
+  ))
 
   slots.inject('conversation.input.dock', () => slots.register(
     { name: 'conversation.input.dock', id: 'interview-timeline', order: 25 },

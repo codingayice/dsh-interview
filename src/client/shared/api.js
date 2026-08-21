@@ -1,5 +1,6 @@
 const cache = new Map()
 const listeners = new Set()
+const notificationListeners = new Set()
 
 async function jsonRequest(url, options) {
   const response = await fetch(url, options)
@@ -42,6 +43,8 @@ export const interviewApi = {
     })
     cache.clear()
     for (const listener of listeners) listener(value.revision)
+    const message = value?.assistantResponse?.mode === 'exact' ? value.assistantResponse.text : ''
+    if (message) for (const listener of notificationListeners) listener(message)
     return value
   },
   downloadUrl(token) {
@@ -50,6 +53,10 @@ export const interviewApi = {
   subscribe(listener) {
     listeners.add(listener)
     return () => listeners.delete(listener)
+  },
+  subscribeNotifications(listener) {
+    notificationListeners.add(listener)
+    return () => notificationListeners.delete(listener)
   },
   cached(key, loader) {
     if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => { cache.delete(key); throw error }))

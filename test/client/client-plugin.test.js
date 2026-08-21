@@ -53,7 +53,8 @@ test('构建后的 Client 注册全部原子工具视图和时间轴槽位', () 
     registrations.filter((item) => item.name === 'tool.call.toolview').map((item) => item.key),
     INTERVIEW_TOOL_NAMES,
   )
-  assert.equal(registrations.find((item) => item.name === 'conversation.input.dock').id, 'interview-timeline')
+  const dockIds = registrations.filter((item) => item.name === 'conversation.input.dock').map((item) => item.id)
+  assert.deepEqual(dockIds, ['interview-workspace', 'interview-timeline'])
 })
 
 test('工具视图只按结构化 presentation 渲染用户可见卡片', () => {
