@@ -112,3 +112,47 @@ test('选择练习向模型提供完整上下文并只返回切换确认', async
   assert.equal(selected.assistantResponse.text, '已切换到当前练习：JVM。')
   assert.equal(selected.context.practice.questions[0].prompt, '什么是 JMM？')
 })
+
+test('本地管理与力扣操作不会派发 Agent 任务', async () => {
+  const fixture = applicationFixture()
+  const dispatched = []
+  const coordinator = new InterviewCoordinator({
+    application: fixture.application,
+    eventBridge: { dispatch(tasks) { dispatched.push(...tasks) } },
+  })
+  const executeUi = (sessionId, action, payload = {}) => coordinator.execute({ sessionId, action, payload, source: 'ui' })
+
+  const leetcode = await executeUi('leetcode-local', INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'leetcode', config: {} })
+  assert.equal(dispatched.length, 0, '新建力扣练习由本地题库出题')
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION, { slug: 'two-sum', completed: true })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.REQUEST_NEXT)
+  assert.equal(dispatched.length, 0, '力扣进度与随机下一题不调用模型')
+
+  const practiceId = leetcode.presentation.practiceId
+  const questionId = leetcode.presentation.questionId
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.SELECT_PRACTICE, { practiceId })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.OPEN_QUESTION, { questionId })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.RETRY_QUESTION, { questionId })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.UPDATE_PRACTICE, { practiceId, mode: 'leetcode', config: {} })
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG)
+  await executeUi('leetcode-local', INTERVIEW_ACTIONS.EXPORT_PRACTICES, { practiceIds: [practiceId] })
+  assert.equal(dispatched.length, 0, '切换、打开、重答、修改、查询和导出均为本地操作')
+})
+
+test('只有内容生成阶段会派发显式 Agent 任务', async () => {
+  const fixture = applicationFixture()
+  const dispatched = []
+  const coordinator = new InterviewCoordinator({
+    application: fixture.application,
+    eventBridge: { dispatch(tasks) { dispatched.push(...tasks) } },
+  })
+  const executeUi = (action, payload = {}) => coordinator.execute({ sessionId: 'paid-boundary', action, payload, source: 'ui' })
+
+  await executeUi(INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'bagu', config: { topic: 'JVM' } })
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.GENERATE_QUESTION])
+  dispatched.length = 0
+
+  await coordinator.execute({ sessionId: 'paid-boundary', action: INTERVIEW_ACTIONS.PRESENT_QUESTION, payload: { prompt: '什么是 JMM？' }, source: 'agent' })
+  await executeUi(INTERVIEW_ACTIONS.REVEAL_ANSWER)
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.GENERATE_REVIEW])
+})
