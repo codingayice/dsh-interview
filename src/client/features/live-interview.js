@@ -99,7 +99,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
   const run = (name, payload) => command.run(name, payload).catch(() => {})
   const retry = async () => {
     const result = await command.run('question.retry', { questionId: question.id }).catch(() => null)
-    if (result) interviewApi.navigateWorkspace('current')
+    if (result) interviewApi.navigateWorkspace('active')
   }
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation

@@ -691,7 +691,7 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   });
   const retry = async () => {
     const result = await command.run("question.retry", { questionId: question.id }).catch(() => null);
-    if (result) interviewApi.navigateWorkspace("current");
+    if (result) interviewApi.navigateWorkspace("active");
   };
   const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
@@ -921,7 +921,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
   const activate = async () => {
     const result = await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
-    if (result) interviewApi.navigateWorkspace("current");
+    if (result) interviewApi.navigateWorkspace("active");
   };
   const exportOne = async () => {
     const result = await run("library.export", { practiceIds: [practice.id] });
@@ -950,7 +950,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     if (practice.status !== "active") return;
     await run("session.select", { practiceId: practice.id });
     const result = await run("question.retry", { questionId });
-    if (result) interviewApi.navigateWorkspace("current");
+    if (result) interviewApi.navigateWorkspace("active");
   };
   return h(
     "section",
@@ -1055,19 +1055,26 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     }) : h(Empty, { title: "\u8FD9\u6761\u7EC3\u4E60\u8FD8\u6CA1\u6709\u9898\u76EE" })
   );
 }
-function PracticeLibrary({ sessionId, initialPracticeId = null }) {
+function PracticeLibrary({
+  sessionId,
+  initialPracticeId = null,
+  statusScope = "completed",
+  title = "\u7EC3\u4E60\u6863\u6848",
+  allowCreate = false
+}) {
   const [queryText, setQueryText] = import_react5.default.useState("");
   const [mode, setMode] = import_react5.default.useState("");
-  const [status, setStatus] = import_react5.default.useState("");
   const [selectedId, setSelectedId] = import_react5.default.useState(initialPracticeId);
   const [confirmingId, setConfirmingId] = import_react5.default.useState(null);
   const [downloads, setDownloads] = import_react5.default.useState([]);
   const [creating, setCreating] = import_react5.default.useState(false);
   const command = useCommand(sessionId);
-  const filters = { query: queryText, mode, status };
-  const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status]);
+  const effectiveStatus = statusScope === "active" ? "active" : "completed";
+  const filters = { query: queryText, mode, status: effectiveStatus };
+  const list = useInterviewQuery(`practices:${queryText}:${mode}:${effectiveStatus}`, () => interviewApi.practices(filters), [queryText, mode, effectiveStatus]);
   const practices = list.data?.resource?.data || [];
-  const detail = useInterviewQuery(`practice:${selectedId || "none"}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId]);
+  const visibleSelectedId = practices.some((practice) => practice.id === selectedId) ? selectedId : null;
+  const detail = useInterviewQuery(`practice:${visibleSelectedId || "none"}`, () => visibleSelectedId ? interviewApi.practice(visibleSelectedId) : Promise.resolve(null), [visibleSelectedId]);
   const selected = detail.data?.resource?.data || null;
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
   const createPractice = async (payload) => {
@@ -1075,11 +1082,11 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     if (!result) return;
     setCreating(false);
     setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null);
-    if (payload.mode === "leetcode") interviewApi.navigateWorkspace("current");
+    interviewApi.navigateWorkspace("active");
   };
   const activate = async (practice) => {
     const result = await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
-    if (result) interviewApi.navigateWorkspace("current");
+    if (result) interviewApi.navigateWorkspace("active");
   };
   const exportOne = async (practice) => {
     const result = await run("library.export", { practiceIds: [practice.id] });
@@ -1105,31 +1112,37 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     }).replaceAll("/", "-");
   };
   const scoreClass = (score) => Number(score) >= 8 ? "is-good" : Number(score) >= 6 ? "is-mid" : "is-empty";
+  const emptyState = effectiveStatus === "active" ? { title: "\u6CA1\u6709\u8FDB\u884C\u4E2D\u7684\u7EC3\u4E60", detail: "\u65B0\u5EFA\u7EC3\u4E60\u540E\u4F1A\u663E\u793A\u5728\u8FD9\u91CC\u3002" } : { title: "\u7EC3\u4E60\u6863\u6848\u4E3A\u7A7A", detail: "\u7ED3\u675F\u7EC3\u4E60\u540E\u4F1A\u5F52\u6863\u5230\u8FD9\u91CC\u3002" };
   const rows = practices.map((practice) => h(
     "tr",
-    { key: practice.id, className: selectedId === practice.id ? "is-selected" : "" },
-    h("td", null, h("button", { className: "di-history-topic", onClick: () => setSelectedId(selectedId === practice.id ? null : practice.id) }, practice.topic)),
+    { key: practice.id, className: visibleSelectedId === practice.id ? "is-selected" : "" },
+    h("td", null, h("button", { className: "di-history-topic", onClick: () => setSelectedId(visibleSelectedId === practice.id ? null : practice.id) }, practice.topic)),
     h("td", null, practice.modeLabel),
     h("td", { className: "di-history-time" }, dateText(practice.updatedAt)),
     h("td", null, h("span", { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? "\u2014")),
     h("td", null, h(
       "div",
       { className: "di-row-actions" },
-      h(Button, { className: "di-icon-button", title: "\u5207\u6362\u5230\u8BE5\u7EC3\u4E60", "aria-label": `\u5207\u6362\u5230${practice.topic}`, onClick: () => activate(practice) }, h(Icon, { name: "swap" })),
+      h(Button, {
+        className: "di-icon-button",
+        title: practice.status === "completed" ? "\u91CD\u65B0\u6253\u5F00" : "\u5207\u6362\u5230\u8BE5\u7EC3\u4E60",
+        "aria-label": practice.status === "completed" ? `\u91CD\u65B0\u6253\u5F00${practice.topic}` : `\u5207\u6362\u5230${practice.topic}`,
+        onClick: () => activate(practice)
+      }, h(Icon, { name: "swap" })),
       h(Button, { className: "di-icon-button is-delete", title: "\u5220\u9664", "aria-label": `\u5220\u9664${practice.topic}`, onClick: () => setConfirmingId(practice.id) }, h(Icon, { name: "trash" })),
       h(Button, { className: "di-icon-button", title: "\u5BFC\u51FA", "aria-label": `\u5BFC\u51FA${practice.topic}`, onClick: () => exportOne(practice) }, h(Icon, { name: "download" }))
     ))
   ));
   return h(
     "section",
-    { className: "di-ledger di-history", "aria-label": "\u7EC3\u4E60\u5386\u53F2" },
+    { className: "di-ledger di-history", "aria-label": title },
     h(
       "header",
       { className: "di-history-head" },
-      h("div", { className: "di-ledger-title" }, "\u7EC3\u4E60\u5386\u53F2"),
-      h(Button, { tone: "primary", onClick: () => setCreating((value) => !value) }, "\u65B0\u5EFA\u7EC3\u4E60")
+      h("div", { className: "di-ledger-title" }, title),
+      allowCreate ? h(Button, { tone: "primary", onClick: () => setCreating((value) => !value) }, "\u65B0\u5EFA\u7EC3\u4E60") : null
     ),
-    creating ? h(PracticeForm, { busy: command.busy === "session.start", onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
+    allowCreate && creating ? h(PracticeForm, { busy: command.busy === "session.start", onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h(
       "div",
       { className: "di-history-filters" },
@@ -1142,13 +1155,6 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
         h("option", { value: "mock" }, "\u6A21\u62DF\u9762\u8BD5"),
         h("option", { value: "scenario" }, "\u573A\u666F\u9898"),
         h("option", { value: "leetcode" }, "\u5237\u529B\u6263")
-      ),
-      h(
-        "select",
-        { className: "di-select", value: status, onChange: (event) => setStatus(event.target.value), "aria-label": "\u7B5B\u9009\u72B6\u6001" },
-        h("option", { value: "" }, "\u5168\u90E8\u72B6\u6001"),
-        h("option", { value: "active" }, "\u8FDB\u884C\u4E2D"),
-        h("option", { value: "completed" }, "\u5DF2\u7ED3\u675F")
       )
     ),
     h(ErrorNotice, null, list.error),
@@ -1181,8 +1187,8 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
         )),
         h("tbody", null, rows)
       )
-    ) : h(Empty, { title: "\u8FD8\u6CA1\u6709\u7B26\u5408\u6761\u4EF6\u7684\u7EC3\u4E60", detail: "\u5F00\u59CB\u4E00\u6B21\u9762\u8BD5\u540E\uFF0C\u8BB0\u5F55\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" }),
-    selectedId ? h(
+    ) : h(Empty, emptyState),
+    visibleSelectedId ? h(
       "div",
       { className: "di-history-detail" },
       detail.loading ? h(Loading, { label: "\u6B63\u5728\u8BFB\u53D6\u7EC3\u4E60\u8BE6\u60C5\u2026" }) : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => {
@@ -1334,18 +1340,29 @@ function TimelinePanel({ sessionId, revisionSignal }) {
 // src/client/features/workspace-dock.js
 var import_react7 = __toESM(require("react"), 1);
 var WORKSPACE_TABS = Object.freeze([
-  { id: "current", label: "\u5F53\u524D\u7EC3\u4E60" },
+  { id: "active", label: "\u8FDB\u884C\u4E2D" },
   { id: "library", label: "\u7EC3\u4E60\u6863\u6848" },
   { id: "leetcode", label: "\u70ED\u9898 100" }
 ]);
 function WorkspaceContent({ tab, sessionId }) {
-  if (tab === "library") return h(PracticeLibrary, { sessionId });
+  if (tab === "active") return h(PracticeLibrary, {
+    sessionId,
+    statusScope: "active",
+    title: "\u8FDB\u884C\u4E2D",
+    allowCreate: true
+  });
+  if (tab === "library") return h(PracticeLibrary, {
+    sessionId,
+    statusScope: "completed",
+    title: "\u7EC3\u4E60\u6863\u6848",
+    allowCreate: false
+  });
   if (tab === "leetcode") return h(LeetcodeCatalog, { sessionId });
-  return h(LiveInterviewCard, { sessionId });
+  return null;
 }
 function WorkspaceDock({ sessionId }) {
   const [open, setOpen] = import_react7.default.useState(false);
-  const [tab, setTab] = import_react7.default.useState("current");
+  const [tab, setTab] = import_react7.default.useState("active");
   const [notice, setNotice] = import_react7.default.useState("");
   import_react7.default.useEffect(() => {
     let timer = null;

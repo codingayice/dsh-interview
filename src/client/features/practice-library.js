@@ -59,7 +59,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const run = (name, payload) => command.run(name, payload).catch(() => null)
   const activate = async () => {
     const result = await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
-    if (result) interviewApi.navigateWorkspace('current')
+    if (result) interviewApi.navigateWorkspace('active')
   }
   const exportOne = async () => {
     const result = await run('library.export', { practiceIds: [practice.id] })
@@ -85,7 +85,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     if (practice.status !== 'active') return
     await run('session.select', { practiceId: practice.id })
     const result = await run('question.retry', { questionId })
-    if (result) interviewApi.navigateWorkspace('current')
+    if (result) interviewApi.navigateWorkspace('active')
   }
   return h('section', { className: 'di-detail' },
     h('div', { className: 'di-detail-heading' },
@@ -151,19 +151,26 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     }) : h(Empty, { title: '这条练习还没有题目' }))
 }
 
-export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
+export function PracticeLibrary({
+  sessionId,
+  initialPracticeId = null,
+  statusScope = 'completed',
+  title = '练习档案',
+  allowCreate = false,
+}) {
   const [queryText, setQueryText] = React.useState('')
   const [mode, setMode] = React.useState('')
-  const [status, setStatus] = React.useState('')
   const [selectedId, setSelectedId] = React.useState(initialPracticeId)
   const [confirmingId, setConfirmingId] = React.useState(null)
   const [downloads, setDownloads] = React.useState([])
   const [creating, setCreating] = React.useState(false)
   const command = useCommand(sessionId)
-  const filters = { query: queryText, mode, status }
-  const list = useInterviewQuery(`practices:${queryText}:${mode}:${status}`, () => interviewApi.practices(filters), [queryText, mode, status])
+  const effectiveStatus = statusScope === 'active' ? 'active' : 'completed'
+  const filters = { query: queryText, mode, status: effectiveStatus }
+  const list = useInterviewQuery(`practices:${queryText}:${mode}:${effectiveStatus}`, () => interviewApi.practices(filters), [queryText, mode, effectiveStatus])
   const practices = list.data?.resource?.data || []
-  const detail = useInterviewQuery(`practice:${selectedId || 'none'}`, () => selectedId ? interviewApi.practice(selectedId) : Promise.resolve(null), [selectedId])
+  const visibleSelectedId = practices.some((practice) => practice.id === selectedId) ? selectedId : null
+  const detail = useInterviewQuery(`practice:${visibleSelectedId || 'none'}`, () => visibleSelectedId ? interviewApi.practice(visibleSelectedId) : Promise.resolve(null), [visibleSelectedId])
   const selected = detail.data?.resource?.data || null
   const run = (name, payload) => command.run(name, payload).catch(() => null)
   const createPractice = async (payload) => {
@@ -171,11 +178,11 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     if (!result) return
     setCreating(false)
     setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null)
-    if (payload.mode === 'leetcode') interviewApi.navigateWorkspace('current')
+    interviewApi.navigateWorkspace('active')
   }
   const activate = async (practice) => {
     const result = await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
-    if (result) interviewApi.navigateWorkspace('current')
+    if (result) interviewApi.navigateWorkspace('active')
   }
   const exportOne = async (practice) => {
     const result = await run('library.export', { practiceIds: [practice.id] })
@@ -196,27 +203,33 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     }).replaceAll('/', '-')
   }
   const scoreClass = (score) => Number(score) >= 8 ? 'is-good' : Number(score) >= 6 ? 'is-mid' : 'is-empty'
-  const rows = practices.map((practice) => h('tr', { key: practice.id, className: selectedId === practice.id ? 'is-selected' : '' },
-    h('td', null, h('button', { className: 'di-history-topic', onClick: () => setSelectedId(selectedId === practice.id ? null : practice.id) }, practice.topic)),
+  const emptyState = effectiveStatus === 'active'
+    ? { title: '没有进行中的练习', detail: '新建练习后会显示在这里。' }
+    : { title: '练习档案为空', detail: '结束练习后会归档到这里。' }
+  const rows = practices.map((practice) => h('tr', { key: practice.id, className: visibleSelectedId === practice.id ? 'is-selected' : '' },
+    h('td', null, h('button', { className: 'di-history-topic', onClick: () => setSelectedId(visibleSelectedId === practice.id ? null : practice.id) }, practice.topic)),
     h('td', null, practice.modeLabel),
     h('td', { className: 'di-history-time' }, dateText(practice.updatedAt)),
     h('td', null, h('span', { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? '—')),
     h('td', null, h('div', { className: 'di-row-actions' },
-      h(Button, { className: 'di-icon-button', title: '切换到该练习', 'aria-label': `切换到${practice.topic}`, onClick: () => activate(practice) }, h(Icon, { name: 'swap' })),
+      h(Button, {
+        className: 'di-icon-button',
+        title: practice.status === 'completed' ? '重新打开' : '切换到该练习',
+        'aria-label': practice.status === 'completed' ? `重新打开${practice.topic}` : `切换到${practice.topic}`,
+        onClick: () => activate(practice),
+      }, h(Icon, { name: 'swap' })),
       h(Button, { className: 'di-icon-button is-delete', title: '删除', 'aria-label': `删除${practice.topic}`, onClick: () => setConfirmingId(practice.id) }, h(Icon, { name: 'trash' })),
       h(Button, { className: 'di-icon-button', title: '导出', 'aria-label': `导出${practice.topic}`, onClick: () => exportOne(practice) }, h(Icon, { name: 'download' }))))))
 
-  return h('section', { className: 'di-ledger di-history', 'aria-label': '练习历史' },
+  return h('section', { className: 'di-ledger di-history', 'aria-label': title },
     h('header', { className: 'di-history-head' },
-      h('div', { className: 'di-ledger-title' }, '练习历史'),
-      h(Button, { tone: 'primary', onClick: () => setCreating((value) => !value) }, '新建练习')),
-    creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
+      h('div', { className: 'di-ledger-title' }, title),
+      allowCreate ? h(Button, { tone: 'primary', onClick: () => setCreating((value) => !value) }, '新建练习') : null),
+    allowCreate && creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
       h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
-        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'leetcode' }, '刷力扣')),
-      h('select', { className: 'di-select', value: status, onChange: (event) => setStatus(event.target.value), 'aria-label': '筛选状态' },
-        h('option', { value: '' }, '全部状态'), h('option', { value: 'active' }, '进行中'), h('option', { value: 'completed' }, '已结束'))),
+        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'leetcode' }, '刷力扣'))),
     h(ErrorNotice, null, list.error),
     downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
       h('a', { className: 'di-link', href: interviewApi.downloadUrl(file.token), key: file.token }, `下载 ${file.name}`))) : null,
@@ -231,8 +244,8 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
             h('thead', null, h('tr', null,
               h('th', null, '练习内容'), h('th', null, '类型'), h('th', null, '练习时间'), h('th', null, '得分'), h('th', { 'aria-label': '操作' }))),
             h('tbody', null, rows)))
-      : h(Empty, { title: '还没有符合条件的练习', detail: '开始一次面试后，记录会自动出现在这里。' }),
-    selectedId ? h('div', { className: 'di-history-detail' },
+      : h(Empty, emptyState),
+    visibleSelectedId ? h('div', { className: 'di-history-detail' },
       detail.loading ? h(Loading, { label: '正在读取练习详情…' })
         : h(PracticeDetail, { practice: selected, sessionId, onDeleted: () => { setSelectedId(null); interviewApi.invalidate() } })) : null)
 }

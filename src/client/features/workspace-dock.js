@@ -1,25 +1,29 @@
 import React from 'react'
-import { LiveInterviewCard } from './live-interview.js'
 import { PracticeLibrary } from './practice-library.js'
 import { LeetcodeCatalog } from './leetcode.js'
 import { interviewApi } from '../shared/api.js'
 import { h } from '../shared/ui.js'
 
 const WORKSPACE_TABS = Object.freeze([
-  { id: 'current', label: '当前练习' },
+  { id: 'active', label: '进行中' },
   { id: 'library', label: '练习档案' },
   { id: 'leetcode', label: '热题 100' },
 ])
 
 function WorkspaceContent({ tab, sessionId }) {
-  if (tab === 'library') return h(PracticeLibrary, { sessionId })
+  if (tab === 'active') return h(PracticeLibrary, {
+    sessionId, statusScope: 'active', title: '进行中', allowCreate: true,
+  })
+  if (tab === 'library') return h(PracticeLibrary, {
+    sessionId, statusScope: 'completed', title: '练习档案', allowCreate: false,
+  })
   if (tab === 'leetcode') return h(LeetcodeCatalog, { sessionId })
-  return h(LiveInterviewCard, { sessionId })
+  return null
 }
 
 export function WorkspaceDock({ sessionId }) {
   const [open, setOpen] = React.useState(false)
-  const [tab, setTab] = React.useState('current')
+  const [tab, setTab] = React.useState('active')
   const [notice, setNotice] = React.useState('')
 
   React.useEffect(() => {

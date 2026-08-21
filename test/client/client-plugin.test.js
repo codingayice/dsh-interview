@@ -119,3 +119,17 @@ test('界面只对主标题使用粗体且不渲染装饰性副标题', () => {
   assert.match(styles, /--di-weight-text:400/)
   assert.match(styles, /--di-weight-title:600/)
 })
+
+test('工作台按进行中与已结束状态分离练习', () => {
+  const workspace = readFileSync(new URL('../../src/client/features/workspace-dock.js', import.meta.url), 'utf8')
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+
+  assert.match(workspace, /id: 'active', label: '进行中'/)
+  assert.match(workspace, /statusScope: 'active'/)
+  assert.match(workspace, /statusScope: 'completed'/)
+  assert.doesNotMatch(workspace, /label: '当前练习'/)
+  assert.doesNotMatch(workspace, /LiveInterviewCard/)
+  assert.match(library, /statusScope = 'completed'/)
+  assert.match(library, /statusScope === 'active' \? 'active' : 'completed'/)
+  assert.doesNotMatch(library, /全部状态/)
+})
