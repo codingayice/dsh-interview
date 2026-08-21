@@ -32,6 +32,7 @@ const AGENT_RECOVERABLE_CODES = new Set([
   'INVALID_DIMENSION_SCORE',
   'LEETCODE_PROBLEM_NOT_FOUND',
   'LEETCODE_COMPLETION_REQUIRED',
+  'LEETCODE_SOLUTION_LANGUAGES_REQUIRED',
 ])
 
 async function executeApplicationAction(application, sessionId, action, payload) {

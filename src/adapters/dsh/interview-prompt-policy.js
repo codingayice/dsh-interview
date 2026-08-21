@@ -19,12 +19,22 @@ export const QUESTION_GENERATION_POLICY = [
   '刷力扣模式禁止调用 interview_present_question；开始练习和请求下一题时插件会直接返回固定题库中的题目。',
 ].join('')
 
+export const LEETCODE_EXPLANATION_POLICY = [
+  '力扣讲解规则：目标是从零教会用户独立解决当前题目，禁止套用背八股、面试评价或“直接背”格式。',
+  '必须先读取当前练习上下文，确认题目标题、题型、难度和官方地址，不得讲解其他题目。',
+  'detail 必须依次包含：题意与关键约束、从直观方案到最优方案的推导、逐步算法过程、正确性依据、边界情况、时间复杂度和空间复杂度。',
+  'detail 必须按 C++、Java、Python、C、Go 的固定顺序给出五份完整可提交代码，分别使用 cpp、java、python、c、go Markdown 代码块。',
+  '五份代码必须实现同一最优算法，符合力扣函数签名习惯，可以独立阅读，禁止省略、伪代码、占位符或只给核心片段。',
+  'memorization_points 字段只填写精炼的解题要点，包括识别特征、核心状态或数据结构、关键步骤与复杂度。',
+].join('')
+
 export const CONTINUE_PRACTICE_POLICY = [
   '继续规则：仅当用户明确表达继续、接着练或恢复当前练习时调用。切换练习不等于继续练习。',
   '必须严格执行工具返回的 nextAction，不得自行猜测恢复阶段。',
   'nextAction=generate_question 时先调用 interview_read_practice_context，再生成一道题并调用 interview_present_question。',
   'nextAction=evaluate_answer 时读取完整上下文，对返回的当前原始回答生成评价并调用 interview_save_evaluation，随后继续完成讲解。',
   'nextAction=generate_explanation 时读取完整上下文，生成详细讲解和直接背并调用 interview_complete_review。',
+  `nextAction=generate_leetcode_explanation 时读取完整上下文，严格按力扣讲解规则生成内容并调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
   'nextAction=generate_summary 时读取完整上下文，生成总结并调用 interview_complete_summary。',
   'nextAction=select_practice、show_current_question 或 confirm_reopen 时遵守 assistantResponse 立即停止，不得继续生成内容。',
 ].join('')

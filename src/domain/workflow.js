@@ -16,6 +16,7 @@ export const CONTINUATION_ACTIONS = Object.freeze({
   SHOW_CURRENT_QUESTION: 'show_current_question',
   EVALUATE_ANSWER: 'evaluate_answer',
   GENERATE_EXPLANATION: 'generate_explanation',
+  GENERATE_LEETCODE_EXPLANATION: 'generate_leetcode_explanation',
   REQUEST_NEXT: 'request_next',
   GENERATE_SUMMARY: 'generate_summary',
   CONFIRM_REOPEN: 'confirm_reopen',

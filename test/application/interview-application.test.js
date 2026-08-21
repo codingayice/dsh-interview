@@ -240,10 +240,21 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   assert.equal(fixture.published.at(-1).type, 'leetcode.problem_drawn')
 
   const revealed = await fixture.application.revealAnswer('leetcode-session')
-  assert.equal(revealed.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_REVIEW)
+  assert.equal(revealed.resource.data.explanationType, 'leetcode_solution')
+  assert.equal(revealed.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION)
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'generating_explanation')
+  const resumedExplanation = await fixture.application.continuePractice('leetcode-session')
+  assert.equal(resumedExplanation.resource.data.resumeAction, 'generate_leetcode_explanation')
+  assert.equal(resumedExplanation.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION)
   await fixture.application.saveExplanation('leetcode-session', {
-    detail: '使用哈希表保存已访问元素及其下标，一次遍历查找目标差值。',
+    detail: [
+      '使用哈希表保存已访问元素及其下标，一次遍历查找目标差值。',
+      '```cpp\nvector<int> twoSum(vector<int>& nums, int target) { return {}; }\n```',
+      '```java\nclass Solution { public int[] twoSum(int[] nums, int target) { return new int[0]; } }\n```',
+      '```python\nclass Solution:\n    def twoSum(self, nums, target): return []\n```',
+      '```c\nint* twoSum(int* nums, int numsSize, int target, int* returnSize) { return 0; }\n```',
+      '```go\nfunc twoSum(nums []int, target int) []int { return nil }\n```',
+    ].join('\n\n'),
     memorizationPoints: '边遍历边查差值，哈希表把查找降为常数时间。',
   })
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_next')

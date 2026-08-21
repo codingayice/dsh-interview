@@ -133,7 +133,7 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
             h(Markdown, null, current.explanation.detail),
             current.explanation.memorizationPoints
               ? h('div', { className: 'di-attempt' },
-                  h('div', { className: 'di-section-label' }, '直接背'),
+                  h('div', { className: 'di-section-label' }, '解题要点'),
                   h(Markdown, null, current.explanation.memorizationPoints))
               : null)
         : null)

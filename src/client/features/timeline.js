@@ -41,7 +41,7 @@ function TimelineContent({ question, view }) {
     h(Markdown, null, question.explanation.detail),
     question.explanation.memorizationPoints
       ? h('section', { className: 'di-time-memorize' },
-          h('div', { className: 'di-time-record-label' }, '直接背'),
+          h('div', { className: 'di-time-record-label' }, question.leetcode ? '解题要点' : '直接背'),
           h(Markdown, null, question.explanation.memorizationPoints))
       : null)
 }

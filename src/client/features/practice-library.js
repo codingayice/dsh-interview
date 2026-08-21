@@ -131,8 +131,13 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
           h(Markdown, null, attempt.answer),
           attempt.evaluation ? h('div', { className: 'di-section' }, h(Markdown, null, attempt.evaluation.feedback)) : null)),
         question.explanation ? h('div', { className: 'di-section' },
-          h('div', { className: 'di-section-label' }, '参考讲解'),
-          h(Markdown, null, question.explanation.detail)) : null,
+          h('div', { className: 'di-section-label' }, question.leetcode ? '算法讲解' : '参考讲解'),
+          h(Markdown, null, question.explanation.detail),
+          question.explanation.memorizationPoints
+            ? h('div', { className: 'di-attempt' },
+                h('div', { className: 'di-section-label' }, question.leetcode ? '解题要点' : '直接背'),
+                h(Markdown, null, question.explanation.memorizationPoints))
+            : null) : null,
         h('div', { className: 'di-detail-actions' },
           !question.leetcode && editingQuestionId === question.id
             ? h(React.Fragment, null,

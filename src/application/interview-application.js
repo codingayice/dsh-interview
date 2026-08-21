@@ -193,10 +193,14 @@ export class InterviewApplication {
     }
 
     if (cursor.questionId) question = findQuestion(practice, cursor.questionId)
+    if (resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION && question?.leetcode) {
+      resumeAction = CONTINUATION_ACTIONS.GENERATE_LEETCODE_EXPLANATION
+    }
     const questionRequired = [
       CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
       CONTINUATION_ACTIONS.EVALUATE_ANSWER,
       CONTINUATION_ACTIONS.GENERATE_EXPLANATION,
+      CONTINUATION_ACTIONS.GENERATE_LEETCODE_EXPLANATION,
     ].includes(resumeAction)
     assertDomain(!questionRequired || Boolean(question), 'QUESTION_NOT_FOCUSED', '找不到当前待恢复题目')
     if (resumeAction === CONTINUATION_ACTIONS.EVALUATE_ANSWER) {
@@ -215,6 +219,10 @@ export class InterviewApplication {
     } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION) {
       agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_REVIEW, {
         sessionId, practiceId: practice.id, questionId: question.id, attemptId: cursor.attemptId,
+      })]
+    } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_LEETCODE_EXPLANATION) {
+      agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION, {
+        sessionId, practiceId: practice.id, questionId: question.id,
       })]
     } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_SUMMARY) {
       agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_SUMMARY, {
@@ -327,17 +335,25 @@ export class InterviewApplication {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
     const questionId = input.questionId || cursor.questionId
-    assertDomain(Boolean(questionId) && questionId === cursor.questionId, 'QUESTION_NOT_FOCUSED', '只能查看当前题目的答案')
+    assertDomain(Boolean(questionId) && questionId === cursor.questionId, 'QUESTION_NOT_FOCUSED', '只能查看或讲解当前题目')
     const question = findQuestion(practice, questionId)
+    const explanationType = question.leetcode ? 'leetcode_solution' : 'interview_review'
     const reviewReady = Boolean(question.explanation)
     const nextCursor = markAnswerRevealed(cursor, now, { reviewReady })
-    const events = [{ type: 'answer.revealed', sessionId, practiceId: practice.id, questionId, reviewReady }]
-    const agentTasks = reviewReady ? [] : [agentTask(AGENT_TASK_TYPES.GENERATE_REVIEW, {
-      sessionId, practiceId: practice.id, questionId, reason: 'answer_revealed',
+    const events = [{
+      type: question.leetcode ? 'leetcode.explanation_requested' : 'answer.revealed',
+      sessionId, practiceId: practice.id, questionId, reviewReady,
+    }]
+    const taskType = question.leetcode
+      ? AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION
+      : AGENT_TASK_TYPES.GENERATE_REVIEW
+    const agentTasks = reviewReady ? [] : [agentTask(taskType, {
+      sessionId, practiceId: practice.id, questionId,
+      ...(question.leetcode ? {} : { reason: 'answer_revealed' }),
     })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('answer-revealed', { questionId, reviewReady }, nextCursor, { events, agentTasks })
+    return this.#result('answer-revealed', { questionId, reviewReady, explanationType }, nextCursor, { events, agentTasks })
   }
 
   async evaluateAnswer(sessionId, input) {
@@ -360,12 +376,17 @@ export class InterviewApplication {
     const { cursor, practice } = await this.#context(sessionId)
     const questionId = input.questionId || cursor.questionId
     assertDomain(questionId === cursor.questionId, 'QUESTION_NOT_FOCUSED', '只能保存当前题目的讲解')
+    const question = findQuestion(practice, questionId)
     const added = addExplanation(practice, { ...input, questionId, now })
     const nextCursor = markExplanationSaved(cursor, now)
     const events = [{ type: 'review.completed', sessionId, practiceId: practice.id, questionId, attemptId: cursor.attemptId }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('explanation', { questionId, ...added.explanation }, nextCursor, { events })
+    return this.#result('explanation', {
+      questionId,
+      explanationType: question.leetcode ? 'leetcode_solution' : 'interview_review',
+      ...added.explanation,
+    }, nextCursor, { events })
   }
 
   async requestNextQuestion(sessionId) {

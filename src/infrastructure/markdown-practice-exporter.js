@@ -115,9 +115,9 @@ export function renderPracticeMarkdown(practice, include) {
       }
     }
     if (sections.has('explanations') && question.explanation) {
-      lines.push('', '### 参考讲解', '', question.explanation.detail)
+      lines.push('', question.leetcode ? '### 算法讲解' : '### 参考讲解', '', question.explanation.detail)
       if (question.explanation.memorizationPoints) {
-        lines.push('', '### 直接背', '', question.explanation.memorizationPoints)
+        lines.push('', question.leetcode ? '### 解题要点' : '### 直接背', '', question.explanation.memorizationPoints)
       }
     }
   }

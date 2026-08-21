@@ -103,7 +103,8 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
   }
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation
-  return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': '点评讲解' },
+  const isLeetcode = Boolean(question.leetcode)
+  return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': isLeetcode ? '题目讲解' : '点评讲解' },
     evaluation ? h('header', { className: 'di-review-score' },
       h('span', { className: 'di-review-check' }, h(Icon, { name: 'check', size: 22 })),
       h('div', { className: 'di-review-score-summary' },
@@ -124,12 +125,12 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
         h('div', { className: 'di-explanation-copy' }, h(Markdown, null, explanation.detail))),
       h('section', { className: 'di-memorize-box' },
         h('div', { className: 'di-memorize-copy' },
-          h('div', { className: 'di-memorize-label' }, '直接背'),
+          h('div', { className: 'di-memorize-label' }, isLeetcode ? '解题要点' : '直接背'),
           h(Markdown, null, explanation.memorizationPoints))),
       h(ErrorNotice, null, command.error),
       h('div', { className: 'di-review-actions' },
         h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
-        h(Button, { busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答'),
+        !isLeetcode ? h(Button, { busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答') : null,
         h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习'))))
 }
 
@@ -172,7 +173,7 @@ export function ReviewResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
-  return h(PresentedState, { query, missing: '找不到点评讲解数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
+  return h(PresentedState, { query, missing: '找不到讲解数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
 }
 
 export function PracticeSummaryCard({ presentation, revision }) {

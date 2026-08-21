@@ -576,7 +576,7 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
       current.explanation.memorizationPoints ? h(
         "div",
         { className: "di-attempt" },
-        h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"),
+        h("div", { className: "di-section-label" }, "\u89E3\u9898\u8981\u70B9"),
         h(Markdown, null, current.explanation.memorizationPoints)
       ) : null
     ) : null
@@ -710,9 +710,10 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   };
   const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
+  const isLeetcode = Boolean(question.leetcode);
   return h(
     "article",
-    { id: `di-review-${question.id}`, className: "di-card di-review-card", "aria-label": "\u70B9\u8BC4\u8BB2\u89E3" },
+    { id: `di-review-${question.id}`, className: "di-card di-review-card", "aria-label": isLeetcode ? "\u9898\u76EE\u8BB2\u89E3" : "\u70B9\u8BC4\u8BB2\u89E3" },
     evaluation ? h(
       "header",
       { className: "di-review-score" },
@@ -752,7 +753,7 @@ function ReviewResultCard({ sessionId, question, attempt }) {
         h(
           "div",
           { className: "di-memorize-copy" },
-          h("div", { className: "di-memorize-label" }, "\u76F4\u63A5\u80CC"),
+          h("div", { className: "di-memorize-label" }, isLeetcode ? "\u89E3\u9898\u8981\u70B9" : "\u76F4\u63A5\u80CC"),
           h(Markdown, null, explanation.memorizationPoints)
         )
       ),
@@ -761,7 +762,7 @@ function ReviewResultCard({ sessionId, question, attempt }) {
         "div",
         { className: "di-review-actions" },
         h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
-        h(Button, { busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54"),
+        !isLeetcode ? h(Button, { busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54") : null,
         h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
       )
     )
@@ -801,7 +802,7 @@ function ReviewResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null;
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u70B9\u8BC4\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
 }
 function PracticeSummaryCard({ presentation, revision }) {
   const query = usePresentedPractice(presentation, revision);
@@ -1034,8 +1035,14 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         question.explanation ? h(
           "div",
           { className: "di-section" },
-          h("div", { className: "di-section-label" }, "\u53C2\u8003\u8BB2\u89E3"),
-          h(Markdown, null, question.explanation.detail)
+          h("div", { className: "di-section-label" }, question.leetcode ? "\u7B97\u6CD5\u8BB2\u89E3" : "\u53C2\u8003\u8BB2\u89E3"),
+          h(Markdown, null, question.explanation.detail),
+          question.explanation.memorizationPoints ? h(
+            "div",
+            { className: "di-attempt" },
+            h("div", { className: "di-section-label" }, question.leetcode ? "\u89E3\u9898\u8981\u70B9" : "\u76F4\u63A5\u80CC"),
+            h(Markdown, null, question.explanation.memorizationPoints)
+          ) : null
         ) : null,
         h(
           "div",
@@ -1286,7 +1293,7 @@ function TimelineContent({ question, view }) {
     question.explanation.memorizationPoints ? h(
       "section",
       { className: "di-time-memorize" },
-      h("div", { className: "di-time-record-label" }, "\u76F4\u63A5\u80CC"),
+      h("div", { className: "di-time-record-label" }, question.leetcode ? "\u89E3\u9898\u8981\u70B9" : "\u76F4\u63A5\u80CC"),
       h(Markdown, null, question.explanation.memorizationPoints)
     ) : null
   );

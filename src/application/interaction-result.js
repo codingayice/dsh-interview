@@ -40,7 +40,7 @@ function descriptor(action, result) {
         nextAction: data.phase === 'awaiting_question'
           ? 'generate_question'
           : data.phase === 'generating_explanation'
-            ? 'generate_explanation'
+            ? data.currentQuestion?.leetcode ? 'generate_leetcode_explanation' : 'generate_explanation'
             : data.phase === 'generating_summary'
               ? 'generate_summary'
               : 'wait_for_user',
@@ -106,7 +106,11 @@ function descriptor(action, result) {
       const generating = needsQuestion || needsExplanation
       return {
         state: data.phase,
-        nextAction: needsQuestion ? 'generate_question' : needsExplanation ? 'generate_explanation' : 'wait_for_user',
+        nextAction: needsQuestion
+          ? 'generate_question'
+          : needsExplanation
+            ? data.currentQuestion?.leetcode ? 'generate_leetcode_explanation' : 'generate_explanation'
+            : 'wait_for_user',
         presentation: generating ? null : { kind: 'live-session' },
         assistantResponse: generating ? continueSilently() : exact('练习已切换，请继续作答。'),
         context: data,
@@ -145,10 +149,12 @@ function descriptor(action, result) {
           }
         : {
             state: 'generating_explanation',
-            nextAction: 'generate_explanation',
+            nextAction: data.explanationType === 'leetcode_solution'
+              ? 'generate_leetcode_explanation'
+              : 'generate_explanation',
             presentation: null,
             assistantResponse: continueSilently(),
-            context: references,
+            context: { ...references, explanationType: data.explanationType },
           }
     }
     case INTERVIEW_ACTIONS.SAVE_EVALUATION: {
@@ -173,7 +179,9 @@ function descriptor(action, result) {
         state: 'awaiting_next',
         nextAction: 'wait_for_user',
         presentation: { kind: 'review', ...referencesOf(result, 'practiceId', 'questionId'), ...optionalReference(result, 'attemptId') },
-        assistantResponse: exact('点评讲解已生成，请查看卡片。'),
+        assistantResponse: exact(data.explanationType === 'leetcode_solution'
+          ? '题目讲解已生成，请查看卡片。'
+          : '点评讲解已生成，请查看卡片。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_NEXT:
       if (data.leetcode) {

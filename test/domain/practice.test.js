@@ -152,6 +152,14 @@ test('刷力扣题目只能引用固定题库并保留规范元数据', () => {
   assert.throws(() => updateQuestion(practice, { questionId: 'question-1', prompt: '篡改题目', now: 3 }), {
     code: 'LEETCODE_QUESTION_IMMUTABLE',
   })
+  assert.throws(() => saveExplanation(practice, {
+    questionId: 'question-1',
+    detail: '只给出一种语言。\n\n```cpp\nvector<int> twoSum() { return {}; }\n```',
+    memorizationPoints: '哈希表查找差值。',
+    now: 3,
+  }), {
+    code: 'LEETCODE_SOLUTION_LANGUAGES_REQUIRED',
+  })
 })
 
 test('练习和题目修改经过领域校验，删除题目后连续重排', () => {

@@ -2,7 +2,7 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 import { toAgentInteractionResult } from '../../application/interaction-result.js'
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
 import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'
-import { CONTINUE_PRACTICE_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
+import { CONTINUE_PRACTICE_POLICY, LEETCODE_EXPLANATION_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
 
 const emptyParameters = Object.freeze({ type: 'object', properties: {}, additionalProperties: false })
 
@@ -188,7 +188,7 @@ const tools = [
   }),
   atomicTool({
     name: 'interview_reveal_answer', action: INTERVIEW_ACTIONS.REVEAL_ANSWER,
-    description: '用户明确选择直接看当前题答案时调用。不得伪造作答或评价；若 nextAction=generate_explanation，读取完整练习上下文后生成详细讲解和直接背，并调用 interview_complete_review。',
+    description: `用户明确选择查看当前面试题答案或讲解当前力扣题时调用。不得伪造作答或评价；nextAction=generate_explanation 时生成面试知识讲解和直接背；nextAction=generate_leetcode_explanation 时严格生成算法教学讲解与 C++、Java、Python、C、Go 五种完整答案代码；最后调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
     parameters: {
       type: 'object',
       properties: { question_id: { type: 'string', minLength: 1, description: '当前题目 ID；省略时使用会话当前题。' } },
@@ -232,12 +232,12 @@ const tools = [
   atomicTool({
     name: 'interview_complete_review',
     action: INTERVIEW_ACTIONS.COMPLETE_REVIEW,
-    description: '保存完整参考讲解和直接背要点，并通过 UI 展示包含评价、讲解和背诵要点的点评讲解。',
+    description: '保存当前题目的完整讲解。面试题的 memorization_points 是直接背；力扣题的 detail 必须包含算法教学与 C++、Java、Python、C、Go 完整代码，memorization_points 是解题要点。',
     parameters: {
       type: 'object',
       properties: {
-        detail: { type: 'string', minLength: 1, description: '完整参考讲解。' },
-        memorization_points: { type: 'string', minLength: 1, description: '可直接复述的精炼背诵要点。' },
+        detail: { type: 'string', minLength: 1, description: '完整讲解；力扣题必须包含五种指定语言的完整答案代码。' },
+        memorization_points: { type: 'string', minLength: 1, description: '面试题填写直接背；力扣题填写精炼解题要点。' },
         question_id: { type: 'string', minLength: 1 },
       },
       required: ['detail', 'memorization_points'],

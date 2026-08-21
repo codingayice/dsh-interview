@@ -3,6 +3,13 @@ import { LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from './leetcode-top-1
 import { modeDefinition } from './modes.js'
 
 const DIFFICULTIES = new Set(['junior', 'intermediate', 'senior'])
+const LEETCODE_CODE_BLOCKS = Object.freeze([
+  ['C++', /```(?:cpp|c\+\+)\s*\r?\n[\s\S]+?```/i],
+  ['Java', /```java\s*\r?\n[\s\S]+?```/i],
+  ['Python', /```python\s*\r?\n[\s\S]+?```/i],
+  ['C', /```c\s*\r?\n[\s\S]+?```/i],
+  ['Go', /```(?:go|golang)\s*\r?\n[\s\S]+?```/i],
+])
 
 function requiredText(value, code, message) {
   const text = typeof value === 'string' ? value.trim() : ''
@@ -190,9 +197,21 @@ export function saveExplanation(practice, { questionId, detail, memorizationPoin
   activePractice(practice)
   const target = findQuestion(practice, questionId)
   assertDomain(!target.explanation, 'EXPLANATION_ALREADY_EXISTS', '该题已经存在讲解')
+  const normalizedDetail = requiredText(detail, 'INVALID_EXPLANATION', '讲解内容不能为空')
+  if (target.leetcode) {
+    const missingLanguages = LEETCODE_CODE_BLOCKS
+      .filter(([, pattern]) => !pattern.test(normalizedDetail))
+      .map(([language]) => language)
+    assertDomain(
+      missingLanguages.length === 0,
+      'LEETCODE_SOLUTION_LANGUAGES_REQUIRED',
+      `力扣讲解缺少完整代码：${missingLanguages.join('、')}`,
+      { missingLanguages },
+    )
+  }
   const explanation = {
-    detail: requiredText(detail, 'INVALID_EXPLANATION', '讲解内容不能为空'),
-    memorizationPoints: requiredText(memorizationPoints, 'INVALID_MEMORIZATION_POINTS', '直接背内容不能为空'),
+    detail: normalizedDetail,
+    memorizationPoints: requiredText(memorizationPoints, 'INVALID_MEMORIZATION_POINTS', '讲解要点不能为空'),
     createdAt: now,
   }
   const questions = practice.questions.map((question) => question.id === target.id
