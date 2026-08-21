@@ -1,9 +1,22 @@
 import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
-import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail } from '../shared/ui.js'
+import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, ScoreRail, Select } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 import { LEETCODE_LANGUAGES, leetcodeLanguageLabel } from '../../domain/leetcode-languages.js'
+
+const MODE_OPTIONS = [
+  { value: 'bagu', label: '背八股' },
+  { value: 'mock', label: '模拟面试' },
+  { value: 'scenario', label: '场景题' },
+  { value: 'leetcode', label: '刷力扣' },
+]
+const CODING_OPTIONS = [{ value: 'true', label: '是' }, { value: 'false', label: '否' }]
+const DIFFICULTY_OPTIONS = [
+  { value: 'junior', label: '初级' },
+  { value: 'intermediate', label: '中级' },
+  { value: 'senior', label: '高级' },
+]
 
 function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   const [mode, setMode] = React.useState(initial?.mode || '')
@@ -25,29 +38,20 @@ function PracticeForm({ initial = null, busy = false, onSubmit, onCancel }) {
   }
   return h('div', { className: 'di-practice-form' },
     h('label', { className: 'di-field' }, h('span', null, '模式'),
-      h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value) },
-        h('option', { value: '' }, '请选择'),
-        h('option', { value: 'bagu' }, '背八股'),
-        h('option', { value: 'mock' }, '模拟面试'),
-        h('option', { value: 'scenario' }, '场景题'),
-        h('option', { value: 'leetcode' }, '刷力扣'))),
+      h(Select, { value: mode, options: MODE_OPTIONS, onChange: setMode, 'aria-label': '选择练习模式' })),
     topicMode ? h('label', { className: 'di-field' }, h('span', null, '主题'),
       h('input', { className: 'di-input', value: topic, onChange: (event) => setTopic(event.target.value) })) : null,
     mode === 'leetcode' ? h('label', { className: 'di-field' }, h('span', null, '编程语言'),
-      h('select', { className: 'di-select', value: language, onChange: (event) => setLanguage(event.target.value) },
-        h('option', { value: '' }, '请选择'),
-        LEETCODE_LANGUAGES.map((item) => h('option', { key: item.id, value: item.id }, item.label)))) : null,
+      h(Select, { value: language, options: LEETCODE_LANGUAGES.map((item) => ({ value: item.id, label: item.label })), onChange: setLanguage, 'aria-label': '选择编程语言' })) : null,
     mode === 'mock' ? h(React.Fragment, null,
       h('label', { className: 'di-field di-field-wide' }, h('span', null, '简历'),
         h('textarea', { className: 'di-input di-textarea', value: resume, onChange: (event) => setResume(event.target.value) })),
       h('label', { className: 'di-field' }, h('span', null, '面试官风格'),
         h('input', { className: 'di-input', value: interviewerStyle, onChange: (event) => setInterviewerStyle(event.target.value) })),
       h('label', { className: 'di-field' }, h('span', null, '是否手撕代码'),
-        h('select', { className: 'di-select', value: coding, onChange: (event) => setCoding(event.target.value) },
-          h('option', { value: '' }, '请选择'), h('option', { value: 'true' }, '是'), h('option', { value: 'false' }, '否'))),
+        h(Select, { value: coding, options: CODING_OPTIONS, onChange: setCoding, 'aria-label': '选择是否手撕代码' })),
       h('label', { className: 'di-field' }, h('span', null, '面试难度'),
-        h('select', { className: 'di-select', value: difficulty, onChange: (event) => setDifficulty(event.target.value) },
-          h('option', { value: '' }, '请选择'), h('option', { value: 'junior' }, '初级'), h('option', { value: 'intermediate' }, '中级'), h('option', { value: 'senior' }, '高级')))) : null,
+        h(Select, { value: difficulty, options: DIFFICULTY_OPTIONS, onChange: setDifficulty, 'aria-label': '选择面试难度' }))) : null,
     h('div', { className: 'di-actions di-field-wide' },
       h(Button, { onClick: onCancel }, '取消'),
       h(Button, { tone: 'primary', disabled: !valid, busy, onClick: submit }, initial ? '保存配置' : '开始练习')))
@@ -244,8 +248,7 @@ export function PracticeLibrary({
     allowCreate && creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h('div', { className: 'di-history-filters' },
       h('input', { className: 'di-input', value: queryText, onChange: (event) => setQueryText(event.target.value), placeholder: '搜索练习主题', 'aria-label': '搜索练习主题' }),
-      h('select', { className: 'di-select', value: mode, onChange: (event) => setMode(event.target.value), 'aria-label': '筛选模式' },
-        h('option', { value: '' }, '全部模式'), h('option', { value: 'bagu' }, '背八股'), h('option', { value: 'mock' }, '模拟面试'), h('option', { value: 'scenario' }, '场景题'), h('option', { value: 'leetcode' }, '刷力扣'))),
+      h(Select, { className: 'di-history-mode-select', value: mode, options: [{ value: '', label: '全部模式' }, ...MODE_OPTIONS], onChange: setMode, 'aria-label': '筛选模式' })),
     h(ErrorNotice, null, list.error),
     downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
       h('a', { className: 'di-link', href: interviewApi.downloadUrl(file.token), key: file.token }, `下载 ${file.name}`))) : null,

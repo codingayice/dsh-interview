@@ -26,6 +26,7 @@ const ICON_PATHS = {
   flame: [h('path', { key: 'a', d: 'M12 22c4 0 7-3 7-7 0-3-1.5-5.5-4.5-8 .2 2-1 3.5-2 4.5C12 8 10 5 7 3c.4 4-2 6-2 10 0 5 3 9 7 9Z' })],
   plus: [h('path', { key: 'a', d: 'M12 5v14M5 12h14' })],
   alert: [h('path', { key: 'a', d: 'M10.3 4.2 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0ZM12 9v4m0 3h.01' })],
+  chevronDown: [h('path', { key: 'a', d: 'm7 10 5 5 5-5' })],
 }
 
 export function Icon({ name, size = 18 }) {
@@ -112,4 +113,81 @@ export function Empty({ title, detail }) {
 
 export function Button({ children, tone = 'quiet', busy = false, ...props }) {
   return h('button', { ...props, className: `di-button is-${tone}${props.className ? ` ${props.className}` : ''}`, disabled: props.disabled || busy }, busy ? '处理中…' : children)
+}
+
+let selectSequence = 0
+
+export function Select({ value = '', options = [], placeholder = '请选择', onChange, disabled = false, className = '', ...props }) {
+  const [open, setOpen] = React.useState(false)
+  const rootRef = React.useRef(null)
+  const menuIdRef = React.useRef(null)
+  if (!menuIdRef.current) menuIdRef.current = `di-select-menu-${++selectSequence}`
+  const menuId = menuIdRef.current
+  const selectedIndex = options.findIndex((option) => option.value === value)
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : null
+
+  React.useEffect(() => {
+    if (!open) return undefined
+    const close = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+
+  const choose = (option) => {
+    if (option.disabled) return
+    onChange?.(option.value)
+    setOpen(false)
+  }
+  const move = (offset) => {
+    if (!options.length) return
+    let index = selectedIndex
+    for (let count = 0; count < options.length; count += 1) {
+      index = (index + offset + options.length) % options.length
+      if (!options[index].disabled) {
+        choose(options[index])
+        return
+      }
+    }
+  }
+  const onKeyDown = (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!open) setOpen(true)
+      else move(event.key === 'ArrowDown' ? 1 : -1)
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+    } else if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      const candidates = event.key === 'Home' ? options : [...options].reverse()
+      const option = candidates.find((item) => !item.disabled)
+      if (option) choose(option)
+    }
+  }
+
+  return h('div', { ref: rootRef, className: `di-custom-select${open ? ' is-open' : ''}${disabled ? ' is-disabled' : ''}${className ? ` ${className}` : ''}` },
+    h('button', {
+      ...props,
+      type: 'button',
+      className: 'di-custom-select-trigger',
+      disabled,
+      role: 'combobox',
+      'aria-expanded': open,
+      'aria-controls': menuId,
+      'aria-haspopup': 'listbox',
+      onClick: () => setOpen((current) => !current),
+      onKeyDown,
+    },
+    h('span', { className: selected ? '' : 'is-placeholder' }, selected?.label || placeholder),
+    h(Icon, { name: 'chevronDown', size: 15 })),
+    open ? h('div', { id: menuId, className: 'di-custom-select-menu', role: 'listbox' }, options.map((option) => h('button', {
+      type: 'button',
+      role: 'option',
+      key: option.value,
+      className: `di-custom-select-option${option.value === value ? ' is-selected' : ''}`,
+      'aria-selected': option.value === value,
+      disabled: option.disabled,
+      onClick: () => choose(option),
+    }, h('span', null, option.label), option.value === value ? h(Icon, { name: 'check', size: 14 }) : null))) : null)
 }
