@@ -239,6 +239,15 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_solution')
   assert.equal(fixture.published.at(-1).type, 'leetcode.problem_drawn')
 
+  const revealed = await fixture.application.revealAnswer('leetcode-session')
+  assert.equal(revealed.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_REVIEW)
+  assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'generating_explanation')
+  await fixture.application.saveExplanation('leetcode-session', {
+    detail: '使用哈希表保存已访问元素及其下标，一次遍历查找目标差值。',
+    memorizationPoints: '边遍历边查差值，哈希表把查找降为常数时间。',
+  })
+  assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_next')
+
   await fixture.application.setLeetcodeProblemCompletion('two-sum', true, 'leetcode-session')
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_next')
 

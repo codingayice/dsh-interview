@@ -518,11 +518,12 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
   const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
   const command = useCommand(sessionId);
-  const [showCatalog, setShowCatalog] = import_react3.default.useState(false);
+  const [showExplanation, setShowExplanation] = import_react3.default.useState(false);
   const session = sessionQuery.data?.resource?.data;
   const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion;
   const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null;
   const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null;
+  import_react3.default.useEffect(() => setShowExplanation(false), [current?.id]);
   if (sessionQuery.loading && !current) return h("div", { className: "di-card" }, h(Loading));
   if (!problem) return null;
   const run = async (name2, payload) => {
@@ -532,39 +533,53 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
     } catch {
     }
   };
+  const explain = () => {
+    if (current.explanation) return setShowExplanation((value) => !value);
+    return run("question.reveal", { questionId: current.id });
+  };
   return h(
-    import_react3.default.Fragment,
-    null,
+    "article",
+    { className: "di-card di-lc-problem-card", "aria-label": "\u5F53\u524D\u529B\u6263\u9898\u76EE" },
     h(
-      "article",
-      { className: "di-card di-lc-problem-card", "aria-label": "\u5F53\u524D\u529B\u6263\u9898\u76EE" },
+      "div",
+      { className: "di-lc-problem-main" },
+      h("div", { className: "di-lc-problem-title" }, h("span", null, problem.id), problem.title),
       h(
         "div",
-        { className: "di-lc-problem-main" },
-        h("div", { className: "di-lc-problem-title" }, h("span", null, problem.id), problem.title),
-        h(
-          "div",
-          { className: "di-lc-problem-meta" },
-          h("span", null, problem.category),
-          h(DifficultyBadge, { difficulty: problem.difficulty }),
-          h("span", { className: problem.completed ? "is-complete" : "" }, problem.completed ? "\u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210")
-        )
-      ),
-      h(
-        "div",
-        { className: "di-lc-problem-actions" },
-        h("a", { className: "di-button is-primary", href: problem.url, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u9898\u76EE \u2197"),
-        h(Button, {
-          busy: command.busy === "leetcode.set-completion",
-          onClick: () => run("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
-        }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
-        h(Button, { busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
-        h(Button, { onClick: () => setShowCatalog((value) => !value) }, showCatalog ? "\u6536\u8D77\u9898\u76EE\u5217\u8868" : "\u67E5\u770B\u9898\u76EE\u5217\u8868"),
-        h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
-      ),
-      h(ErrorNotice, null, command.error)
+        { className: "di-lc-problem-meta" },
+        h("span", null, problem.category),
+        h(DifficultyBadge, { difficulty: problem.difficulty }),
+        h("span", { className: problem.completed ? "is-complete" : "" }, problem.completed ? "\u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210")
+      )
     ),
-    showCatalog ? h(LeetcodeCatalog, { sessionId }) : null
+    h(
+      "div",
+      { className: "di-lc-problem-actions" },
+      h("a", { className: "di-button is-primary", href: problem.url, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u9898\u76EE \u2197"),
+      h(Button, {
+        busy: command.busy === "leetcode.set-completion",
+        onClick: () => run("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
+      }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
+      h(Button, { busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
+      h(Button, {
+        busy: command.busy === "question.reveal" || session?.phase === "generating_explanation",
+        onClick: explain
+      }, "\u8BB2\u89E3"),
+      h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+    ),
+    h(ErrorNotice, null, command.error),
+    showExplanation && current.explanation ? h(
+      "section",
+      { className: "di-section", "aria-label": "\u9898\u76EE\u8BB2\u89E3" },
+      h("div", { className: "di-section-label" }, "\u8BB2\u89E3"),
+      h(Markdown, null, current.explanation.detail),
+      current.explanation.memorizationPoints ? h(
+        "div",
+        { className: "di-attempt" },
+        h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"),
+        h(Markdown, null, current.explanation.memorizationPoints)
+      ) : null
+    ) : null
   );
 }
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
-import { Button, ErrorNotice, h, Loading } from '../shared/ui.js'
+import { Button, ErrorNotice, h, Loading, Markdown } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 
 const DIFFICULTY = Object.freeze({
@@ -86,11 +86,12 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
   const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
   const command = useCommand(sessionId)
-  const [showCatalog, setShowCatalog] = React.useState(false)
+  const [showExplanation, setShowExplanation] = React.useState(false)
   const session = sessionQuery.data?.resource?.data
   const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion
   const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null
   const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null
+  React.useEffect(() => setShowExplanation(false), [current?.id])
   if (sessionQuery.loading && !current) return h('div', { className: 'di-card' }, h(Loading))
   if (!problem) return null
   const run = async (name, payload) => {
@@ -101,9 +102,12 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
       // useCommand 已保存可展示错误。
     }
   }
+  const explain = () => {
+    if (current.explanation) return setShowExplanation((value) => !value)
+    return run('question.reveal', { questionId: current.id })
+  }
 
-  return h(React.Fragment, null,
-    h('article', { className: 'di-card di-lc-problem-card', 'aria-label': '当前力扣题目' },
+  return h('article', { className: 'di-card di-lc-problem-card', 'aria-label': '当前力扣题目' },
       h('div', { className: 'di-lc-problem-main' },
         h('div', { className: 'di-lc-problem-title' }, h('span', null, problem.id), problem.title),
         h('div', { className: 'di-lc-problem-meta' },
@@ -117,8 +121,20 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
           onClick: () => run('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed }),
         }, problem.completed ? '标记未完成' : '标记完成'),
         h(Button, { busy: command.busy === 'question.next', onClick: () => run('question.next') }, '随机下一题'),
-        h(Button, { onClick: () => setShowCatalog((value) => !value) }, showCatalog ? '收起题目列表' : '查看题目列表'),
+        h(Button, {
+          busy: command.busy === 'question.reveal' || session?.phase === 'generating_explanation',
+          onClick: explain,
+        }, '讲解'),
         h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习')),
-      h(ErrorNotice, null, command.error)),
-    showCatalog ? h(LeetcodeCatalog, { sessionId }) : null)
+      h(ErrorNotice, null, command.error),
+      showExplanation && current.explanation
+        ? h('section', { className: 'di-section', 'aria-label': '题目讲解' },
+            h('div', { className: 'di-section-label' }, '讲解'),
+            h(Markdown, null, current.explanation.detail),
+            current.explanation.memorizationPoints
+              ? h('div', { className: 'di-attempt' },
+                  h('div', { className: 'di-section-label' }, '直接背'),
+                  h(Markdown, null, current.explanation.memorizationPoints))
+              : null)
+        : null)
 }

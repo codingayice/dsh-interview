@@ -141,3 +141,10 @@ test('工作台按进行中与已结束状态分离练习', () => {
   assert.match(library, /statusScope === 'active' \? 'active' : 'completed'/)
   assert.doesNotMatch(library, /全部状态/)
 })
+
+test('力扣题目卡使用讲解入口且不重复展示题目列表入口', () => {
+  const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(leetcode, /查看题目列表|收起题目列表/)
+  assert.match(leetcode, /run\('question\.reveal'/)
+  assert.match(leetcode, /}, '讲解'\)/)
+})
