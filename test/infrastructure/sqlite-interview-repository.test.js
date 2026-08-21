@@ -44,6 +44,48 @@ test('SQLite 事务保存并恢复完整聚合与会话游标', async () => {
   }
 })
 
+test('SQLite 在绑定练习时原子转移会话并释放原绑定', async () => {
+  const context = fixture()
+  try {
+    const { practice, cursor } = aggregate()
+    await context.repository.commit({ practice, cursor })
+    const transferred = { ...cursor, sessionId: 'session-2', revision: cursor.revision + 1, updatedAt: cursor.updatedAt + 1 }
+    await context.repository.commit({ cursor: transferred })
+    assert.equal(await context.repository.getCursor('session-1'), null)
+    assert.deepEqual(await context.repository.getCursor('session-2'), transferred)
+    assert.deepEqual(await context.repository.getCursorByPractice(practice.id), transferred)
+
+    await context.repository.commit({ unbindSessionId: 'session-2' })
+    assert.equal(await context.repository.getCursorByPractice(practice.id), null)
+  } finally {
+    context.cleanup()
+  }
+})
+
+test('SQLite 迁移时只保留同一练习最近更新的会话绑定', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dsh-interview-sqlite-migration-'))
+  const filePath = join(directory, 'interview.sqlite')
+  let repository = new SqliteInterviewRepository(filePath)
+  try {
+    const { practice, cursor } = aggregate()
+    await repository.commit({ practice, cursor })
+    repository.database.exec('DROP INDEX ux_session_cursors_practice')
+    repository.database.prepare(`
+      INSERT INTO session_cursors (session_id, practice_id, question_id, attempt_id, phase, revision, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('session-new', practice.id, cursor.questionId, cursor.attemptId, cursor.phase, cursor.revision + 1, cursor.updatedAt + 1)
+    repository.close()
+    repository = null
+
+    repository = new SqliteInterviewRepository(filePath)
+    assert.equal(await repository.getCursor('session-1'), null)
+    assert.equal((await repository.getCursorByPractice(practice.id)).sessionId, 'session-new')
+  } finally {
+    repository?.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('SQLite 列表支持模式、状态和主题筛选', async () => {
   const context = fixture()
   try {

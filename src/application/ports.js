@@ -2,6 +2,7 @@ const REQUIRED_REPOSITORY_METHODS = [
   'getPractice',
   'listPractices',
   'getCursor',
+  'getCursorByPractice',
   'commit',
   'deletePractice',
   'clearCursor',

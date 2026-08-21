@@ -89,6 +89,24 @@ export class SqliteInterviewRepository {
     if (!questionColumns.some((column) => column.name === 'leetcode_json')) {
       this.database.exec('ALTER TABLE questions ADD COLUMN leetcode_json TEXT')
     }
+    this.database.exec(`
+      BEGIN IMMEDIATE;
+      DELETE FROM session_cursors
+      WHERE rowid NOT IN (
+        SELECT (
+          SELECT winner.rowid
+          FROM session_cursors AS winner
+          WHERE winner.practice_id = grouped.practice_id
+          ORDER BY winner.updated_at DESC, winner.revision DESC, winner.session_id DESC
+          LIMIT 1
+        )
+        FROM session_cursors AS grouped
+        GROUP BY grouped.practice_id
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_session_cursors_practice
+        ON session_cursors(practice_id);
+      COMMIT;
+    `)
   }
 
   #readQuestion(row) {
@@ -160,6 +178,15 @@ export class SqliteInterviewRepository {
 
   async getCursor(sessionId) {
     const row = this.database.prepare('SELECT * FROM session_cursors WHERE session_id = ?').get(sessionId)
+    return this.#readCursor(row)
+  }
+
+  async getCursorByPractice(practiceId) {
+    const row = this.database.prepare('SELECT * FROM session_cursors WHERE practice_id = ?').get(practiceId)
+    return this.#readCursor(row)
+  }
+
+  #readCursor(row) {
     return row ? {
       sessionId: row.session_id,
       practiceId: row.practice_id,
@@ -242,17 +269,12 @@ export class SqliteInterviewRepository {
   }
 
   #writeCursor(cursor) {
+    this.database.prepare('DELETE FROM session_cursors WHERE session_id = ? OR practice_id = ?')
+      .run(cursor.sessionId, cursor.practiceId)
     this.database.prepare(`
       INSERT INTO session_cursors (
         session_id, practice_id, question_id, attempt_id, phase, revision, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(session_id) DO UPDATE SET
-        practice_id = excluded.practice_id,
-        question_id = excluded.question_id,
-        attempt_id = excluded.attempt_id,
-        phase = excluded.phase,
-        revision = excluded.revision,
-        updated_at = excluded.updated_at
     `).run(
       cursor.sessionId,
       cursor.practiceId,
@@ -264,10 +286,11 @@ export class SqliteInterviewRepository {
     )
   }
 
-  async commit({ practice, cursor }) {
+  async commit({ practice, cursor, unbindSessionId }) {
     this.database.exec('BEGIN IMMEDIATE')
     try {
       if (practice) this.#writePractice(practice)
+      if (unbindSessionId) this.database.prepare('DELETE FROM session_cursors WHERE session_id = ?').run(unbindSessionId)
       if (cursor) this.#writeCursor(cursor)
       this.database.exec('COMMIT')
     } catch (error) {
