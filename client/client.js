@@ -46,6 +46,7 @@ var import_react4 = __toESM(require("react"), 1);
 var cache = /* @__PURE__ */ new Map();
 var listeners = /* @__PURE__ */ new Set();
 var notificationListeners = /* @__PURE__ */ new Set();
+var workspaceNavigationListeners = /* @__PURE__ */ new Set();
 async function jsonRequest(url, options) {
   const response = await fetch(url, options);
   const value = await response.json().catch(() => null);
@@ -99,6 +100,13 @@ var interviewApi = {
   subscribeNotifications(listener) {
     notificationListeners.add(listener);
     return () => notificationListeners.delete(listener);
+  },
+  navigateWorkspace(tab) {
+    for (const listener of workspaceNavigationListeners) listener(tab);
+  },
+  subscribeWorkspaceNavigation(listener) {
+    workspaceNavigationListeners.add(listener);
+    return () => workspaceNavigationListeners.delete(listener);
   },
   cached(key, loader) {
     if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => {
@@ -688,6 +696,10 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   const command = useCommand(sessionId);
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });
+  const retry = async () => {
+    const result = await command.run("question.retry", { questionId: question.id }).catch(() => null);
+    if (result) interviewApi.navigateWorkspace("current");
+  };
   const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
   return h(
@@ -741,7 +753,7 @@ function ReviewResultCard({ sessionId, question, attempt }) {
         "div",
         { className: "di-review-actions" },
         h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
-        h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54"),
+        h(Button, { busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54"),
         h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
       )
     )
@@ -920,7 +932,8 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   if (!practice) return h(Empty, { title: "\u9009\u62E9\u4E00\u6761\u7EC3\u4E60", detail: "\u53F3\u4FA7\u4F1A\u5C55\u793A\u9898\u76EE\u3001\u5386\u6B21\u4F5C\u7B54\u548C\u8BB2\u89E3\u3002" });
   const run = (name2, payload) => command.run(name2, payload).catch(() => null);
   const activate = async () => {
-    await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+    const result = await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+    if (result) interviewApi.navigateWorkspace("current");
   };
   const exportOne = async () => {
     const result = await run("library.export", { practiceIds: [practice.id] });
@@ -948,7 +961,8 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const retry = async (questionId) => {
     if (practice.status !== "active") return;
     await run("session.select", { practiceId: practice.id });
-    await run("question.retry", { questionId });
+    const result = await run("question.retry", { questionId });
+    if (result) interviewApi.navigateWorkspace("current");
   };
   return h(
     "section",
@@ -1070,9 +1084,11 @@ function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     if (!result) return;
     setCreating(false);
     setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null);
+    if (payload.mode === "leetcode") interviewApi.navigateWorkspace("current");
   };
   const activate = async (practice) => {
-    await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+    const result = await run(practice.status === "completed" ? "session.reopen" : "session.select", { practiceId: practice.id });
+    if (result) interviewApi.navigateWorkspace("current");
   };
   const exportOne = async (practice) => {
     const result = await run("library.export", { practiceIds: [practice.id] });
@@ -1395,6 +1411,10 @@ function WorkspaceDock({ sessionId }) {
       unsubscribe();
     };
   }, []);
+  import_react7.default.useEffect(() => interviewApi.subscribeWorkspaceNavigation((nextTab) => {
+    if (WORKSPACE_TABS.some((item) => item.id === nextTab)) setTab(nextTab);
+    setOpen(true);
+  }), []);
   const runLocalCommand = async () => {
     setCommandError("");
     let parsed;

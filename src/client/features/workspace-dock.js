@@ -39,6 +39,11 @@ export function WorkspaceDock({ sessionId }) {
     }
   }, [])
 
+  React.useEffect(() => interviewApi.subscribeWorkspaceNavigation((nextTab) => {
+    if (WORKSPACE_TABS.some((item) => item.id === nextTab)) setTab(nextTab)
+    setOpen(true)
+  }), [])
+
   const runLocalCommand = async () => {
     setCommandError('')
     let parsed

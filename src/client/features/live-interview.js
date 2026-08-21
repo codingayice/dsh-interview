@@ -100,6 +100,10 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
   if (!question || !question.explanation || (attempt && !attempt.evaluation)) return null
   const command = useCommand(sessionId)
   const run = (name, payload) => command.run(name, payload).catch(() => {})
+  const retry = async () => {
+    const result = await command.run('question.retry', { questionId: question.id }).catch(() => null)
+    if (result) interviewApi.navigateWorkspace('current')
+  }
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation
   return h('article', { id: `di-review-${question.id}`, className: 'di-card di-review-card', 'aria-label': '点评讲解' },
@@ -128,7 +132,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
       h(ErrorNotice, null, command.error),
       h('div', { className: 'di-review-actions' },
         h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
-        h(Button, { busy: command.busy === 'question.retry', onClick: () => run('question.retry', { questionId: question.id }) }, h(Icon, { name: 'swap' }), '重新作答'),
+        h(Button, { busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答'),
         h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习'))))
 }
 

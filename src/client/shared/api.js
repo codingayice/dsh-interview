@@ -1,6 +1,7 @@
 const cache = new Map()
 const listeners = new Set()
 const notificationListeners = new Set()
+const workspaceNavigationListeners = new Set()
 
 async function jsonRequest(url, options) {
   const response = await fetch(url, options)
@@ -57,6 +58,13 @@ export const interviewApi = {
   subscribeNotifications(listener) {
     notificationListeners.add(listener)
     return () => notificationListeners.delete(listener)
+  },
+  navigateWorkspace(tab) {
+    for (const listener of workspaceNavigationListeners) listener(tab)
+  },
+  subscribeWorkspaceNavigation(listener) {
+    workspaceNavigationListeners.add(listener)
+    return () => workspaceNavigationListeners.delete(listener)
   },
   cached(key, loader) {
     if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => { cache.delete(key); throw error }))

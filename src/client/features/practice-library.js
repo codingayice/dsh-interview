@@ -58,7 +58,8 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   if (!practice) return h(Empty, { title: '选择一条练习', detail: '右侧会展示题目、历次作答和讲解。' })
   const run = (name, payload) => command.run(name, payload).catch(() => null)
   const activate = async () => {
-    await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
+    const result = await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
+    if (result) interviewApi.navigateWorkspace('current')
   }
   const exportOne = async () => {
     const result = await run('library.export', { practiceIds: [practice.id] })
@@ -83,7 +84,8 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const retry = async (questionId) => {
     if (practice.status !== 'active') return
     await run('session.select', { practiceId: practice.id })
-    await run('question.retry', { questionId })
+    const result = await run('question.retry', { questionId })
+    if (result) interviewApi.navigateWorkspace('current')
   }
   return h('section', { className: 'di-detail' },
     h('div', { className: 'di-eyebrow' }, practice.modeLabel),
@@ -169,9 +171,11 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     if (!result) return
     setCreating(false)
     setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null)
+    if (payload.mode === 'leetcode') interviewApi.navigateWorkspace('current')
   }
   const activate = async (practice) => {
-    await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
+    const result = await run(practice.status === 'completed' ? 'session.reopen' : 'session.select', { practiceId: practice.id })
+    if (result) interviewApi.navigateWorkspace('current')
   }
   const exportOne = async (practice) => {
     const result = await run('library.export', { practiceIds: [practice.id] })
