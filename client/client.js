@@ -584,13 +584,13 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
     ) : null
   );
 }
-function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "" }) {
+function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "", live = false }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
   const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
   const command = useCommand(sessionId);
   const session = sessionQuery.data?.resource?.data;
   const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null;
-  const current = initialQuestion?.leetcode ? sessionQuestion?.id === initialQuestion.id ? sessionQuestion : initialQuestion : sessionQuestion;
+  const current = live ? sessionQuestion || initialQuestion : initialQuestion;
   const [showExplanation, setShowExplanation] = import_react3.default.useState(false);
   import_react3.default.useEffect(() => setShowExplanation(false), [current?.id]);
   if (sessionQuery.loading && !current) return h("div", { className: "di-card" }, h(Loading));
@@ -613,7 +613,7 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "" 
     if (result) setShowExplanation(true);
   };
   const catalog = catalogQuery.data?.resource?.data;
-  const active = sessionQuery.loading ? true : Boolean(session?.selected && session?.phase !== "completed" && sessionQuestion?.id === current.id);
+  const active = live ? sessionQuery.loading || Boolean(session?.selected && session?.phase !== "completed" && sessionQuestion?.id === current.id) : true;
   return h(LeetcodeQuestionCard, {
     question: current,
     catalog,
@@ -621,7 +621,7 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "" 
     active,
     expanded: showExplanation,
     command,
-    phase: session?.phase,
+    phase: live ? session?.phase : null,
     onRun: run,
     onExplain: explain
   });
@@ -668,7 +668,7 @@ function LiveInterviewCard({ sessionId }) {
   const session = query.data?.resource?.data;
   if (!session?.selected) return h("div", { className: "di-card" }, h(Empty, { title: "\u8FD8\u6CA1\u6709\u5F00\u59CB\u7EC3\u4E60", detail: "\u7528\u81EA\u7136\u8BED\u8A00\u63CF\u8FF0\u9762\u8BD5\u6A21\u5F0F\u548C\u4E3B\u9898\u5373\u53EF\u5F00\u59CB\u3002" }));
   const question = session.currentQuestion;
-  if (question?.leetcode) return h(LeetcodeProblemCard, { key: question.id, sessionId, initialQuestion: question });
+  if (question?.leetcode) return h(LeetcodeProblemCard, { key: question.id, sessionId, initialQuestion: question, live: true });
   const latestAttempt = question?.attempts?.at(-1) || null;
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });

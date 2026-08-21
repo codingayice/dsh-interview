@@ -120,15 +120,15 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
         : null)
 }
 
-export function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = '' }) {
+export function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = '', live = false }) {
   const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
   const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
   const command = useCommand(sessionId)
   const session = sessionQuery.data?.resource?.data
   const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null
-  const current = initialQuestion?.leetcode
-    ? sessionQuestion?.id === initialQuestion.id ? sessionQuestion : initialQuestion
-    : sessionQuestion
+  const current = live
+    ? sessionQuestion || initialQuestion
+    : initialQuestion
   const [showExplanation, setShowExplanation] = React.useState(false)
 
   React.useEffect(() => setShowExplanation(false), [current?.id])
@@ -157,9 +157,9 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null, languag
   }
 
   const catalog = catalogQuery.data?.resource?.data
-  const active = sessionQuery.loading
-    ? true
-    : Boolean(session?.selected && session?.phase !== 'completed' && sessionQuestion?.id === current.id)
+  const active = live
+    ? sessionQuery.loading || Boolean(session?.selected && session?.phase !== 'completed' && sessionQuestion?.id === current.id)
+    : true
   return h(LeetcodeQuestionCard, {
     question: current,
     catalog,
@@ -167,7 +167,7 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null, languag
     active,
     expanded: showExplanation,
     command,
-    phase: session?.phase,
+    phase: live ? session?.phase : null,
     onRun: run,
     onExplain: explain,
   })

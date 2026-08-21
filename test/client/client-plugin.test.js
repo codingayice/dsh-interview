@@ -175,7 +175,19 @@ test('力扣切题不使用本地临时卡片槽位', () => {
   const index = readFileSync(new URL('../../src/client/index.js', import.meta.url), 'utf8')
 
   assert.match(leetcode, /onRun\('question\.next'\)/)
-  assert.match(leetcode, /sessionQuestion\?\.id === initialQuestion\.id/)
+  assert.match(leetcode, /const current = live/)
+  assert.match(leetcode, /: initialQuestion/)
+  assert.match(leetcode, /const active = live/)
   assert.doesNotMatch(index, /interview-latest-question/)
   assert.doesNotMatch(api, /subscribeLocalQuestions/)
+})
+
+test('会话中的下一题不会改变先前力扣消息卡片', () => {
+  const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+
+  assert.match(leetcode, /live = false/)
+  assert.match(leetcode, /const current = live\s*\? sessionQuestion \|\| initialQuestion\s*:\s*initialQuestion/)
+  assert.match(leetcode, /const active = live[\s\S]*:\s*true/)
+  assert.match(liveInterview, /LeetcodeProblemCard, \{ sessionId, initialQuestion: question, language: practice\.config\?\.language \}/)
 })
