@@ -61,11 +61,18 @@ function descriptor(action, result) {
       }
       if (nextAction === 'show_current_question') {
         const leetcode = Boolean(data.question?.leetcode)
+        const response = leetcode && data.trigger === 'next_requested'
+          ? '已抽取下一题。'
+          : leetcode && data.trigger === 'practice_started'
+            ? '已抽取题目，请开始刷题。'
+            : leetcode
+              ? '已恢复当前力扣题，请继续刷题。'
+              : '已恢复当前题，请继续作答。'
         return {
           state: data.phase,
           nextAction: 'wait_for_user',
           presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
-          assistantResponse: exact(leetcode ? '已恢复当前力扣题，请继续刷题。' : '已恢复当前题，请继续作答。'),
+          assistantResponse: exact(response),
         }
       }
       if (nextAction === 'confirm_reopen') {
@@ -189,7 +196,7 @@ function descriptor(action, result) {
           state: 'awaiting_solution',
           nextAction: 'wait_for_user',
           presentation: { kind: 'question', ...referencesOf(result, 'practiceId', 'questionId') },
-          assistantResponse: exact('已随机抽取下一道力扣题，请开始刷题。'),
+          assistantResponse: exact('已抽取下一题。'),
         }
       }
       return { state: 'awaiting_question', nextAction: 'generate_question', presentation: null, assistantResponse: continueSilently(), context: data }

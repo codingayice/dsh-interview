@@ -24,7 +24,7 @@ function instructionFor(task) {
     case AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION:
       return `力扣练习事件：用户请求当前题讲解。practice_id=${task.practiceId}，question_id=${task.questionId}。必须调用 interview_read_practice_context 读取当前力扣题和 config.language，再严格生成教学型算法讲解及该配置语言的答案代码，最后调用 interview_complete_review 保存；不得创建作答、评分、评价或新题。${LEETCODE_EXPLANATION_POLICY}${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION:
-      return `力扣题目展示事件：插件已经随机抽取并保存题目。practice_id=${task.practiceId}，question_id=${task.questionId}。必须只调用 interview_continue_practice 读取并展示当前权威题目卡片。禁止调用 interview_request_next、interview_present_question 或自行生成题目，避免重复抽题。${ASSISTANT_RESPONSE_PROTOCOL}`
+      return `力扣题目展示事件：插件已经随机抽取并保存题目。practice_id=${task.practiceId}，question_id=${task.questionId}，trigger=${task.reason}。必须只调用 interview_continue_practice，并原样传入 trigger=${task.reason}，读取并展示当前权威题目卡片。禁止调用 interview_request_next、interview_present_question 或自行生成题目，避免重复抽题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.GENERATE_SUMMARY:
       return `面试工作流事件：用户要求结束练习。practice_id=${task.practiceId}。必须调用 interview_read_practice_context 读取练习配置、全部题目、全部历次作答、评价和讲解；基于这些真实数据生成总体总结、表现亮点和改进建议，然后调用 interview_complete_summary。禁止继续出题。${ASSISTANT_RESPONSE_PROTOCOL}`
     default:

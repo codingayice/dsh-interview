@@ -130,7 +130,7 @@ export class InterviewApplication {
         { type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id },
       ]
       const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
-        sessionId, practiceId: practice.id, questionId: drawn.question.id,
+        sessionId, practiceId: practice.id, questionId: drawn.question.id, reason: 'practice_started',
       })]
       await this.repository.commit({ practice, cursor })
       await this.#publish(events)
@@ -159,7 +159,7 @@ export class InterviewApplication {
     return this.#result('session', toSessionDto(cursor, practice), cursor)
   }
 
-  async continuePractice(sessionId) {
+  async continuePractice(sessionId, { trigger = null } = {}) {
     const selected = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
     if (!selected) {
       return this.#result('continuation', {
@@ -186,6 +186,7 @@ export class InterviewApplication {
         selected: true,
         phase: drawn.cursor.phase,
         resumeAction: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
+        trigger: trigger || 'next_requested',
         practiceId: practice.id,
         questionId: drawn.question.id,
         question: toQuestionDto(drawn.question),
@@ -240,6 +241,7 @@ export class InterviewApplication {
       selected: true,
       phase: cursor.phase,
       resumeAction,
+      ...(trigger ? { trigger } : {}),
       practiceId: practice.id,
       questionId: cursor.questionId,
       attemptId: cursor.attemptId,
@@ -401,7 +403,7 @@ export class InterviewApplication {
       const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
       const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
       const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
-        sessionId, practiceId: practice.id, questionId: drawn.question.id,
+        sessionId, practiceId: practice.id, questionId: drawn.question.id, reason: 'next_requested',
       })]
       await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
       await this.#publish(events)

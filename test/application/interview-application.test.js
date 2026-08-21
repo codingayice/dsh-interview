@@ -240,6 +240,7 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   assert.equal(started.resource.data.leetcode.difficulty, 'easy')
   assert.equal(started.agentTasks[0].type, AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION)
   assert.equal(started.agentTasks[0].questionId, started.resource.data.id)
+  assert.equal(started.agentTasks[0].reason, 'practice_started')
   assert.equal((await fixture.application.getSession('leetcode-session')).resource.data.phase, 'awaiting_solution')
   assert.equal(fixture.published.at(-1).type, 'leetcode.problem_drawn')
 
@@ -271,6 +272,7 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
   assert.equal(next.resource.data.leetcode.slug, 'longest-consecutive-sequence')
   assert.equal(next.agentTasks[0].type, AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION)
   assert.equal(next.agentTasks[0].questionId, next.resource.data.id)
+  assert.equal(next.agentTasks[0].reason, 'next_requested')
   assert.equal((await fixture.application.getPractice(next.references.practiceId)).resource.data.questions.length, 3)
 
   await fixture.application.selectPractice('leetcode-session-2', next.references.practiceId)

@@ -58,6 +58,7 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_start_practice.description, /不得询问题数、是否追问/)
   assert.match(fixture.tools.interview_continue_practice.description, /不把“继续”简单等同于“下一题”/)
   assert.match(fixture.tools.interview_continue_practice.description, /必须严格执行工具返回的 nextAction/)
+  assert.deepEqual(fixture.tools.interview_continue_practice.parameters.properties.trigger.enum, ['practice_started', 'next_requested'])
   assert.match(fixture.tools.interview_reveal_answer.description, /generate_leetcode_explanation/)
   assert.match(fixture.tools.interview_reveal_answer.description, /只生成指定语言的一份完整答案代码/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
@@ -155,6 +156,22 @@ test('继续工具按阶段恢复并向模型返回确定的下一动作', async
   assert.equal(evaluating.context.answer, '负责加载类。')
 })
 
+test('力扣题目展示事件区分新抽题与恢复文案', async () => {
+  const fixture = toolFixture()
+  await fixture.tools.interview_start_practice.execute({ mode: 'leetcode', language: 'java' }, exec('leetcode-announcement'))
+
+  const started = await fixture.tools.interview_continue_practice.execute({ trigger: 'practice_started' }, exec('leetcode-announcement'))
+  assert.equal(started.assistantResponse.text, '已抽取题目，请开始刷题。')
+
+  const requested = await fixture.tools.interview_request_next.execute({}, exec('leetcode-announcement'))
+  assert.equal(requested.assistantResponse.text, '已抽取下一题。')
+  const next = await fixture.tools.interview_continue_practice.execute({ trigger: 'next_requested' }, exec('leetcode-announcement'))
+  assert.equal(next.assistantResponse.text, '已抽取下一题。')
+
+  const resumed = await fixture.tools.interview_continue_practice.execute({}, exec('leetcode-announcement'))
+  assert.equal(resumed.assistantResponse.text, '已恢复当前力扣题，请继续刷题。')
+})
+
 test('空题目被归类为 Agent 可恢复协议错误而不生成 UI', async () => {
   const fixture = toolFixture()
   await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())
@@ -219,9 +236,10 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.match(leetcodeExplanation, /禁止输出其他语言代码/)
   assert.match(leetcodeExplanation, /interview_complete_review/)
   assert.doesNotMatch(leetcodeExplanation, /可直接背诵/)
-  const leetcodePresentation = instructionFor({ type: AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, practiceId: 'p2', questionId: 'q3' })
+  const leetcodePresentation = instructionFor({ type: AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, practiceId: 'p2', questionId: 'q3', reason: 'next_requested' })
   assert.match(leetcodePresentation, /interview_continue_practice/)
   assert.match(leetcodePresentation, /已经随机抽取并保存题目/)
+  assert.match(leetcodePresentation, /trigger=next_requested/)
   assert.match(leetcodePresentation, /禁止调用 interview_request_next/)
   assert.match(leetcodePresentation, /禁止调用.*interview_present_question/)
   const summary = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_SUMMARY, practiceId: 'p1' })
