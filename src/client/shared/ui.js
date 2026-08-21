@@ -17,6 +17,11 @@ const ICON_PATHS = {
   swap: [h('path', { key: 'a', d: 'M7 7h11l-3-3m3 3-3 3' }), h('path', { key: 'b', d: 'M17 17H6l3 3m-3-3 3-3' })],
   trash: [h('path', { key: 'a', d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5' })],
   download: [h('path', { key: 'a', d: 'M12 3v12m0 0 4-4m-4 4-4-4M5 19h14' })],
+  play: [h('path', { key: 'a', d: 'M8 5.5v13l10-6.5L8 5.5Z' })],
+  archive: [h('path', { key: 'a', d: 'M4 7h16v13H4V7Zm-1-3h18v3H3V4Zm6 7h6' })],
+  code: [h('path', { key: 'a', d: 'm8 9-3 3 3 3m8-6 3 3-3 3m-2-9-4 12' })],
+  grid: [h('rect', { key: 'a', x: 4, y: 4, width: 6, height: 6, rx: 1 }), h('rect', { key: 'b', x: 14, y: 4, width: 6, height: 6, rx: 1 }), h('rect', { key: 'c', x: 4, y: 14, width: 6, height: 6, rx: 1 }), h('rect', { key: 'd', x: 14, y: 14, width: 6, height: 6, rx: 1 })],
+  close: [h('path', { key: 'a', d: 'm6 6 12 12M18 6 6 18' })],
 }
 
 export function Icon({ name, size = 18 }) {

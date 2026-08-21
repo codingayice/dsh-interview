@@ -206,3 +206,14 @@ test('力扣随机下一题点击后立即锁定为已出下一题', () => {
   assert.match(leetcodeSource, /nextRequested \? '已出下一题' : '随机下一题'/)
   assert.match(leetcodeSource, /disabled: nextRequested/)
 })
+
+test('练习工作台使用模态布局、图标导航和居中删除确认', () => {
+  const workspace = readFileSync(new URL('../../src/client/features/workspace-dock.js', import.meta.url), 'utf8')
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+  const styles = readFileSync(new URL('../../src/client/shared/styles.js', import.meta.url), 'utf8')
+  assert.match(workspace, /di-workspace-backdrop/)
+  assert.match(workspace, /role: 'dialog'/)
+  assert.match(workspace, /name: item\.icon/)
+  assert.match(library, /di-confirm-modal/)
+  assert.match(styles, /grid-template-columns:196px minmax\(0,1fr\)/)
+})

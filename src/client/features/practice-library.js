@@ -96,7 +96,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     h('div', { className: 'di-detail-heading' },
       h('h3', { className: 'di-ledger-title' }, practice.topic),
       h('span', { className: 'di-meta' }, practice.mode === 'leetcode'
-        ? `${practice.modeLabel} · ${leetcodeLanguageLabel(practice.config.language)} · ${practice.questionCount} 道已抽取题目`
+        ? `${practice.modeLabel} · ${leetcodeLanguageLabel(practice.config.language)}`
         : `${practice.modeLabel} · ${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`)),
     h('div', { className: 'di-actions' },
       h(Button, { tone: 'primary', busy: Boolean(command.busy?.startsWith('session.')), onClick: activate }, practice.status === 'completed' ? '重新打开' : '切换到练习'),
@@ -105,11 +105,13 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       h(Button, { tone: 'danger', onClick: () => setConfirming(true) }, '删除')),
     downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
       h('a', { className: 'di-link', href: interviewApi.downloadUrl(file.token), key: file.token }, `下载 ${file.name}`))) : null,
-    confirming ? h('div', { className: 'di-confirm' },
-      h('div', null, '删除后无法恢复这条练习及全部作答。'),
-      h('div', { className: 'di-actions' },
-        h(Button, { onClick: () => setConfirming(false) }, '取消'),
-        h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: remove }, '确认删除'))) : null,
+    confirming ? h('div', { className: 'di-modal-backdrop' },
+      h('div', { className: 'di-confirm-modal', role: 'alertdialog', 'aria-label': '确认删除练习' },
+        h('h4', null, '删除练习'),
+        h('p', null, '删除后无法恢复这条练习及全部作答。'),
+        h('div', { className: 'di-actions' },
+          h(Button, { onClick: () => setConfirming(false) }, '取消'),
+          h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: remove }, '确认删除')))) : null,
     editing ? h(PracticeForm, { initial: practice, busy: command.busy === 'practice.update', onSubmit: updateConfiguration, onCancel: () => setEditing(false) }) : null,
     h(ErrorNotice, null, command.error),
     practice.summary?.kind === 'leetcode' ? h('section', { className: 'di-section' },
@@ -236,7 +238,7 @@ export function PracticeLibrary({
 
   return h('section', { className: 'di-ledger di-history', 'aria-label': title },
     h('header', { className: 'di-history-head' },
-      h('div', { className: 'di-ledger-title' }, title),
+      h('h2', { className: 'di-ledger-title' }, title),
       allowCreate ? h(Button, { tone: 'primary', onClick: () => setCreating((value) => !value) }, '新建练习') : null),
     allowCreate && creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h('div', { className: 'di-history-filters' },
@@ -246,11 +248,13 @@ export function PracticeLibrary({
     h(ErrorNotice, null, list.error),
     downloads.length ? h('div', { className: 'di-notice' }, downloads.map((file) =>
       h('a', { className: 'di-link', href: interviewApi.downloadUrl(file.token), key: file.token }, `下载 ${file.name}`))) : null,
-    confirmingId ? h('div', { className: 'di-delete-confirm' },
-      h('span', null, `确认删除“${practices.find((item) => item.id === confirmingId)?.topic || '该练习'}”及全部作答？`),
-      h('div', { className: 'di-actions' },
-        h(Button, { onClick: () => setConfirmingId(null) }, '取消'),
-        h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: () => remove(practices.find((item) => item.id === confirmingId)) }, '确认删除'))) : null,
+    confirmingId ? h('div', { className: 'di-modal-backdrop' },
+      h('div', { className: 'di-confirm-modal', role: 'alertdialog', 'aria-label': '确认删除练习' },
+        h('h4', null, '删除练习'),
+        h('p', null, `确认删除“${practices.find((item) => item.id === confirmingId)?.topic || '该练习'}”及全部作答？`),
+        h('div', { className: 'di-actions' },
+          h(Button, { onClick: () => setConfirmingId(null) }, '取消'),
+          h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: () => remove(practices.find((item) => item.id === confirmingId)) }, '确认删除')))) : null,
     list.loading && !list.data ? h(Loading) : practices.length
       ? h('div', { className: 'di-history-scroll' },
           h('table', { className: 'di-history-table' },
