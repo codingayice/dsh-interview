@@ -416,6 +416,20 @@ var LEETCODE_TOP_100_GROUPS = Object.freeze(GROUPS.map((group) => Object.freeze(
 var LEETCODE_TOP_100 = Object.freeze(LEETCODE_TOP_100_GROUPS.flatMap((group) => group.problems));
 var PROBLEM_BY_SLUG = new Map(LEETCODE_TOP_100.map((problem) => [problem.slug, problem]));
 
+// src/client/features/leetcode-card-stack.js
+function upsertLeetcodeCard(cards, question) {
+  if (!question?.id || !question.leetcode) return cards;
+  const index = cards.findIndex((item) => item.id === question.id);
+  if (index < 0) return [...cards, question];
+  if (cards[index] === question) return cards;
+  const next = [...cards];
+  next[index] = question;
+  return next;
+}
+function createLeetcodeCardStack(question) {
+  return question?.id && question.leetcode ? [question] : [];
+}
+
 // src/client/features/leetcode.js
 var DIFFICULTY = Object.freeze({
   easy: { label: "\u7B80\u5355", tone: "easy" },
@@ -514,32 +528,12 @@ function LeetcodeCatalog({ sessionId }) {
     }))
   );
 }
-function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
-  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
-  const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
-  const command = useCommand(sessionId);
-  const [showExplanation, setShowExplanation] = import_react3.default.useState(false);
-  const session = sessionQuery.data?.resource?.data;
-  const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion;
-  const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null;
-  const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null;
-  import_react3.default.useEffect(() => setShowExplanation(false), [current?.id]);
-  if (sessionQuery.loading && !current) return h("div", { className: "di-card" }, h(Loading));
-  if (!problem) return null;
-  const run = async (name2, payload) => {
-    try {
-      await command.run(name2, payload);
-      await Promise.all([sessionQuery.reload(), catalogQuery.reload()]);
-    } catch {
-    }
-  };
-  const explain = () => {
-    if (current.explanation) return setShowExplanation((value) => !value);
-    return run("question.reveal", { questionId: current.id });
-  };
+function LeetcodeQuestionCard({ question, catalog, active, expanded, command, phase, onRun, onExplain }) {
+  const saved = catalogProblem(catalog, question.leetcode.slug);
+  const problem = { ...question.leetcode, completed: saved?.completed === true };
   return h(
     "article",
-    { className: "di-card di-lc-problem-card", "aria-label": "\u5F53\u524D\u529B\u6263\u9898\u76EE" },
+    { className: `di-card di-lc-problem-card${active ? " is-active" : " is-history"}`, "aria-label": active ? "\u5F53\u524D\u529B\u6263\u9898\u76EE" : "\u5386\u53F2\u529B\u6263\u9898\u76EE" },
     h(
       "div",
       { className: "di-lc-problem-main" },
@@ -556,31 +550,85 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
       "div",
       { className: "di-lc-problem-actions" },
       h("a", { className: "di-button is-primary", href: problem.url, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u9898\u76EE \u2197"),
-      h(Button, {
-        busy: command.busy === "leetcode.set-completion",
-        onClick: () => run("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
-      }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
-      h(Button, { busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
-      h(Button, {
-        busy: command.busy === "question.reveal" || session?.phase === "generating_explanation",
-        onClick: explain
-      }, "\u8BB2\u89E3"),
-      h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+      active ? h(
+        import_react3.default.Fragment,
+        null,
+        h(Button, {
+          busy: command.busy === "leetcode.set-completion",
+          onClick: () => onRun("leetcode.set-completion", { slug: problem.slug, completed: !problem.completed })
+        }, problem.completed ? "\u6807\u8BB0\u672A\u5B8C\u6210" : "\u6807\u8BB0\u5B8C\u6210"),
+        h(Button, { busy: command.busy === "question.next", onClick: () => onRun("question.next") }, "\u968F\u673A\u4E0B\u4E00\u9898"),
+        h(Button, {
+          busy: command.busy === "question.reveal" || phase === "generating_explanation",
+          onClick: () => onExplain(question)
+        }, "\u8BB2\u89E3"),
+        h(Button, { busy: command.busy === "session.finish", onClick: () => onRun("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60")
+      ) : null
     ),
-    h(ErrorNotice, null, command.error),
-    showExplanation && current.explanation ? h(
+    active ? h(ErrorNotice, null, command.error) : null,
+    expanded && question.explanation ? h(
       "section",
       { className: "di-section", "aria-label": "\u9898\u76EE\u8BB2\u89E3" },
       h("div", { className: "di-section-label" }, "\u8BB2\u89E3"),
-      h(Markdown, null, current.explanation.detail),
-      current.explanation.memorizationPoints ? h(
+      h(Markdown, null, question.explanation.detail),
+      question.explanation.memorizationPoints ? h(
         "div",
         { className: "di-attempt" },
         h("div", { className: "di-section-label" }, "\u89E3\u9898\u8981\u70B9"),
-        h(Markdown, null, current.explanation.memorizationPoints)
+        h(Markdown, null, question.explanation.memorizationPoints)
       ) : null
     ) : null
   );
+}
+function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
+  const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
+  const command = useCommand(sessionId);
+  const session = sessionQuery.data?.resource?.data;
+  const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null;
+  const sourceQuestion = initialQuestion?.leetcode ? initialQuestion : sessionQuestion;
+  const [cards, setCards] = import_react3.default.useState(() => createLeetcodeCardStack(sourceQuestion));
+  const [expandedQuestionId, setExpandedQuestionId] = import_react3.default.useState("");
+  import_react3.default.useEffect(() => {
+    if (sourceQuestion) setCards((current) => upsertLeetcodeCard(current, sourceQuestion));
+  }, [sourceQuestion]);
+  if (sessionQuery.loading && cards.length === 0) return h("div", { className: "di-card" }, h(Loading));
+  if (cards.length === 0) return null;
+  const run = async (name2, payload) => {
+    try {
+      const result = await command.run(name2, payload);
+      const returnedQuestion = result?.resource?.kind === "question" && result.resource.data?.leetcode ? result.resource.data : null;
+      if (returnedQuestion) setCards((current) => upsertLeetcodeCard(current, returnedQuestion));
+      if (name2 === "question.next") setExpandedQuestionId("");
+      await Promise.all([sessionQuery.reload(), catalogQuery.reload()]);
+      return result;
+    } catch {
+      return null;
+    }
+  };
+  const explain = async (question) => {
+    if (question.explanation) {
+      setExpandedQuestionId((current) => current === question.id ? "" : question.id);
+      return;
+    }
+    const result = await run("question.reveal", { questionId: question.id });
+    if (result) setExpandedQuestionId(question.id);
+  };
+  const catalog = catalogQuery.data?.resource?.data;
+  return h("section", { className: "di-lc-card-stack", "aria-label": "\u529B\u6263\u9898\u76EE\u5361\u7247" }, cards.map((question, index) => {
+    const liveQuestion = sessionQuestion?.id === question.id ? sessionQuestion : question;
+    return h(LeetcodeQuestionCard, {
+      key: question.id,
+      question: liveQuestion,
+      catalog,
+      active: index === cards.length - 1,
+      expanded: expandedQuestionId === question.id,
+      command,
+      phase: session?.phase,
+      onRun: run,
+      onExplain: explain
+    });
+  }));
 }
 
 // src/client/features/live-interview.js
@@ -1490,10 +1538,11 @@ var STYLE_TEXT = `
 .di-state,.di-empty{padding:28px;text-align:center;color:var(--di-muted)}.di-empty{display:grid;gap:6px}.di-spinner{display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid var(--di-line);border-top-color:var(--di-blue);border-radius:50%;animation:di-spin .8s linear infinite}.di-notice{margin:12px 18px;padding:10px 12px;border-radius:7px;background:var(--di-blue-soft);font-size:13px}.di-notice.is-error{background:#fff1f2;color:var(--di-red)}.di-link{color:var(--di-blue);text-decoration:none}
 .di-tool-error{display:flex;align-items:baseline;gap:8px;width:min(1080px,100%);padding:10px 13px;border-left:3px solid var(--di-red);border-radius:0 7px 7px 0;background:#fff1f2;color:var(--di-red);font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}.di-tool-error span{color:var(--di-muted)}
 .di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{margin:0;font-size:18px;font-weight:var(--di-weight-title)}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-textarea{min-height:150px;resize:vertical;line-height:1.6}.di-practice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-field{display:grid;gap:6px;font-size:13px;font-weight:var(--di-weight-text)}.di-field-wide{grid-column:1/-1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:var(--di-weight-text);text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:var(--di-weight-text);line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-heading{display:flex;align-items:baseline;justify-content:space-between;gap:18px}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:var(--di-weight-text);color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
-.di-lc-problem-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:28px;padding:25px 28px;overflow:visible}.di-lc-problem-main{min-width:0}.di-lc-problem-title{display:flex;align-items:baseline;gap:11px;font-size:21px;font-weight:var(--di-weight-title);line-height:1.35}.di-lc-problem-title>span{font-size:13px;font-weight:var(--di-weight-text);color:var(--di-muted)}.di-lc-problem-meta{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--di-muted)}.di-lc-problem-meta .is-complete{color:var(--di-green);font-weight:var(--di-weight-text)}.di-lc-problem-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;max-width:510px}.di-lc-problem-actions>.di-button{text-decoration:none}.di-lc-difficulty{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:var(--di-weight-text)}.di-lc-difficulty.is-easy{color:#087a45;background:#edf9f3}.di-lc-difficulty.is-medium{color:#a86300;background:#fff7e7}.di-lc-difficulty.is-hard{color:#cf3139;background:#fff0f1}
+.di-lc-card-stack{display:grid;gap:12px;width:min(1080px,100%)}.di-lc-card-stack>.di-card{width:100%}.di-lc-problem-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:28px;padding:25px 28px;overflow:visible}.di-lc-problem-card.is-history{box-shadow:none}.di-lc-problem-main{min-width:0}.di-lc-problem-title{display:flex;align-items:baseline;gap:11px;font-size:21px;font-weight:var(--di-weight-title);line-height:1.35}.di-lc-problem-title>span{font-size:13px;font-weight:var(--di-weight-text);color:var(--di-muted)}.di-lc-problem-meta{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--di-muted)}.di-lc-problem-meta .is-complete{color:var(--di-green);font-weight:var(--di-weight-text)}.di-lc-problem-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;max-width:510px}.di-lc-problem-actions>.di-button{text-decoration:none}.di-lc-difficulty{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:var(--di-weight-text)}.di-lc-difficulty.is-easy{color:#087a45;background:#edf9f3}.di-lc-difficulty.is-medium{color:#a86300;background:#fff7e7}.di-lc-difficulty.is-hard{color:#cf3139;background:#fff0f1}
 .di-lc-catalog{width:min(1080px,100%);margin-top:12px;border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-lc-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 28px 18px}.di-lc-title{margin:0;font-size:24px;font-weight:var(--di-weight-title);line-height:1.15}.di-lc-catalog-summary{display:flex;align-items:center;gap:16px}.di-lc-source{color:var(--di-muted);font-size:12px;text-decoration:none}.di-lc-source:hover{color:var(--di-blue)}.di-lc-progress-copy{display:flex;align-items:baseline;gap:5px;color:var(--di-muted)}.di-lc-progress-value{font-size:26px;font-weight:var(--di-weight-text);color:var(--di-green)}.di-lc-progress{height:3px;margin:0 28px 6px;border-radius:99px;background:#edf0f5;overflow:hidden}.di-lc-progress>i{display:block;height:100%;border-radius:inherit;background:var(--di-green);transition:width .2s ease}.di-lc-groups{padding:4px 28px 28px}.di-lc-group{display:grid;grid-template-columns:132px minmax(0,1fr);padding:22px 0;border-top:1px solid var(--di-line)}.di-lc-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-right:24px}.di-lc-group-head h3{margin:0;font-size:14px;font-weight:var(--di-weight-text)}.di-lc-group-head span{color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums}.di-lc-problems{min-width:0}.di-lc-row{display:grid;grid-template-columns:24px minmax(0,1fr) 52px;align-items:center;gap:10px;min-height:38px;padding:3px 4px;border-radius:7px}.di-lc-row:hover{background:var(--di-paper)}.di-lc-row.is-complete .di-lc-problem-link{color:var(--di-muted)}.di-lc-check{appearance:none;width:19px;height:19px;border:1.5px solid #b9c2d2;border-radius:5px;background:var(--di-white);color:#fff;font:var(--di-weight-text) 12px/16px "Segoe UI",sans-serif;cursor:pointer}.di-lc-check:hover{border-color:var(--di-green)}.di-lc-check:focus-visible,.di-lc-problem-link:focus-visible,.di-lc-source:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-lc-check.is-complete{border-color:var(--di-green);background:var(--di-green)}.di-lc-check:disabled{opacity:.55;cursor:wait}.di-lc-problem-link{display:flex;align-items:baseline;gap:9px;min-width:0;color:var(--di-ink);font-size:13px;font-weight:var(--di-weight-text);text-decoration:none}.di-lc-problem-link:hover{color:var(--di-blue)}.di-lc-problem-id{width:30px;flex:0 0 auto;color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums;text-align:right}.di-lc-open{opacity:0;color:var(--di-blue);transition:opacity .15s ease}.di-lc-row:hover .di-lc-open{opacity:1}
 .di-workspace-launcher,.di-workspace-panel,.di-local-toast{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;box-sizing:border-box}.di-workspace-launcher{appearance:none;position:fixed;z-index:55;right:18px;bottom:22px;display:flex;align-items:center;gap:8px;border:1px solid #cfd8eb;border-radius:999px;padding:8px 13px 8px 8px;background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(28,39,67,.12);color:var(--di-ink);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;backdrop-filter:blur(10px)}.di-workspace-launcher:hover,.di-workspace-launcher.is-open{border-color:#aebfff;color:var(--di-blue)}.di-workspace-launcher:focus-visible,.di-workspace-tabs button:focus-visible,.di-workspace-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-workspace-mark{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:50%;background:var(--di-blue);color:#fff;font:var(--di-weight-text) 11px/1 ui-monospace,"Cascadia Mono",monospace}.di-workspace-panel{position:fixed;z-index:54;right:18px;bottom:68px;width:min(1120px,calc(100vw - 36px));height:min(760px,calc(100vh - 92px));border:1px solid var(--di-line);border-radius:15px;background:#fbfcfe;box-shadow:0 24px 70px rgba(18,28,52,.2);overflow:hidden;color:var(--di-ink)}.di-workspace-head{display:flex;align-items:center;justify-content:space-between;height:70px;padding:0 22px 0 25px;border-bottom:1px solid var(--di-line);background:var(--di-white)}.di-workspace-head h2{margin:0;font-size:19px;font-weight:var(--di-weight-title)}.di-workspace-head>button{appearance:none;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--di-muted);font-size:24px;cursor:pointer}.di-workspace-head>button:hover{background:var(--di-paper);color:var(--di-ink)}.di-workspace-layout{display:grid;grid-template-columns:120px minmax(0,1fr);height:calc(100% - 70px)}.di-workspace-tabs{display:flex;flex-direction:column;padding:18px 0;border-right:1px solid var(--di-line);background:#f4f7fb}.di-workspace-tabs button{appearance:none;position:relative;border:0;padding:12px 16px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1.2 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;text-align:left;cursor:pointer}.di-workspace-tabs button::before{content:"";position:absolute;top:8px;bottom:8px;left:0;width:3px;border-radius:0 3px 3px 0;background:transparent}.di-workspace-tabs button:hover{color:var(--di-ink)}.di-workspace-tabs button.is-active{color:var(--di-blue);background:var(--di-white)}.di-workspace-tabs button.is-active::before{background:var(--di-blue)}.di-workspace-content{min-width:0;padding:18px;overflow:auto}.di-workspace-content>.di-card,.di-workspace-content>.di-ledger,.di-workspace-content>.di-lc-catalog{width:100%;margin-top:0;box-shadow:none}.di-local-toast{position:fixed;z-index:70;right:18px;bottom:76px;max-width:min(360px,calc(100vw - 36px));padding:11px 14px;border:1px solid #cfe5d8;border-radius:9px;background:#f3faf6;box-shadow:0 10px 30px rgba(24,65,43,.13);color:#116d40;font-size:13px;font-weight:var(--di-weight-text)}
 .di-timeline{position:fixed;right:18px;top:112px;z-index:40;display:grid;gap:14px;width:56px;max-height:calc(100vh - 144px);padding:4px 0;overflow:visible;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink)}.di-time-item{position:relative;min-height:34px}.di-time-item:not(:last-child)::after{content:"";position:absolute;z-index:-1;top:27px;right:43px;width:1px;height:25px;background:var(--di-line)}.di-time-node{appearance:none;display:flex;align-items:center;gap:7px;width:56px;height:30px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 11px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:color .15s ease,background .15s ease}.di-time-node:hover,.di-time-node:focus-visible,.di-time-item.has-view .di-time-node{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-node:focus-visible,.di-time-tab:focus-visible,.di-time-flyout-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-time-dot{width:7px;height:7px;flex:0 0 auto;border:2px solid #b7c0d0;border-radius:50%;background:var(--di-white)}.di-time-item.is-current .di-time-dot{border-color:var(--di-blue);background:var(--di-blue);box-shadow:0 0 0 4px rgba(36,92,255,.1)}.di-time-flyout{position:fixed;right:82px;top:112px;width:min(390px,calc(100vw - 112px));max-height:calc(100vh - 144px);overflow:hidden;border:1px solid var(--di-line);border-radius:11px;background:var(--di-white);box-shadow:0 16px 42px rgba(23,32,51,.14)}.di-time-flyout-head{display:flex;align-items:stretch;border-bottom:1px solid var(--di-line)}.di-time-tabs{display:flex;align-items:stretch;min-width:0;padding-left:14px}.di-time-tab{appearance:none;position:relative;border:0;padding:13px 2px 11px;margin-right:20px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer}.di-time-tab::after{content:"";position:absolute;right:0;bottom:-1px;left:0;height:2px;border-radius:2px;background:transparent}.di-time-tab:hover{color:var(--di-ink)}.di-time-tab.is-active{color:var(--di-blue)}.di-time-tab.is-active::after{background:var(--di-blue)}.di-time-flyout-head>button{appearance:none;width:42px;border:0;margin-left:auto;background:transparent;color:var(--di-muted);font-size:20px;line-height:1;cursor:pointer}.di-time-flyout-head>button:hover{color:var(--di-ink);background:var(--di-paper)}.di-time-flyout-body{max-height:calc(100vh - 188px);padding:15px 16px;overflow:auto;font-size:13px;line-height:1.7}.di-time-records{display:grid;gap:16px}.di-time-record{padding-bottom:15px;border-bottom:1px solid var(--di-line)}.di-time-record:last-child{padding-bottom:0;border-bottom:0}.di-time-record-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-content-label{margin-bottom:4px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-record-review{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--di-paper)}.di-time-answer>.di-time-memorize{margin-top:14px;padding:12px;border-radius:8px;background:var(--di-green-soft)}.di-time-empty{padding:16px 4px;text-align:center;color:var(--di-muted)}
+.di-lc-problem-card>.di-section,.di-lc-problem-card>.di-notice{grid-column:1/-1}
 @keyframes di-spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.di-detail-heading{align-items:flex-start;flex-direction:column;gap:5px}.di-lc-catalog-summary{gap:10px}}
 @media(max-width:760px){.di-question-card,.di-lc-problem-card{grid-template-columns:1fr;padding:22px}.di-lc-problem-actions{justify-content:flex-start;max-width:none}.di-lc-group{grid-template-columns:1fr;gap:10px}.di-lc-group-head{justify-content:flex-start}.di-answer-button{justify-self:start}.di-history-table th,.di-history-table td{padding-left:16px;padding-right:16px}.di-history-filters{flex-wrap:wrap}.di-input{flex-basis:100%}.di-timeline{display:none}.di-workspace-panel{right:8px;bottom:62px;width:calc(100vw - 16px);height:calc(100vh - 76px)}.di-workspace-layout{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.di-workspace-tabs{flex-direction:row;padding:0;border-right:0;border-bottom:1px solid var(--di-line);overflow-x:auto}.di-workspace-tabs button{white-space:nowrap}.di-workspace-tabs button::before{top:auto;right:12px;bottom:0;left:12px;width:auto;height:2px}.di-workspace-content{padding:10px}.di-workspace-launcher{right:10px;bottom:12px}}

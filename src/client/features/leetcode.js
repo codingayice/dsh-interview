@@ -3,6 +3,7 @@ import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, ErrorNotice, h, Loading, Markdown } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
+import { createLeetcodeCardStack, upsertLeetcodeCard } from './leetcode-card-stack.js'
 
 const DIFFICULTY = Object.freeze({
   easy: { label: '简单', tone: 'easy' },
@@ -82,32 +83,10 @@ export function LeetcodeCatalog({ sessionId }) {
     })))
 }
 
-export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
-  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
-  const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
-  const command = useCommand(sessionId)
-  const [showExplanation, setShowExplanation] = React.useState(false)
-  const session = sessionQuery.data?.resource?.data
-  const current = session?.currentQuestion?.leetcode ? session.currentQuestion : initialQuestion
-  const saved = current?.leetcode ? catalogProblem(catalogQuery.data?.resource?.data, current.leetcode.slug) : null
-  const problem = current?.leetcode ? { ...current.leetcode, completed: saved?.completed === true } : null
-  React.useEffect(() => setShowExplanation(false), [current?.id])
-  if (sessionQuery.loading && !current) return h('div', { className: 'di-card' }, h(Loading))
-  if (!problem) return null
-  const run = async (name, payload) => {
-    try {
-      await command.run(name, payload)
-      await Promise.all([sessionQuery.reload(), catalogQuery.reload()])
-    } catch {
-      // useCommand 已保存可展示错误。
-    }
-  }
-  const explain = () => {
-    if (current.explanation) return setShowExplanation((value) => !value)
-    return run('question.reveal', { questionId: current.id })
-  }
-
-  return h('article', { className: 'di-card di-lc-problem-card', 'aria-label': '当前力扣题目' },
+function LeetcodeQuestionCard({ question, catalog, active, expanded, command, phase, onRun, onExplain }) {
+  const saved = catalogProblem(catalog, question.leetcode.slug)
+  const problem = { ...question.leetcode, completed: saved?.completed === true }
+  return h('article', { className: `di-card di-lc-problem-card${active ? ' is-active' : ' is-history'}`, 'aria-label': active ? '当前力扣题目' : '历史力扣题目' },
       h('div', { className: 'di-lc-problem-main' },
         h('div', { className: 'di-lc-problem-title' }, h('span', null, problem.id), problem.title),
         h('div', { className: 'di-lc-problem-meta' },
@@ -116,25 +95,85 @@ export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
           h('span', { className: problem.completed ? 'is-complete' : '' }, problem.completed ? '已完成' : '未完成'))),
       h('div', { className: 'di-lc-problem-actions' },
         h('a', { className: 'di-button is-primary', href: problem.url, target: '_blank', rel: 'noreferrer' }, '打开题目 ↗'),
-        h(Button, {
-          busy: command.busy === 'leetcode.set-completion',
-          onClick: () => run('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed }),
-        }, problem.completed ? '标记未完成' : '标记完成'),
-        h(Button, { busy: command.busy === 'question.next', onClick: () => run('question.next') }, '随机下一题'),
-        h(Button, {
-          busy: command.busy === 'question.reveal' || session?.phase === 'generating_explanation',
-          onClick: explain,
-        }, '讲解'),
-        h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习')),
-      h(ErrorNotice, null, command.error),
-      showExplanation && current.explanation
+        active ? h(React.Fragment, null,
+          h(Button, {
+            busy: command.busy === 'leetcode.set-completion',
+            onClick: () => onRun('leetcode.set-completion', { slug: problem.slug, completed: !problem.completed }),
+          }, problem.completed ? '标记未完成' : '标记完成'),
+          h(Button, { busy: command.busy === 'question.next', onClick: () => onRun('question.next') }, '随机下一题'),
+          h(Button, {
+            busy: command.busy === 'question.reveal' || phase === 'generating_explanation',
+            onClick: () => onExplain(question),
+          }, '讲解'),
+          h(Button, { busy: command.busy === 'session.finish', onClick: () => onRun('session.finish') }, '结束练习')) : null),
+      active ? h(ErrorNotice, null, command.error) : null,
+      expanded && question.explanation
         ? h('section', { className: 'di-section', 'aria-label': '题目讲解' },
             h('div', { className: 'di-section-label' }, '讲解'),
-            h(Markdown, null, current.explanation.detail),
-            current.explanation.memorizationPoints
+            h(Markdown, null, question.explanation.detail),
+            question.explanation.memorizationPoints
               ? h('div', { className: 'di-attempt' },
                   h('div', { className: 'di-section-label' }, '解题要点'),
-                  h(Markdown, null, current.explanation.memorizationPoints))
+                  h(Markdown, null, question.explanation.memorizationPoints))
               : null)
         : null)
+}
+
+export function LeetcodeProblemCard({ sessionId, initialQuestion = null }) {
+  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
+  const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
+  const command = useCommand(sessionId)
+  const session = sessionQuery.data?.resource?.data
+  const sessionQuestion = session?.currentQuestion?.leetcode ? session.currentQuestion : null
+  const sourceQuestion = initialQuestion?.leetcode ? initialQuestion : sessionQuestion
+  const [cards, setCards] = React.useState(() => createLeetcodeCardStack(sourceQuestion))
+  const [expandedQuestionId, setExpandedQuestionId] = React.useState('')
+
+  React.useEffect(() => {
+    if (sourceQuestion) setCards((current) => upsertLeetcodeCard(current, sourceQuestion))
+  }, [sourceQuestion])
+
+  if (sessionQuery.loading && cards.length === 0) return h('div', { className: 'di-card' }, h(Loading))
+  if (cards.length === 0) return null
+
+  const run = async (name, payload) => {
+    try {
+      const result = await command.run(name, payload)
+      const returnedQuestion = result?.resource?.kind === 'question' && result.resource.data?.leetcode
+        ? result.resource.data
+        : null
+      if (returnedQuestion) setCards((current) => upsertLeetcodeCard(current, returnedQuestion))
+      if (name === 'question.next') setExpandedQuestionId('')
+      await Promise.all([sessionQuery.reload(), catalogQuery.reload()])
+      return result
+    } catch {
+      // useCommand 已保存可展示错误。
+      return null
+    }
+  }
+
+  const explain = async (question) => {
+    if (question.explanation) {
+      setExpandedQuestionId((current) => current === question.id ? '' : question.id)
+      return
+    }
+    const result = await run('question.reveal', { questionId: question.id })
+    if (result) setExpandedQuestionId(question.id)
+  }
+
+  const catalog = catalogQuery.data?.resource?.data
+  return h('section', { className: 'di-lc-card-stack', 'aria-label': '力扣题目卡片' }, cards.map((question, index) => {
+    const liveQuestion = sessionQuestion?.id === question.id ? sessionQuestion : question
+    return h(LeetcodeQuestionCard, {
+      key: question.id,
+      question: liveQuestion,
+      catalog,
+      active: index === cards.length - 1,
+      expanded: expandedQuestionId === question.id,
+      command,
+      phase: session?.phase,
+      onRun: run,
+      onExplain: explain,
+    })
+  }))
 }

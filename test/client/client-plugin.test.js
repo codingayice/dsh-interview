@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { INTERVIEW_TOOL_NAMES } from '../../src/protocol/interview-tool-names.js'
+import { createLeetcodeCardStack, upsertLeetcodeCard } from '../../src/client/features/leetcode-card-stack.js'
 
 function loadPlugin() {
   const source = readFileSync(new URL('../../client/client.js', import.meta.url), 'utf8')
@@ -151,4 +152,23 @@ test('力扣题目卡使用讲解入口且不重复展示题目列表入口', ()
   assert.match(leetcode, /'解题要点'/)
   assert.match(liveInterview, /isLeetcode \? '解题要点' : '直接背'/)
   assert.match(liveInterview, /!isLeetcode \? h\(Button/)
+})
+
+test('切换力扣题目时追加新卡片且保留旧题内容', () => {
+  const first = { id: 'q1', prompt: '两数之和', leetcode: { slug: 'two-sum' } }
+  const second = { id: 'q2', prompt: '三数之和', leetcode: { slug: '3sum' } }
+  const reviewedFirst = { ...first, explanation: { detail: '使用哈希表' } }
+
+  const initial = createLeetcodeCardStack(first)
+  const switched = upsertLeetcodeCard(initial, second)
+  const reviewed = upsertLeetcodeCard(switched, reviewedFirst)
+
+  assert.deepEqual(switched, [first, second])
+  assert.deepEqual(reviewed, [reviewedFirst, second])
+  assert.equal(reviewed.length, 2)
+
+  const source = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  assert.match(source, /className: 'di-lc-card-stack'/)
+  assert.match(source, /result\.resource\.data/)
+  assert.doesNotMatch(source, /session\?\.currentQuestion\?\.leetcode \? session\.currentQuestion : initialQuestion/)
 })
