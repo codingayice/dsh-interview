@@ -92,6 +92,8 @@ export class SqliteInterviewRepository {
     this.database.exec(`
       BEGIN IMMEDIATE;
       DELETE FROM session_cursors
+      WHERE practice_id IN (SELECT id FROM practices WHERE status = 'completed');
+      DELETE FROM session_cursors
       WHERE rowid NOT IN (
         SELECT (
           SELECT winner.rowid

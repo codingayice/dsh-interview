@@ -5,6 +5,7 @@ import { createAgentProtocolError, createInteractionResult } from './interaction
 const AGENT_RECOVERABLE_CODES = new Set([
   'INVALID_WORKFLOW_PHASE',
   'PRACTICE_NOT_FOUND',
+  'PRACTICE_NOT_ACTIVE',
   'QUESTION_NOT_FOUND',
   'INVALID_MODE',
   'INVALID_TOPIC',

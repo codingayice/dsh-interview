@@ -61,6 +61,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
     assert.match(readFileSync(download.filePath, 'utf8'), /互斥重建、逻辑过期、限流降级/)
     assert.equal(events.filter((event) => event.type === 'practice.started').length, 1)
     assert.equal(events.filter((event) => event.type === 'question.next_requested').length, 1)
+    assert.equal(await repository.getCursor('session-e2e'), null)
 
     repository.close()
     const restoredRepository = new SqliteInterviewRepository(databasePath)
@@ -69,6 +70,7 @@ test('真实 SQLite 下完成创建到复盘导出的端到端流程', async () 
       assert.equal(restored.questions[0].attempts[0].evaluation.score, 8.5)
       assert.equal(restored.status, 'completed')
       assert.equal(restored.summary.strengths.length, 1)
+      assert.equal(await restoredRepository.getCursor('session-e2e'), null)
     } finally {
       restoredRepository.close()
     }

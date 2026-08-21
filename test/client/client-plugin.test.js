@@ -57,6 +57,14 @@ test('构建后的 Client 注册全部原子工具视图和时间轴槽位', () 
   assert.deepEqual(dockIds, ['interview-workspace', 'interview-timeline'])
 })
 
+test('Client 只使用 DSH 当前会话身份且不共享练习游标', () => {
+  const source = readFileSync(new URL('../../src/client/index.js', import.meta.url), 'utf8')
+  const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /sessionId\s*\|\|\s*['"]global['"]/)
+  assert.doesNotMatch(leetcode, /sessionId\s*=\s*['"]global['"]/)
+  assert.match(source, /sessionId: props\.sessionId/)
+})
+
 test('工具视图只按结构化 presentation 渲染用户可见卡片', () => {
   const { plugin } = loadPlugin()
   assert.equal(plugin.resolveToolView('interview_start_practice', { argsRaw: '{}' }).kind, 'hidden')

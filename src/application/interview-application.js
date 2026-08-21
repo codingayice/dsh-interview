@@ -28,6 +28,7 @@ import {
   markLeetcodeProblemPresented,
   markQuestionAsked,
   markQuestionRetried,
+  transferCursor,
   WORKFLOW_PHASES,
 } from '../domain/workflow.js'
 import { buildInsights, toPracticeDetailDto, toPracticeSummaryDto, toQuestionDto, toSessionDto } from './dto.js'
@@ -237,10 +238,13 @@ export class InterviewApplication {
   async selectPractice(sessionId, practiceId) {
     const now = this.clock.now()
     const practice = await this.#practice(practiceId)
-    let cursor = createCursor({ sessionId, practiceId: practice.id, now })
+    assertDomain(practice.status === 'active', 'PRACTICE_NOT_ACTIVE', '已结束练习必须先重新打开')
+    const boundCursor = await this.repository.getCursorByPractice(practice.id)
+    let cursor = boundCursor
+      ? transferCursor(boundCursor, sessionId, now)
+      : createCursor({ sessionId, practiceId: practice.id, now })
     const latestQuestion = practice.questions.at(-1) || null
-    if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
-    if (practice.status === 'completed') cursor = { ...cursor, phase: WORKFLOW_PHASES.COMPLETED, revision: cursor.revision + 1 }
+    if (!boundCursor && latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
     const events = [{ type: 'practice.selected', sessionId, practiceId: practice.id, phase: cursor.phase }]
     await this.repository.commit({ cursor })
     await this.#publish(events)
@@ -413,7 +417,7 @@ export class InterviewApplication {
     const completed = completePractice(practice, { ...input, now })
     const nextCursor = markPracticeCompleted(cursor, now)
     const events = [{ type: 'practice.completed', sessionId, practiceId: practice.id }]
-    await this.repository.commit({ practice: completed, cursor: nextCursor })
+    await this.repository.commit({ practice: completed, unbindSessionId: cursor.sessionId })
     await this.#publish(events)
     return this.#result('practice-summary', toPracticeDetailDto(completed), nextCursor, { events })
   }

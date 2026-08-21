@@ -66,6 +66,11 @@ export function createCursor({ sessionId, practiceId, now }) {
   }
 }
 
+export function transferCursor(cursor, sessionId, now) {
+  assertDomain(typeof sessionId === 'string' && sessionId.trim(), 'INVALID_SESSION_ID', 'sessionId 不能为空')
+  return advance(cursor, { sessionId: sessionId.trim() }, now)
+}
+
 export function markQuestionAsked(cursor, questionId, now) {
   requirePhase(cursor, WORKFLOW_PHASES.AWAITING_QUESTION)
   return advance(cursor, {

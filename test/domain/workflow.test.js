@@ -14,6 +14,7 @@ import {
   markLeetcodeProblemPresented,
   markQuestionAsked,
   markQuestionRetried,
+  transferCursor,
   cursorForQuestion,
   WORKFLOW_PHASES,
 } from '../../src/domain/workflow.js'
@@ -32,6 +33,21 @@ test('每个工作流阶段都有唯一的继续动作', () => {
   ]
   for (const [phase, action] of cases) assert.equal(continuationFor({ ...cursor, phase }), action)
   assert.throws(() => continuationFor(cursor), { code: 'INVALID_WORKFLOW_PHASE' })
+})
+
+test('会话转移只更换归属并完整保留练习进度', () => {
+  const cursor = markQuestionAsked(
+    createCursor({ sessionId: 'session-a', practiceId: 'practice-1', now: 1 }),
+    'question-1',
+    2,
+  )
+  const transferred = transferCursor(cursor, 'session-b', 3)
+  assert.deepEqual(transferred, {
+    ...cursor,
+    sessionId: 'session-b',
+    revision: cursor.revision + 1,
+    updatedAt: 3,
+  })
 })
 
 test('刷力扣题目使用独立作答阶段并可按完成状态恢复', () => {

@@ -104,8 +104,8 @@ test('结束、重新打开、洞察和导出通过独立用例完成', async ()
     overall: '基础知识仍需加强。', strengths: ['完成了作答。'], improvements: ['补充知识细节。'],
   })
   const completedSession = await fixture.application.getSession('session-1')
-  assert.equal(completedSession.resource.data.phase, 'completed')
-  assert.equal(completedSession.resource.data.practice.summary.overall, '基础知识仍需加强。')
+  assert.equal(completedSession.resource.data.selected, false)
+  assert.equal((await fixture.application.getPractice(practiceId)).resource.data.summary.overall, '基础知识仍需加强。')
   assert.equal((await fixture.application.getInsights()).resource.data.weakestTopic.topic, '模拟面试')
   assert.equal((await fixture.application.exportPractices({ practiceIds: [practiceId] })).resource.data[0].token, `download-${practiceId}`)
   assert.equal((await fixture.application.reopenPractice('session-1', practiceId)).resource.data.practice.status, 'active')
@@ -143,6 +143,7 @@ test('应用层提供练习与题目 CRUD，切换时返回完整模型上下文
   assert.equal(selected.resource.data.practice.questions[0].attempts[0].answer, '历史回答')
   assert.equal(selected.events[0].type, 'practice.selected')
   assert.equal(selected.events[0].practiceId, practiceId)
+  assert.equal((await fixture.application.getSession('session-1')).resource.data.selected, false)
 
   await fixture.application.deleteQuestion(practiceId, questionId, 'session-2')
   assert.equal((await fixture.application.getPractice(practiceId)).resource.data.questions.length, 0)
@@ -190,8 +191,24 @@ test('继续练习根据权威阶段恢复且不重复创建当前题', async ()
     overall: '练习完成。', strengths: ['理解可见性。'], improvements: ['补充规则细节。'],
   })
   resumed = await fixture.application.continuePractice('session-continue')
-  assert.equal(resumed.resource.data.resumeAction, 'confirm_reopen')
+  assert.equal(resumed.resource.data.resumeAction, 'select_practice')
   assert.equal(resumed.events.length, 0)
+})
+
+test('切换练习会完整转移游标并释放会话原来绑定的练习', async () => {
+  const fixture = applicationFixture()
+  const first = await fixture.application.startPractice('session-a', { mode: 'bagu', config: { topic: 'JMM' } })
+  const firstPracticeId = first.resource.data.practice.id
+  const question = await fixture.application.askQuestion('session-a', { prompt: '什么是 happens-before？' })
+  const second = await fixture.application.startPractice('session-b', { mode: 'scenario', config: { topic: '缓存一致性' } })
+  const secondPracticeId = second.resource.data.practice.id
+
+  const switched = await fixture.application.selectPractice('session-b', firstPracticeId)
+  assert.equal(switched.resource.data.phase, 'awaiting_answer')
+  assert.equal(switched.resource.data.questionId, question.resource.data.id)
+  assert.equal((await fixture.application.getSession('session-a')).resource.data.selected, false)
+  assert.equal((await fixture.application.getSession('session-b')).resource.data.practice.id, firstPracticeId)
+  assert.equal(await fixture.repository.getCursorByPractice(secondPracticeId), null)
 })
 
 test('力扣热题目录按官方题型分组并持久化完成状态', async () => {
