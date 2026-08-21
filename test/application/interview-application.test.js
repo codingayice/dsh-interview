@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { applicationFixture } from '../support/application-fixture.js'
+import { AGENT_TASK_TYPES } from '../../src/application/agent-tasks.js'
 
 async function start(fixture) {
   return fixture.application.startPractice('session-1', {
@@ -15,7 +16,8 @@ test('创建练习会持久化游标并发布出题请求', async () => {
   assert.equal(result.resource.kind, 'practice-started')
   assert.equal(result.resource.data.phase, 'awaiting_question')
   assert.deepEqual(result.resource.data.practice.config, { resume: 'Java 后端简历', interviewerStyle: '循序渐进', coding: true, difficulty: 'intermediate' })
-  assert.equal(fixture.published[0].type, 'question.generation_requested')
+  assert.equal(fixture.published[0].type, 'practice.started')
+  assert.equal(result.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_QUESTION)
   assert.equal((await fixture.repository.listPractices()).length, 1)
 })
 
@@ -155,7 +157,7 @@ test('继续练习根据权威阶段恢复且不重复创建当前题', async ()
   await fixture.application.startPractice('session-continue', { mode: 'bagu', config: { topic: 'JMM' } })
   let resumed = await fixture.application.continuePractice('session-continue')
   assert.equal(resumed.resource.data.resumeAction, 'generate_question')
-  assert.equal(resumed.events[0].type, 'question.generation_requested')
+  assert.equal(resumed.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_QUESTION)
 
   const asked = await fixture.application.askQuestion('session-continue', { prompt: '什么是 happens-before？' })
   resumed = await fixture.application.continuePractice('session-continue')
@@ -167,18 +169,18 @@ test('继续练习根据权威阶段恢复且不重复创建当前题', async ()
   resumed = await fixture.application.continuePractice('session-continue')
   assert.equal(resumed.resource.data.resumeAction, 'evaluate_answer')
   assert.equal(resumed.resource.data.attempt.id, submitted.resource.data.id)
-  assert.equal(resumed.events[0].type, 'answer.evaluation_requested')
+  assert.equal(resumed.agentTasks[0].type, AGENT_TASK_TYPES.EVALUATE_ANSWER)
 
   await fixture.application.evaluateAnswer('session-continue', { score: 8, feedback: '核心方向正确。' })
   resumed = await fixture.application.continuePractice('session-continue')
   assert.equal(resumed.resource.data.resumeAction, 'generate_explanation')
-  assert.equal(resumed.events[0].type, 'review.generation_requested')
+  assert.equal(resumed.agentTasks[0].type, AGENT_TASK_TYPES.GENERATE_REVIEW)
 
   await fixture.application.saveExplanation('session-continue', { detail: 'happens-before 保证前序结果对后序可见。', memorizationPoints: '规则先行，结果可见。' })
   resumed = await fixture.application.continuePractice('session-continue')
   assert.equal(resumed.resource.data.resumeAction, 'generate_question')
   assert.equal(resumed.resource.data.phase, 'awaiting_question')
-  assert.equal(resumed.events[0].reason, 'practice_continued')
+  assert.equal(resumed.agentTasks[0].reason, 'practice_continued')
 
   await fixture.application.requestPracticeSummary('session-continue')
   resumed = await fixture.application.continuePractice('session-continue')

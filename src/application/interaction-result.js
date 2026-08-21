@@ -236,6 +236,7 @@ export function createInteractionResult(action, result) {
     ...descriptor(action, result),
     resource: result.resource,
     events: result.events || [],
+    agentTasks: result.agentTasks || [],
   }
 }
 

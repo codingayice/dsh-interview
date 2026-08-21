@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { InterviewCoordinator } from '../../src/application/interview-coordinator.js'
 import { createToolDefinitions, INTERVIEW_TOOL_NAMES, modelText, sessionIdOf } from '../../src/adapters/dsh/tool-definitions.js'
 import { instructionFor } from '../../src/adapters/dsh/agent-event-bridge.js'
+import { AGENT_TASK_TYPES } from '../../src/application/agent-tasks.js'
 import { dispatchCommand } from '../../src/adapters/http/command-dispatcher.js'
 import { errorResponse } from '../../src/adapters/http/api-routes.js'
 import { DomainError } from '../../src/domain/errors.js'
@@ -180,35 +181,31 @@ test('UI 命令分发与 Agent 工具复用同一个协调器', async () => {
   const question = await fixture.application.askQuestion('session-1', { prompt: '类加载过程？' })
   const result = await dispatchCommand(fixture.coordinator, 'session-1', 'question.open', { questionId: question.resource.data.id })
   assert.equal(result.presentation.kind, 'question')
-  assert.equal(fixture.dispatched[0].type, 'question.generation_requested')
+  assert.equal(fixture.dispatched[0].type, AGENT_TASK_TYPES.GENERATE_QUESTION)
 })
 
 test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
-  const question = instructionFor({ type: 'question.generation_requested', practiceId: 'p1', reason: 'next_requested' })
+  const question = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_QUESTION, practiceId: 'p1', reason: 'next_requested' })
   assert.match(question, /interview_present_question/)
   assert.match(question, /非空题目作为 prompt/)
   assert.match(question, /每轮只生成一道题/)
   assert.match(question, /禁止把多个子问题/)
   assert.match(question, /必须调用 interview_read_practice_context/)
   assert.match(question, /练习开始后禁止重新询问或自行修改配置/)
-  const leetcode = instructionFor({ type: 'leetcode.problem_drawn', practiceId: 'p1', questionId: 'q100' })
-  assert.match(leetcode, /interview_open_question/)
-  assert.match(leetcode, /禁止自行生成、改写或替换题目/)
-  const reveal = instructionFor({ type: 'answer.reveal_requested', practiceId: 'p1', questionId: 'q1' })
+  const reveal = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_REVIEW, practiceId: 'p1', questionId: 'q1', reason: 'answer_revealed' })
   assert.match(reveal, /禁止创建用户作答、评分或评价/)
   assert.match(reveal, /interview_complete_review/)
-  const summary = instructionFor({ type: 'practice.summary_requested', practiceId: 'p1' })
+  const summary = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_SUMMARY, practiceId: 'p1' })
   assert.match(summary, /全部历次作答、评价和讲解/)
   assert.match(summary, /interview_complete_summary/)
-  const evaluation = instructionFor({ type: 'answer.evaluation_requested', practiceId: 'p1', questionId: 'q1', attemptId: 'a1' })
+  const evaluation = instructionFor({ type: AGENT_TASK_TYPES.EVALUATE_ANSWER, practiceId: 'p1', questionId: 'q1', attemptId: 'a1' })
   assert.match(evaluation, /interview_save_evaluation/)
   assert.match(evaluation, /不得创建新作答或新题/)
-  const review = instructionFor({ type: 'review.generation_requested', practiceId: 'p1', questionId: 'q1' })
+  const review = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_REVIEW, practiceId: 'p1', questionId: 'q1' })
   assert.match(review, /interview_complete_review/)
   assert.match(review, /不得重复评价/)
-  const selected = instructionFor({ type: 'practice.selected', practiceId: 'p1', phase: 'awaiting_answer' })
-  assert.match(selected, /interview_select_practice/)
-  assert.match(selected, /完成确认后停止/)
+  assert.equal(instructionFor({ type: 'practice.selected', practiceId: 'p1' }), null)
+  assert.equal(instructionFor({ type: 'leetcode.problem_drawn', practiceId: 'p1' }), null)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
 })
 

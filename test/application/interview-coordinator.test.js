@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { INTERVIEW_ACTIONS } from '../../src/application/interview-actions.js'
 import { InterviewCoordinator } from '../../src/application/interview-coordinator.js'
 import { applicationFixture } from '../support/application-fixture.js'
+import { AGENT_TASK_TYPES } from '../../src/application/agent-tasks.js'
 
 test('协调器把应用结果转换为状态驱动的结构化交互', async () => {
   const fixture = applicationFixture()
@@ -55,12 +56,12 @@ test('UI 入口由协调器统一派发后续生成事件', async () => {
     payload: { mode: 'mock', config: { resume: 'Java 简历', interviewerStyle: '深挖项目', coding: true, difficulty: 'intermediate' } },
     source: 'ui',
   })
-  assert.equal(dispatched[0].type, 'question.generation_requested')
+  assert.equal(dispatched[0].type, AGENT_TASK_TYPES.GENERATE_QUESTION)
   await coordinator.execute({
     sessionId: 'session-ui', action: INTERVIEW_ACTIONS.SELECT_PRACTICE,
     payload: { practiceId: started.resource.data.practice.id }, source: 'ui',
   })
-  assert.equal(dispatched.at(-1).type, 'practice.selected')
+  assert.equal(dispatched.length, 1, '切换练习只更新本地会话，不派发 Agent 任务')
 })
 
 test('UI 继续命令按当前阶段派发对应恢复事件', async () => {
@@ -78,7 +79,7 @@ test('UI 继续命令按当前阶段派发对应恢复事件', async () => {
     sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE, source: 'ui',
   })
   assert.equal(questionResume.nextAction, 'generate_question')
-  assert.equal(dispatched.at(-1).type, 'question.generation_requested')
+  assert.equal(dispatched.at(-1).type, AGENT_TASK_TYPES.GENERATE_QUESTION)
 
   await coordinator.execute({
     sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.PRESENT_QUESTION,
@@ -92,7 +93,7 @@ test('UI 继续命令按当前阶段派发对应恢复事件', async () => {
     sessionId: 'session-ui-continue', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE, source: 'ui',
   })
   assert.equal(evaluationResume.nextAction, 'evaluate_answer')
-  assert.equal(dispatched.at(-1).type, 'answer.evaluation_requested')
+  assert.equal(dispatched.at(-1).type, AGENT_TASK_TYPES.EVALUATE_ANSWER)
 })
 
 test('选择练习向模型提供完整上下文并只返回切换确认', async () => {

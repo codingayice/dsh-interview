@@ -92,7 +92,7 @@ export class InterviewCoordinator {
   async execute({ sessionId, action, payload = {}, source = 'agent' }) {
     try {
       const result = await executeApplicationAction(this.application, sessionId, action, payload)
-      if (source === 'ui') this.eventBridge?.dispatch(result.events)
+      if (source === 'ui') this.eventBridge?.dispatch(result.agentTasks)
       return createInteractionResult(action, result)
     } catch (error) {
       if (source === 'agent' && error instanceof DomainError && AGENT_RECOVERABLE_CODES.has(error.code)) {

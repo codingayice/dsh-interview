@@ -31,6 +31,7 @@ import {
   WORKFLOW_PHASES,
 } from '../domain/workflow.js'
 import { buildInsights, toPracticeDetailDto, toPracticeSummaryDto, toQuestionDto, toSessionDto } from './dto.js'
+import { AGENT_TASK_TYPES, agentTask } from './agent-tasks.js'
 import { validateApplicationPorts } from './ports.js'
 
 function requiredId(value, name) {
@@ -103,14 +104,14 @@ export class InterviewApplication {
     return { ...added, cursor: nextCursor }
   }
 
-  #result(kind, data, cursor, events = [], explicitReferences = {}) {
+  #result(kind, data, cursor, { events = [], agentTasks = [], references: explicitReferences = {} } = {}) {
     const references = {
       ...(cursor?.practiceId ? { practiceId: cursor.practiceId } : {}),
       ...(cursor?.questionId ? { questionId: cursor.questionId } : {}),
       ...(cursor?.attemptId ? { attemptId: cursor.attemptId } : {}),
       ...explicitReferences,
     }
-    return { resource: { kind, data }, references, events, revision: cursor?.revision ?? 0 }
+    return { resource: { kind, data }, references, events, agentTasks, revision: cursor?.revision ?? 0 }
   }
 
   async startPractice(sessionId, input) {
@@ -121,20 +122,21 @@ export class InterviewApplication {
       const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
       practice = drawn.practice
       cursor = drawn.cursor
-      const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
+      const events = [
+        { type: 'practice.started', sessionId, practiceId: practice.id, mode: practice.mode },
+        { type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id },
+      ]
       await this.repository.commit({ practice, cursor })
       await this.#publish(events)
-      return this.#result('question', toQuestionDto(drawn.question), cursor, events)
+      return this.#result('question', toQuestionDto(drawn.question), cursor, { events })
     }
-    const events = [{
-      type: 'question.generation_requested',
-      sessionId,
-      practiceId: practice.id,
-      reason: 'practice_started',
-    }]
+    const events = [{ type: 'practice.started', sessionId, practiceId: practice.id, mode: practice.mode }]
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
+      sessionId, practiceId: practice.id, reason: 'practice_started',
+    })]
     await this.repository.commit({ practice, cursor })
     await this.#publish(events)
-    return this.#result('practice-started', toSessionDto(cursor, practice), cursor, events)
+    return this.#result('practice-started', toSessionDto(cursor, practice), cursor, { events, agentTasks })
   }
 
   async updatePractice(practiceId, input) {
@@ -142,7 +144,7 @@ export class InterviewApplication {
     const current = await this.#practice(practiceId)
     const practice = revisePractice(current, { ...input, now })
     await this.repository.commit({ practice })
-    return this.#result('practice-detail', toPracticeDetailDto(practice), null, [], { practiceId: practice.id })
+    return this.#result('practice-detail', toPracticeDetailDto(practice), null, { references: { practiceId: practice.id } })
   }
 
   async getSession(sessionId) {
@@ -164,7 +166,7 @@ export class InterviewApplication {
     const practice = await this.#practice(selected.practiceId)
     let cursor = selected
     let resumeAction = continuationFor(cursor)
-    let events = []
+    let agentTasks = []
     let question = null
     let attempt = null
 
@@ -181,7 +183,7 @@ export class InterviewApplication {
         practiceId: practice.id,
         questionId: drawn.question.id,
         question: toQuestionDto(drawn.question),
-      }, drawn.cursor, drawnEvents)
+      }, drawn.cursor, { events: drawnEvents })
     }
 
     if (resumeAction === CONTINUATION_ACTIONS.REQUEST_NEXT) {
@@ -202,39 +204,24 @@ export class InterviewApplication {
     }
 
     if (resumeAction === CONTINUATION_ACTIONS.GENERATE_QUESTION) {
-      events = [{
-        type: 'question.generation_requested',
-        sessionId,
-        practiceId: practice.id,
-        reason: 'practice_continued',
-      }]
+      agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
+        sessionId, practiceId: practice.id, reason: 'practice_continued',
+      })]
     } else if (resumeAction === CONTINUATION_ACTIONS.EVALUATE_ANSWER) {
-      events = [{
-        type: 'answer.evaluation_requested',
-        sessionId,
-        practiceId: practice.id,
-        questionId: question.id,
-        attemptId: attempt.id,
-      }]
+      agentTasks = [agentTask(AGENT_TASK_TYPES.EVALUATE_ANSWER, {
+        sessionId, practiceId: practice.id, questionId: question.id, attemptId: attempt.id,
+      })]
     } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION) {
-      events = [{
-        type: 'review.generation_requested',
-        sessionId,
-        practiceId: practice.id,
-        questionId: question.id,
-        attemptId: cursor.attemptId,
-      }]
+      agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_REVIEW, {
+        sessionId, practiceId: practice.id, questionId: question.id, attemptId: cursor.attemptId,
+      })]
     } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_SUMMARY) {
-      events = [{
-        type: 'practice.summary_requested',
-        sessionId,
-        practiceId: practice.id,
-        reason: 'practice_continued',
-      }]
+      agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_SUMMARY, {
+        sessionId, practiceId: practice.id, reason: 'practice_continued',
+      })]
     }
 
     if (cursor !== selected) await this.repository.commit({ cursor })
-    await this.#publish(events)
     return this.#result('continuation', {
       selected: true,
       phase: cursor.phase,
@@ -244,7 +231,7 @@ export class InterviewApplication {
       attemptId: cursor.attemptId,
       ...(question ? { question: toQuestionDto(question) } : {}),
       ...(attempt ? { attempt: { id: attempt.id, sequence: attempt.sequence, answer: attempt.answer } } : {}),
-    }, cursor, events)
+    }, cursor, { agentTasks })
   }
 
   async selectPractice(sessionId, practiceId) {
@@ -257,7 +244,7 @@ export class InterviewApplication {
     const events = [{ type: 'practice.selected', sessionId, practiceId: practice.id, phase: cursor.phase }]
     await this.repository.commit({ cursor })
     await this.#publish(events)
-    return this.#result('session', toSessionDto(cursor, practice), cursor, events)
+    return this.#result('session', toSessionDto(cursor, practice), cursor, { events })
   }
 
   async askQuestion(sessionId, input) {
@@ -268,7 +255,7 @@ export class InterviewApplication {
     const events = [{ type: 'question.asked', sessionId, practiceId: practice.id, questionId: added.question.id }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('question', toQuestionDto(added.question), nextCursor, events)
+    return this.#result('question', toQuestionDto(added.question), nextCursor, { events })
   }
 
   async openQuestion(sessionId, questionId) {
@@ -285,7 +272,7 @@ export class InterviewApplication {
   async getQuestion(practiceId, questionId) {
     const practice = await this.#practice(practiceId)
     const question = findQuestion(practice, questionId)
-    return this.#result('question-detail', toQuestionDto(question), null, [], { practiceId: practice.id, questionId: question.id })
+    return this.#result('question-detail', toQuestionDto(question), null, { references: { practiceId: practice.id, questionId: question.id } })
   }
 
   async updateQuestion(practiceId, questionId, input) {
@@ -293,7 +280,7 @@ export class InterviewApplication {
     const current = await this.#practice(practiceId)
     const updated = reviseQuestion(current, { questionId, prompt: input.prompt, now })
     await this.repository.commit({ practice: updated.practice })
-    return this.#result('question-detail', toQuestionDto(updated.question), null, [], { practiceId: current.id, questionId: updated.question.id })
+    return this.#result('question-detail', toQuestionDto(updated.question), null, { references: { practiceId: current.id, questionId: updated.question.id } })
   }
 
   async deleteQuestion(practiceId, questionId, sessionId = null) {
@@ -311,7 +298,7 @@ export class InterviewApplication {
       }
     }
     await this.repository.commit({ practice: removed.practice, cursor })
-    return this.#result('question-deleted', { practiceId: current.id, questionId }, cursor, [], { practiceId: current.id, questionId })
+    return this.#result('question-deleted', { practiceId: current.id, questionId }, cursor, { references: { practiceId: current.id, questionId } })
   }
 
   async submitAnswer(sessionId, input) {
@@ -329,7 +316,7 @@ export class InterviewApplication {
     const events = [{ type: 'answer.submitted', sessionId, practiceId: practice.id, questionId, attemptId: added.attempt.id }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('attempt', { questionId, ...added.attempt }, nextCursor, events)
+    return this.#result('attempt', { questionId, ...added.attempt }, nextCursor, { events })
   }
 
   async revealAnswer(sessionId, input = {}) {
@@ -340,12 +327,13 @@ export class InterviewApplication {
     const question = findQuestion(practice, questionId)
     const reviewReady = Boolean(question.explanation)
     const nextCursor = markAnswerRevealed(cursor, now, { reviewReady })
-    const events = reviewReady ? [] : [{
-      type: 'answer.reveal_requested', sessionId, practiceId: practice.id, questionId,
-    }]
+    const events = [{ type: 'answer.revealed', sessionId, practiceId: practice.id, questionId, reviewReady }]
+    const agentTasks = reviewReady ? [] : [agentTask(AGENT_TASK_TYPES.GENERATE_REVIEW, {
+      sessionId, practiceId: practice.id, questionId, reason: 'answer_revealed',
+    })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('answer-revealed', { questionId, reviewReady }, nextCursor, events)
+    return this.#result('answer-revealed', { questionId, reviewReady }, nextCursor, { events, agentTasks })
   }
 
   async evaluateAnswer(sessionId, input) {
@@ -360,7 +348,7 @@ export class InterviewApplication {
     const events = [{ type: 'answer.evaluated', sessionId, practiceId: practice.id, questionId, attemptId }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('evaluation', { questionId, attemptId, reviewReady, ...added.evaluation }, nextCursor, events)
+    return this.#result('evaluation', { questionId, attemptId, reviewReady, ...added.evaluation }, nextCursor, { events })
   }
 
   async saveExplanation(sessionId, input) {
@@ -373,7 +361,7 @@ export class InterviewApplication {
     const events = [{ type: 'review.completed', sessionId, practiceId: practice.id, questionId, attemptId: cursor.attemptId }]
     await this.repository.commit({ practice: added.practice, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('explanation', { questionId, ...added.explanation }, nextCursor, events)
+    return this.#result('explanation', { questionId, ...added.explanation }, nextCursor, { events })
   }
 
   async requestNextQuestion(sessionId) {
@@ -384,13 +372,16 @@ export class InterviewApplication {
       const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
       await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
       await this.#publish(events)
-      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, events)
+      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, { events })
     }
     const nextCursor = markNextRequested(cursor, now)
-    const events = [{ type: 'question.generation_requested', sessionId, practiceId: practice.id, reason: 'next_requested' }]
+    const events = [{ type: 'question.next_requested', sessionId, practiceId: practice.id }]
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
+      sessionId, practiceId: practice.id, reason: 'next_requested',
+    })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('question-requested', toSessionDto(nextCursor, practice), nextCursor, events)
+    return this.#result('question-requested', toSessionDto(nextCursor, practice), nextCursor, { events, agentTasks })
   }
 
   async retryQuestion(sessionId, questionId) {
@@ -402,17 +393,18 @@ export class InterviewApplication {
     const events = [{ type: 'question.retry_requested', sessionId, practiceId: practice.id, questionId }]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('question-retried', toSessionDto(nextCursor, practice), nextCursor, events)
+    return this.#result('question-retried', toSessionDto(nextCursor, practice), nextCursor, { events })
   }
 
   async requestPracticeSummary(sessionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
     const nextCursor = markPracticeFinishRequested(cursor, now)
-    const events = [{ type: 'practice.summary_requested', sessionId, practiceId: practice.id }]
+    const events = [{ type: 'practice.finish_requested', sessionId, practiceId: practice.id }]
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_SUMMARY, { sessionId, practiceId: practice.id })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('summary-requested', toPracticeDetailDto(practice), nextCursor, events)
+    return this.#result('summary-requested', toPracticeDetailDto(practice), nextCursor, { events, agentTasks })
   }
 
   async completePractice(sessionId, input) {
@@ -423,7 +415,7 @@ export class InterviewApplication {
     const events = [{ type: 'practice.completed', sessionId, practiceId: practice.id }]
     await this.repository.commit({ practice: completed, cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('practice-summary', toPracticeDetailDto(completed), nextCursor, events)
+    return this.#result('practice-summary', toPracticeDetailDto(completed), nextCursor, { events })
   }
 
   async reopenPractice(sessionId, practiceId) {
@@ -432,10 +424,13 @@ export class InterviewApplication {
     let cursor = createCursor({ sessionId, practiceId: practice.id, now })
     const latestQuestion = practice.questions.at(-1) || null
     if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
-    const events = latestQuestion ? [] : [{ type: 'question.generation_requested', sessionId, practiceId: practice.id, reason: 'practice_reopened' }]
+    const events = [{ type: 'practice.reopened', sessionId, practiceId: practice.id }]
+    const agentTasks = latestQuestion ? [] : [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
+      sessionId, practiceId: practice.id, reason: 'practice_reopened',
+    })]
     await this.repository.commit({ practice, cursor })
     await this.#publish(events)
-    return this.#result('practice-reopened', toSessionDto(cursor, practice), cursor, events)
+    return this.#result('practice-reopened', toSessionDto(cursor, practice), cursor, { events, agentTasks })
   }
 
   async listPractices(filters = {}) {
@@ -445,7 +440,7 @@ export class InterviewApplication {
 
   async getPractice(practiceId) {
     const practice = await this.#practice(practiceId)
-    return this.#result('practice-detail', toPracticeDetailDto(practice), null, [], { practiceId: practice.id })
+    return this.#result('practice-detail', toPracticeDetailDto(practice), null, { references: { practiceId: practice.id } })
   }
 
   async getInsights() {
@@ -490,7 +485,7 @@ export class InterviewApplication {
         await this.repository.commit({ cursor })
       }
     }
-    return this.#result('leetcode-progress', { ...problem, ...progress }, cursor, [], { problemSlug: problem.slug })
+    return this.#result('leetcode-progress', { ...problem, ...progress }, cursor, { references: { problemSlug: problem.slug } })
   }
 
   async deletePractice(practiceId, sessionId = null) {
@@ -500,7 +495,7 @@ export class InterviewApplication {
       const cursor = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
       if (cursor?.practiceId === practice.id) await this.repository.clearCursor(sessionId)
     }
-    return this.#result('practice-deleted', { practiceId: practice.id }, null, [], { practiceId: practice.id })
+    return this.#result('practice-deleted', { practiceId: practice.id }, null, { references: { practiceId: practice.id } })
   }
 
   async exportPractices(input = {}) {
