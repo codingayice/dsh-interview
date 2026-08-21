@@ -62,27 +62,17 @@ test('SQLite 在绑定练习时原子转移会话并释放原绑定', async () =
   }
 })
 
-test('SQLite 迁移时只保留同一练习最近更新的会话绑定', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'dsh-interview-sqlite-migration-'))
-  const filePath = join(directory, 'interview.sqlite')
-  let repository = new SqliteInterviewRepository(filePath)
+test('SQLite 表结构直接约束一个练习只能绑定一个会话', async () => {
+  const context = fixture()
   try {
     const { practice, cursor } = aggregate()
-    await repository.commit({ practice, cursor })
-    repository.database.exec('DROP INDEX ux_session_cursors_practice')
-    repository.database.prepare(`
+    await context.repository.commit({ practice, cursor })
+    assert.throws(() => context.repository.database.prepare(`
       INSERT INTO session_cursors (session_id, practice_id, question_id, attempt_id, phase, revision, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('session-new', practice.id, cursor.questionId, cursor.attemptId, cursor.phase, cursor.revision + 1, cursor.updatedAt + 1)
-    repository.close()
-    repository = null
-
-    repository = new SqliteInterviewRepository(filePath)
-    assert.equal(await repository.getCursor('session-1'), null)
-    assert.equal((await repository.getCursorByPractice(practice.id)).sessionId, 'session-new')
+    `).run('session-duplicate', practice.id, cursor.questionId, cursor.attemptId, cursor.phase, cursor.revision, cursor.updatedAt))
   } finally {
-    repository?.close()
-    rmSync(directory, { recursive: true, force: true })
+    context.cleanup()
   }
 })
 

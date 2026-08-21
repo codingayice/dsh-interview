@@ -14,10 +14,10 @@ export class SqliteInterviewRepository {
     if (filePath !== ':memory:') mkdirSync(dirname(filePath), { recursive: true })
     this.database = new DatabaseSync(filePath)
     this.database.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;')
-    this.#migrate()
+    this.#initializeSchema()
   }
 
-  #migrate() {
+  #initializeSchema() {
     this.database.exec(`
       CREATE TABLE IF NOT EXISTS practices (
         id TEXT PRIMARY KEY,
@@ -61,7 +61,7 @@ export class SqliteInterviewRepository {
 
       CREATE TABLE IF NOT EXISTS session_cursors (
         session_id TEXT PRIMARY KEY,
-        practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+        practice_id TEXT NOT NULL UNIQUE REFERENCES practices(id) ON DELETE CASCADE,
         question_id TEXT,
         attempt_id TEXT,
         phase TEXT NOT NULL,
@@ -80,34 +80,6 @@ export class SqliteInterviewRepository {
       CREATE INDEX IF NOT EXISTS idx_practices_mode_status ON practices(mode, status);
       CREATE INDEX IF NOT EXISTS idx_questions_practice ON questions(practice_id, sequence);
       CREATE INDEX IF NOT EXISTS idx_attempts_question ON attempts(question_id, sequence);
-    `)
-    const practiceColumns = this.database.prepare('PRAGMA table_info(practices)').all()
-    if (!practiceColumns.some((column) => column.name === 'summary_json')) {
-      this.database.exec('ALTER TABLE practices ADD COLUMN summary_json TEXT')
-    }
-    const questionColumns = this.database.prepare('PRAGMA table_info(questions)').all()
-    if (!questionColumns.some((column) => column.name === 'leetcode_json')) {
-      this.database.exec('ALTER TABLE questions ADD COLUMN leetcode_json TEXT')
-    }
-    this.database.exec(`
-      BEGIN IMMEDIATE;
-      DELETE FROM session_cursors
-      WHERE practice_id IN (SELECT id FROM practices WHERE status = 'completed');
-      DELETE FROM session_cursors
-      WHERE rowid NOT IN (
-        SELECT (
-          SELECT winner.rowid
-          FROM session_cursors AS winner
-          WHERE winner.practice_id = grouped.practice_id
-          ORDER BY winner.updated_at DESC, winner.revision DESC, winner.session_id DESC
-          LIMIT 1
-        )
-        FROM session_cursors AS grouped
-        GROUP BY grouped.practice_id
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_session_cursors_practice
-        ON session_cursors(practice_id);
-      COMMIT;
     `)
   }
 
