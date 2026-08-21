@@ -98,10 +98,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
   if (!question || !question.explanation || (attempt && !attempt.evaluation)) return null
   const command = useCommand(sessionId)
   const run = (name, payload) => command.run(name, payload).catch(() => {})
-  const retry = async () => {
-    const result = await command.run('question.retry', { questionId: question.id }).catch(() => null)
-    if (result) interviewApi.navigateWorkspace('active')
-  }
+  const retry = () => run('question.retry', { questionId: question.id })
   const evaluation = attempt?.evaluation || null
   const explanation = question.explanation
   const isLeetcode = Boolean(question.leetcode)

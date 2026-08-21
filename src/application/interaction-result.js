@@ -34,7 +34,6 @@ function descriptor(action, result) {
     case INTERVIEW_ACTIONS.UPDATE_PRACTICE:
       return { state: 'complete', nextAction: 'wait_for_user', presentation: { kind: 'library', ...referencesOf(result, 'practiceId') }, assistantResponse: exact('练习配置已更新。'), context: data }
     case INTERVIEW_ACTIONS.GET_STATUS: {
-      const generating = ['awaiting_question', 'generating_explanation', 'generating_summary'].includes(data.phase)
       return {
         state: data.phase,
         nextAction: data.phase === 'awaiting_question'
@@ -44,8 +43,8 @@ function descriptor(action, result) {
             : data.phase === 'generating_summary'
               ? 'generate_summary'
               : 'wait_for_user',
-        presentation: generating ? null : { kind: 'live-session' },
-        assistantResponse: generating ? continueSilently() : exact('当前练习状态已更新，请查看卡片。'),
+        presentation: null,
+        assistantResponse: continueSilently(),
         context: data,
       }
     }

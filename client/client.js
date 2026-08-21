@@ -748,10 +748,7 @@ function ReviewResultCard({ sessionId, question, attempt }) {
   const command = useCommand(sessionId);
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
   });
-  const retry = async () => {
-    const result = await command.run("question.retry", { questionId: question.id }).catch(() => null);
-    if (result) interviewApi.navigateWorkspace("active");
-  };
+  const retry = () => run("question.retry", { questionId: question.id });
   const evaluation = attempt?.evaluation || null;
   const explanation = question.explanation;
   const isLeetcode = Boolean(question.leetcode);
@@ -1036,8 +1033,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const retry = async (questionId) => {
     if (practice.status !== "active") return;
     await run("session.select", { practiceId: practice.id });
-    const result = await run("question.retry", { questionId });
-    if (result) interviewApi.navigateWorkspace("active");
+    await run("question.retry", { questionId });
   };
   return h(
     "section",

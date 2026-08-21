@@ -191,3 +191,11 @@ test('会话中的下一题不会改变先前力扣消息卡片', () => {
   assert.match(leetcode, /const active = live[\s\S]*:\s*true/)
   assert.match(liveInterview, /LeetcodeProblemCard, \{ sessionId, initialQuestion: question, language: practice\.config\?\.language \}/)
 })
+
+test('重新作答只切换题目状态且不主动打开练习工作台', () => {
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(liveInterview, /navigateWorkspace\('active'\)/)
+  assert.doesNotMatch(library, /question\.retry[\s\S]{0,160}navigateWorkspace/)
+})

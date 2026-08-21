@@ -29,6 +29,11 @@ test('协调器把应用结果转换为状态驱动的结构化交互', async ()
   const detail = await fixture.application.getPractice(asked.presentation.practiceId)
   assert.equal(detail.resource.data.questions[0].id, asked.presentation.questionId)
   assert.equal(asked.assistantResponse.text, '已出题，请开始作答。')
+
+  const status = await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.GET_STATUS })
+  assert.equal(status.presentation, null)
+  assert.equal(status.assistantResponse.mode, 'continue')
+  assert.equal(status.context.currentQuestion.id, asked.resource.data.id)
 })
 
 test('协调器把 Agent 协议错误标记为可恢复且不交给 UI', async () => {

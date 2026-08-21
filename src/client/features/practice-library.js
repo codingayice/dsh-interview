@@ -90,8 +90,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
   const retry = async (questionId) => {
     if (practice.status !== 'active') return
     await run('session.select', { practiceId: practice.id })
-    const result = await run('question.retry', { questionId })
-    if (result) interviewApi.navigateWorkspace('active')
+    await run('question.retry', { questionId })
   }
   return h('section', { className: 'di-detail' },
     h('div', { className: 'di-detail-heading' },
