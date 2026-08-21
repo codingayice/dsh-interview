@@ -4,7 +4,6 @@ import { PracticeLibrary } from './practice-library.js'
 import { LeetcodeCatalog } from './leetcode.js'
 import { interviewApi } from '../shared/api.js'
 import { h } from '../shared/ui.js'
-import { LOCAL_COMMAND_EXAMPLE, parseLocalCommand } from '../shared/local-command.js'
 
 const WORKSPACE_TABS = Object.freeze([
   { id: 'current', label: '当前练习' },
@@ -22,9 +21,6 @@ export function WorkspaceDock({ sessionId }) {
   const [open, setOpen] = React.useState(false)
   const [tab, setTab] = React.useState('current')
   const [notice, setNotice] = React.useState('')
-  const [commandText, setCommandText] = React.useState('')
-  const [commandError, setCommandError] = React.useState('')
-  const [commandBusy, setCommandBusy] = React.useState(false)
 
   React.useEffect(() => {
     let timer = null
@@ -44,32 +40,6 @@ export function WorkspaceDock({ sessionId }) {
     setOpen(true)
   }), [])
 
-  const runLocalCommand = async () => {
-    setCommandError('')
-    let parsed
-    try {
-      parsed = parseLocalCommand(commandText)
-    } catch (error) {
-      setCommandError(error.message)
-      return
-    }
-    if (parsed.type === 'navigate') {
-      setTab(parsed.tab)
-      setCommandText('')
-      return
-    }
-    setCommandBusy(true)
-    try {
-      await interviewApi.command(sessionId, parsed.command, parsed.payload)
-      if (parsed.tab) setTab(parsed.tab)
-      setCommandText('')
-    } catch (error) {
-      setCommandError(error.message || '本地命令执行失败')
-    } finally {
-      setCommandBusy(false)
-    }
-  }
-
   return h(React.Fragment, null,
     h('button', {
       type: 'button',
@@ -88,19 +58,6 @@ export function WorkspaceDock({ sessionId }) {
         h('div', { className: 'di-eyebrow' }, 'LOCAL INTERVIEW WORKSPACE'),
         h('h2', null, '练习工作台')),
       h('button', { type: 'button', onClick: () => setOpen(false), 'aria-label': '关闭练习工作台' }, '×')),
-    h('form', {
-      className: 'di-local-command',
-      onSubmit: (event) => { event.preventDefault(); runLocalCommand() },
-    },
-    h('span', { 'aria-hidden': 'true' }, '›'),
-    h('input', {
-      value: commandText,
-      onChange: (event) => setCommandText(event.target.value),
-      placeholder: LOCAL_COMMAND_EXAMPLE,
-      'aria-label': '本地快捷命令',
-    }),
-    h('button', { type: 'submit', disabled: commandBusy || !commandText.trim() }, commandBusy ? '执行中' : '执行'),
-    commandError ? h('div', { className: 'di-local-command-error', role: 'alert' }, commandError) : null),
     h('div', { className: 'di-workspace-layout' },
       h('nav', { className: 'di-workspace-tabs', 'aria-label': '工作台视图' }, WORKSPACE_TABS.map((item) => h('button', {
         type: 'button',
@@ -109,6 +66,7 @@ export function WorkspaceDock({ sessionId }) {
         'aria-current': tab === item.id ? 'page' : undefined,
         onClick: () => setTab(item.id),
       }, item.label))),
-      h('div', { className: 'di-workspace-content' }, h(WorkspaceContent, { tab, sessionId })))) : null,
+      h('div', { className: 'di-workspace-content' }, h(WorkspaceContent, { tab, sessionId })))
+    ) : null,
     notice ? h('div', { className: 'di-local-toast', role: 'status' }, notice) : null)
 }
