@@ -54,14 +54,16 @@ export function LeetcodeCatalog({ sessionId }) {
 
   return h('section', { className: 'di-lc-catalog', 'aria-label': '力扣热题 100 题目列表' },
     h('header', { className: 'di-lc-catalog-head' },
-      h('h2', { className: 'di-lc-title' }, '热题 100'),
+      h('div', { className: 'di-lc-heading' },
+        h('h2', { className: 'di-lc-title' }, '热题 100'),
+        h('a', { className: 'di-lc-source', href: catalog.source.url, target: '_blank', rel: 'noreferrer' }, '官方题单 ↗')),
       h('div', { className: 'di-lc-catalog-summary' },
-        h('a', { className: 'di-lc-source', href: catalog.source.url, target: '_blank', rel: 'noreferrer' }, '官方题单 ↗'),
+        h('span', { className: 'di-lc-progress-label' }, '完成进度'),
         h('div', { className: 'di-lc-progress-copy' },
           h('span', { className: 'di-lc-progress-value' }, catalog.completedCount),
-          h('span', null, `/ ${catalog.total}`)))),
-    h('div', { className: 'di-lc-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': catalog.total, 'aria-valuenow': catalog.completedCount },
-      h('i', { style: { width: `${progress}%` } })),
+          h('span', null, `/ ${catalog.total}`)),
+        h('div', { className: 'di-lc-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': catalog.total, 'aria-valuenow': catalog.completedCount },
+          h('i', { style: { width: `${progress}%` } })))),
     h(ErrorNotice, null, command.error),
     h('div', { className: 'di-lc-groups' }, catalog.groups.map((group) => {
       const completed = group.problems.filter((problem) => problem.completed).length

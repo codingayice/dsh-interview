@@ -18,10 +18,14 @@ const ICON_PATHS = {
   trash: [h('path', { key: 'a', d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5' })],
   download: [h('path', { key: 'a', d: 'M12 3v12m0 0 4-4m-4 4-4-4M5 19h14' })],
   play: [h('path', { key: 'a', d: 'M8 5.5v13l10-6.5L8 5.5Z' })],
+  clock: [h('circle', { key: 'a', cx: 12, cy: 12, r: 8 }), h('path', { key: 'b', d: 'M12 8v4l3 2' })],
   archive: [h('path', { key: 'a', d: 'M4 7h16v13H4V7Zm-1-3h18v3H3V4Zm6 7h6' })],
   code: [h('path', { key: 'a', d: 'm8 9-3 3 3 3m8-6 3 3-3 3m-2-9-4 12' })],
   grid: [h('rect', { key: 'a', x: 4, y: 4, width: 6, height: 6, rx: 1 }), h('rect', { key: 'b', x: 14, y: 4, width: 6, height: 6, rx: 1 }), h('rect', { key: 'c', x: 4, y: 14, width: 6, height: 6, rx: 1 }), h('rect', { key: 'd', x: 14, y: 14, width: 6, height: 6, rx: 1 })],
   close: [h('path', { key: 'a', d: 'm6 6 12 12M18 6 6 18' })],
+  flame: [h('path', { key: 'a', d: 'M12 22c4 0 7-3 7-7 0-3-1.5-5.5-4.5-8 .2 2-1 3.5-2 4.5C12 8 10 5 7 3c.4 4-2 6-2 10 0 5 3 9 7 9Z' })],
+  plus: [h('path', { key: 'a', d: 'M12 5v14M5 12h14' })],
+  alert: [h('path', { key: 'a', d: 'M10.3 4.2 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0ZM12 9v4m0 3h.01' })],
 }
 
 export function Icon({ name, size = 18 }) {

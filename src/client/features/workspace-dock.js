@@ -2,12 +2,13 @@ import React from 'react'
 import { PracticeLibrary } from './practice-library.js'
 import { LeetcodeCatalog } from './leetcode.js'
 import { interviewApi } from '../shared/api.js'
+import { useInterviewQuery } from '../shared/hooks.js'
 import { h, Icon } from '../shared/ui.js'
 
 const WORKSPACE_TABS = Object.freeze([
-  { id: 'active', label: '进行中', icon: 'play' },
+  { id: 'active', label: '进行中', icon: 'clock' },
   { id: 'library', label: '练习档案', icon: 'archive' },
-  { id: 'leetcode', label: '热题 100', icon: 'code' },
+  { id: 'leetcode', label: '热题 100', icon: 'flame' },
 ])
 
 function WorkspaceContent({ tab, sessionId }) {
@@ -25,6 +26,13 @@ export function WorkspaceDock({ sessionId }) {
   const [open, setOpen] = React.useState(false)
   const [tab, setTab] = React.useState('active')
   const [notice, setNotice] = React.useState('')
+  const activeQuery = useInterviewQuery(
+    `workspace-active-count:${open}`,
+    () => interviewApi.practices({ status: 'active' }),
+    [open],
+    { cache: false },
+  )
+  const activeCount = activeQuery.data?.resource?.data?.length || 0
 
   React.useEffect(() => {
     let timer = null
@@ -72,7 +80,8 @@ export function WorkspaceDock({ sessionId }) {
           className: tab === item.id ? 'is-active' : '',
           'aria-current': tab === item.id ? 'page' : undefined,
           onClick: () => setTab(item.id),
-        }, h(Icon, { name: item.icon, size: 17 }), h('span', null, item.label)))),
+        }, h(Icon, { name: item.icon, size: 16 }), h('span', null, item.label),
+        item.id === 'active' && activeCount > 0 ? h('span', { className: 'di-workspace-count' }, activeCount) : null))),
         h('main', { className: `di-workspace-content is-${tab}` }, h(WorkspaceContent, { tab, sessionId }))))
       ) : null,
     notice ? h('div', { className: 'di-local-toast', role: 'status' }, notice) : null)
