@@ -10,7 +10,6 @@ import {
 import { InsightsCard, PracticeLibrary } from './features/practice-library.js'
 import { TimelinePanel } from './features/timeline.js'
 import { LeetcodeCatalog } from './features/leetcode.js'
-import { LatestQuestionDock } from './features/latest-question-dock.js'
 import { WorkspaceDock } from './features/workspace-dock.js'
 import { INTERVIEW_TOOL_NAMES } from '../protocol/interview-tool-names.js'
 import { installStyles } from './shared/styles.js'
@@ -57,19 +56,6 @@ export function apply(ctx) {
       (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId, block: props.block }),
     ))
   }
-
-  slots.inject('conversation.input.dock', () => slots.register(
-    { name: 'conversation.input.dock', id: 'interview-latest-question', order: 23 },
-    (props) => {
-      const transcriptKey = typeof props.useSession === 'function'
-        ? props.useSession((snapshot) => {
-            const order = snapshot?.chat?.order || []
-            return `${order.length}:${order.at(-1) || ''}`
-          })
-        : ''
-      return h(LatestQuestionDock, { sessionId: props.sessionId, transcriptKey })
-    },
-  ))
 
   slots.inject('conversation.input.dock', () => slots.register(
     { name: 'conversation.input.dock', id: 'interview-workspace', order: 24 },

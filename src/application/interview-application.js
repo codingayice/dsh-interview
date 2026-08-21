@@ -127,9 +127,12 @@ export class InterviewApplication {
         { type: 'practice.started', sessionId, practiceId: practice.id, mode: practice.mode },
         { type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id },
       ]
+      const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
+        sessionId, practiceId: practice.id, questionId: drawn.question.id,
+      })]
       await this.repository.commit({ practice, cursor })
       await this.#publish(events)
-      return this.#result('question', toQuestionDto(drawn.question), cursor, { events })
+      return this.#result('question', toQuestionDto(drawn.question), cursor, { events, agentTasks })
     }
     const events = [{ type: 'practice.started', sessionId, practiceId: practice.id, mode: practice.mode }]
     const agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
@@ -395,9 +398,12 @@ export class InterviewApplication {
     if (practice.mode === 'leetcode') {
       const drawn = await this.#drawLeetcodeProblem(practice, cursor, now)
       const events = [{ type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id }]
+      const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
+        sessionId, practiceId: practice.id, questionId: drawn.question.id,
+      })]
       await this.repository.commit({ practice: drawn.practice, cursor: drawn.cursor })
       await this.#publish(events)
-      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, { events })
+      return this.#result('question', toQuestionDto(drawn.question), drawn.cursor, { events, agentTasks })
     }
     const nextCursor = markNextRequested(cursor, now)
     const events = [{ type: 'question.next_requested', sessionId, practiceId: practice.id }]

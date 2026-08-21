@@ -113,7 +113,7 @@ test('选择练习向模型提供完整上下文并只返回切换确认', async
   assert.equal(selected.context.practice.questions[0].prompt, '什么是 JMM？')
 })
 
-test('本地管理与力扣操作不会派发 Agent 任务', async () => {
+test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型调用', async () => {
   const fixture = applicationFixture()
   const dispatched = []
   const coordinator = new InterviewCoordinator({
@@ -123,10 +123,13 @@ test('本地管理与力扣操作不会派发 Agent 任务', async () => {
   const executeUi = (sessionId, action, payload = {}) => coordinator.execute({ sessionId, action, payload, source: 'ui' })
 
   const leetcode = await executeUi('leetcode-local', INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'leetcode', config: {} })
-  assert.equal(dispatched.length, 0, '新建力扣练习由本地题库出题')
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION])
+  dispatched.length = 0
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION, { slug: 'two-sum', completed: true })
+  assert.equal(dispatched.length, 0, '完成状态仍然是纯本地操作')
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.REQUEST_NEXT)
-  assert.equal(dispatched.length, 0, '力扣进度与随机下一题不调用模型')
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION])
+  dispatched.length = 0
 
   const practiceId = leetcode.presentation.practiceId
   const questionId = leetcode.presentation.questionId

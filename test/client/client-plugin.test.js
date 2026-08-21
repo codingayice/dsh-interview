@@ -54,7 +54,7 @@ test('构建后的 Client 注册全部原子工具视图和时间轴槽位', () 
     INTERVIEW_TOOL_NAMES,
   )
   const dockIds = registrations.filter((item) => item.name === 'conversation.input.dock').map((item) => item.id)
-  assert.deepEqual(dockIds, ['interview-latest-question', 'interview-workspace', 'interview-timeline'])
+  assert.deepEqual(dockIds, ['interview-workspace', 'interview-timeline'])
 })
 
 test('Client 只使用 DSH 当前会话身份且不共享练习游标', () => {
@@ -153,16 +153,13 @@ test('力扣题目卡使用讲解入口且不重复展示题目列表入口', ()
   assert.match(liveInterview, /!isLeetcode \? h\(Button/)
 })
 
-test('切换力扣题目时在会话最新位置创建新卡片', () => {
+test('力扣切题不使用本地临时卡片槽位', () => {
   const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
-  const latestDock = readFileSync(new URL('../../src/client/features/latest-question-dock.js', import.meta.url), 'utf8')
   const api = readFileSync(new URL('../../src/client/shared/api.js', import.meta.url), 'utf8')
   const index = readFileSync(new URL('../../src/client/index.js', import.meta.url), 'utf8')
 
-  assert.match(index, /id: 'interview-latest-question'/)
-  assert.match(api, /subscribeLocalQuestions/)
-  assert.match(api, /value\?\.resource\?\.kind === 'question'/)
-  assert.match(latestDock, /current\.transcriptKey !== transcriptKey \? null : current/)
+  assert.match(leetcode, /onRun\('question\.next'\)/)
   assert.match(leetcode, /sessionQuestion\?\.id === initialQuestion\.id/)
-  assert.doesNotMatch(leetcode, /di-lc-card-stack/)
+  assert.doesNotMatch(index, /interview-latest-question/)
+  assert.doesNotMatch(api, /subscribeLocalQuestions/)
 })

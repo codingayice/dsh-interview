@@ -3,6 +3,7 @@ export const AGENT_TASK_TYPES = Object.freeze({
   EVALUATE_ANSWER: 'answer.evaluate',
   GENERATE_REVIEW: 'review.generate',
   GENERATE_LEETCODE_EXPLANATION: 'leetcode.explain',
+  PRESENT_LEETCODE_QUESTION: 'leetcode.present',
   GENERATE_SUMMARY: 'practice.summarize',
 })
 
