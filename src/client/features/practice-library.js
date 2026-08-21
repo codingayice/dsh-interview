@@ -88,11 +88,11 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     if (result) interviewApi.navigateWorkspace('current')
   }
   return h('section', { className: 'di-detail' },
-    h('div', { className: 'di-eyebrow' }, practice.modeLabel),
-    h('h3', { className: 'di-ledger-title', style: { margin: '5px 0 0' } }, practice.topic),
-    h('div', { className: 'di-subtitle' }, practice.mode === 'leetcode'
-      ? `${practice.questionCount} 道已抽取题目`
-      : `${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`),
+    h('div', { className: 'di-detail-heading' },
+      h('h3', { className: 'di-ledger-title' }, practice.topic),
+      h('span', { className: 'di-meta' }, practice.mode === 'leetcode'
+        ? `${practice.modeLabel} · ${practice.questionCount} 道已抽取题目`
+        : `${practice.modeLabel} · ${practice.questionCount} 题 · ${practice.evaluatedCount} 次已评价 · 均分 ${practice.averageScore ?? '—'}`)),
     h('div', { className: 'di-actions' },
       h(Button, { tone: 'primary', busy: Boolean(command.busy?.startsWith('session.')), onClick: activate }, practice.status === 'completed' ? '重新打开' : '切换到练习'),
       h(Button, { onClick: () => setEditing((value) => !value) }, '编辑配置'),
@@ -111,9 +111,9 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
       h('div', { className: 'di-section-label' }, '练习总结'),
       h(Markdown, null, practice.summary.overall),
       h('div', { className: 'di-attempt' },
-        h('strong', null, '表现亮点'),
+        h('div', null, '表现亮点'),
         h('ul', null, practice.summary.strengths.map((item) => h('li', { key: item }, item))),
-        h('strong', null, '改进建议'),
+        h('div', null, '改进建议'),
         h('ul', null, practice.summary.improvements.map((item) => h('li', { key: item }, item))))) : null,
     practice.questions.length ? practice.questions.map((question) => {
       const latest = question.attempts.at(-1)
@@ -127,7 +127,7 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
             ? h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, `${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`)
             : h(ScoreRail, { score: question.latestScore, compact: true })),
         question.attempts.map((attempt) => h('div', { className: 'di-attempt', key: attempt.id },
-          h('div', { className: 'di-attempt-head' }, h('span', null, `第 ${attempt.sequence} 次作答`), h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '未评价')),
+          h('div', { className: 'di-attempt-head' }, h('span', null, `第 ${attempt.sequence} 次作答`), h('span', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '未评价')),
           h(Markdown, null, attempt.answer),
           attempt.evaluation ? h('div', { className: 'di-section' }, h(Markdown, null, attempt.evaluation.feedback)) : null)),
         question.explanation ? h('div', { className: 'di-section' },
@@ -200,7 +200,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
     h('td', null, h('button', { className: 'di-history-topic', onClick: () => setSelectedId(selectedId === practice.id ? null : practice.id) }, practice.topic)),
     h('td', null, practice.modeLabel),
     h('td', { className: 'di-history-time' }, dateText(practice.updatedAt)),
-    h('td', null, h('strong', { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? '—')),
+    h('td', null, h('span', { className: `di-history-score ${scoreClass(practice.averageScore)}` }, practice.averageScore ?? '—')),
     h('td', null, h('div', { className: 'di-row-actions' },
       h(Button, { className: 'di-icon-button', title: '切换到该练习', 'aria-label': `切换到${practice.topic}`, onClick: () => activate(practice) }, h(Icon, { name: 'swap' })),
       h(Button, { className: 'di-icon-button is-delete', title: '删除', 'aria-label': `删除${practice.topic}`, onClick: () => setConfirmingId(practice.id) }, h(Icon, { name: 'trash' })),
@@ -208,7 +208,7 @@ export function PracticeLibrary({ sessionId, initialPracticeId = null }) {
 
   return h('section', { className: 'di-ledger di-history', 'aria-label': '练习历史' },
     h('header', { className: 'di-history-head' },
-      h('div', null, h('div', { className: 'di-ledger-title' }, '练习历史'), h('div', { className: 'di-subtitle' }, `共 ${practices.length} 条练习记录`)),
+      h('div', { className: 'di-ledger-title' }, '练习历史'),
       h(Button, { tone: 'primary', onClick: () => setCreating((value) => !value) }, '新建练习')),
     creating ? h(PracticeForm, { busy: command.busy === 'session.start', onSubmit: createPractice, onCancel: () => setCreating(false) }) : null,
     h('div', { className: 'di-history-filters' },
@@ -246,8 +246,8 @@ export function InsightsCard() {
     h('header', { className: 'di-card-head' }, h('div', { className: 'di-title' }, '能力复盘')),
     h('div', { className: 'di-card-body' },
       h('div', { className: 'di-score-row' }, h('span', { className: 'di-score-number' }, insight.averageScore ?? '—'), h(ScoreRail, { score: insight.averageScore })),
-      h('div', { className: 'di-subtitle', style: { marginTop: '8px' } }, `${insight.practiceCount} 次练习 · ${insight.questionCount} 道题 · ${insight.evaluatedCount} 次评价`),
+      h('div', { className: 'di-meta', style: { marginTop: '8px' } }, `${insight.practiceCount} 次练习 · ${insight.questionCount} 道题 · ${insight.evaluatedCount} 次评价`),
       insight.topics.length ? h('div', { className: 'di-section' }, insight.topics.map((topic) =>
-        h('div', { className: 'di-attempt-head', key: topic.topic }, h('span', null, `${topic.topic} · ${topic.evaluatedCount} 题`), h('span', { className: 'di-score-row' }, h('strong', null, topic.averageScore), h(ScoreRail, { score: topic.averageScore, compact: true }))))
+        h('div', { className: 'di-attempt-head', key: topic.topic }, h('span', null, `${topic.topic} · ${topic.evaluatedCount} 题`), h('span', { className: 'di-score-row' }, h('span', null, topic.averageScore), h(ScoreRail, { score: topic.averageScore, compact: true }))))
       ) : h(Empty, { title: '完成评价后生成能力复盘' })))
 }

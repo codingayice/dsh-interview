@@ -18,7 +18,7 @@ function TimelineContent({ question, view }) {
   if (view === 'question') return question.leetcode
     ? h('div', { className: 'di-time-lc-question' },
         h('a', { className: 'di-link', href: question.leetcode.url, target: '_blank', rel: 'noreferrer' }, question.prompt, ' ↗'),
-        h('div', { className: 'di-subtitle' }, `${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`))
+        h('div', { className: 'di-meta' }, `${question.leetcode.category} · ${leetcodeDifficultyLabel(question.leetcode.difficulty)}`))
     : h(Markdown, null, question.prompt)
 
   if (view === 'attempts') {
@@ -27,7 +27,7 @@ function TimelineContent({ question, view }) {
       h('section', { className: 'di-time-record', key: attempt.id },
         h('div', { className: 'di-time-record-label' },
           h('span', null, `第 ${attempt.sequence} 次回答`),
-          h('strong', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '待点评')),
+          h('span', null, attempt.evaluation ? `${attempt.evaluation.score}/10` : '待点评')),
         h('div', { className: 'di-time-record-answer' },
           h('div', { className: 'di-time-content-label' }, '回答'),
           h(Markdown, null, attempt.answer)),

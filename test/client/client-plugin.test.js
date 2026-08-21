@@ -98,3 +98,24 @@ test('工具视图只按结构化 presentation 渲染用户可见卡片', () => 
   })
   assert.equal(invalidArguments.kind, 'hidden')
 })
+
+test('界面只对主标题使用粗体且不渲染装饰性副标题', () => {
+  const featureFiles = [
+    '../../src/client/features/leetcode.js',
+    '../../src/client/features/live-interview.js',
+    '../../src/client/features/practice-library.js',
+    '../../src/client/features/timeline.js',
+    '../../src/client/features/workspace-dock.js',
+    '../../src/client/shared/ui.js',
+  ]
+  const components = featureFiles
+    .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
+    .join('\n')
+  const styles = readFileSync(new URL('../../src/client/shared/styles.js', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(components, /di-(?:eyebrow|subtitle)/)
+  assert.doesNotMatch(components, /h\('strong'/)
+  assert.doesNotMatch(styles, /font-weight:\s*[5-9]\d{2}/)
+  assert.match(styles, /--di-weight-text:400/)
+  assert.match(styles, /--di-weight-title:600/)
+})

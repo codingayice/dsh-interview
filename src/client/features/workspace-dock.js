@@ -54,9 +54,7 @@ export function WorkspaceDock({ sessionId }) {
       'aria-label': '本地练习工作台',
     },
     h('header', { className: 'di-workspace-head' },
-      h('div', null,
-        h('div', { className: 'di-eyebrow' }, 'LOCAL INTERVIEW WORKSPACE'),
-        h('h2', null, '练习工作台')),
+      h('h2', null, '练习工作台'),
       h('button', { type: 'button', onClick: () => setOpen(false), 'aria-label': '关闭练习工作台' }, '×')),
     h('div', { className: 'di-workspace-layout' },
       h('nav', { className: 'di-workspace-tabs', 'aria-label': '工作台视图' }, WORKSPACE_TABS.map((item) => h('button', {

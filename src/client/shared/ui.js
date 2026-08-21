@@ -7,7 +7,7 @@ const MarkdownText = primitives.MarkdownText
 
 export function Markdown({ children }) {
   const text = String(children || '')
-  return MarkdownText ? h(MarkdownText, { text, content: text }) : h('div', { className: 'di-preline' }, text)
+  return MarkdownText ? h(MarkdownText, { text, content: text, className: 'di-markdown' }) : h('div', { className: 'di-preline di-markdown' }, text)
 }
 
 const ICON_PATHS = {
@@ -98,7 +98,7 @@ export function ErrorNotice({ children }) {
 }
 
 export function Empty({ title, detail }) {
-  return h('div', { className: 'di-empty' }, h('strong', null, title), detail ? h('span', null, detail) : null)
+  return h('div', { className: 'di-empty' }, h('div', { className: 'di-empty-title' }, title), detail ? h('span', null, detail) : null)
 }
 
 export function Button({ children, tone = 'quiet', busy = false, ...props }) {

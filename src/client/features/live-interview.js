@@ -15,7 +15,7 @@ function Evaluation({ attempt }) {
     h('div', { style: { marginTop: '12px' } }, h(Markdown, null, evaluation.feedback)),
     Object.keys(evaluation.dimensions || {}).length
       ? h('div', { className: 'di-attempt' }, Object.entries(evaluation.dimensions).map(([name, score]) =>
-          h('div', { className: 'di-attempt-head', key: name }, h('span', null, name), h('strong', null, `${score}/10`))))
+          h('div', { className: 'di-attempt-head', key: name }, h('span', null, name), h('span', null, `${score}/10`))))
       : null)
 }
 
@@ -46,10 +46,7 @@ export function LiveInterviewCard({ sessionId }) {
 
   return h('article', { className: 'di-card', 'aria-label': '当前面试题' },
     h('header', { className: 'di-card-head' },
-      h('div', null,
-        h('div', { className: 'di-eyebrow' }, `${session.practice.modeLabel} · Q${String(question?.sequence || 0).padStart(2, '0')}`),
-        h('div', { className: 'di-title' }, session.practice.topic),
-        h('div', { className: 'di-subtitle' }, `${session.practice.questionCount} 题 · ${session.practice.evaluatedCount} 次已评价`)),
+      h('div', { className: 'di-title' }, session.practice.topic),
       h(PhaseBadge, { phase: session.phase })),
     h('div', { className: 'di-card-body' },
       question
@@ -112,7 +109,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
       h('div', { className: 'di-review-score-summary' },
         h('div', { className: 'di-review-score-label' }, '评分'),
         h('div', { className: 'di-review-score-value' },
-          h('strong', null, Number(evaluation.score).toFixed(1)), h('span', null, '/ 10'))),
+          h('span', { className: 'di-review-score-number' }, Number(evaluation.score).toFixed(1)), h('span', null, '/ 10'))),
       h(StarRating, { score: evaluation.score })) : null,
     h('div', { className: 'di-review-content' },
       evaluation ? h('section', { className: 'di-review-section' },
@@ -120,7 +117,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
         h('div', { className: 'di-feedback-banner' }, h(Markdown, null, evaluation.feedback)),
         Object.keys(evaluation.dimensions || {}).length
           ? h('div', { className: 'di-dimensions' }, Object.entries(evaluation.dimensions).map(([name, score]) =>
-              h('span', { key: name }, name, h('strong', null, `${score}/10`))))
+              h('span', { key: name }, name, h('span', { className: 'di-dimension-score' }, `${score}/10`))))
           : null) : null,
       h('section', { className: 'di-review-section' },
         h('h3', null, '讲解'),
@@ -138,7 +135,7 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
 
 export function ToolErrorCard({ message }) {
   return h('div', { className: 'di-tool-error', role: 'alert' },
-    h('strong', null, '面试操作失败'),
+    h('span', null, '面试操作失败'),
     h('span', null, message))
 }
 
@@ -184,9 +181,7 @@ export function PracticeSummaryCard({ presentation, revision }) {
   const summary = practice?.summary
   return h(PresentedState, { query, missing: '找不到练习总结' }, summary ? h('article', { className: 'di-card', 'aria-label': '练习总结' },
     h('header', { className: 'di-card-head' },
-      h('div', null,
-        h('div', { className: 'di-title' }, '练习总结'),
-        h('div', { className: 'di-subtitle' }, `${practice.modeLabel} · ${practice.topic}`)),
+      h('div', { className: 'di-title' }, '练习总结'),
       h(PhaseBadge, { phase: 'completed' })),
     h('div', { className: 'di-card-body' },
       h(Markdown, null, summary.overall),
@@ -196,5 +191,5 @@ export function PracticeSummaryCard({ presentation, revision }) {
       h('section', { className: 'di-section' },
         h('div', { className: 'di-section-label' }, '改进建议'),
         h('ul', null, summary.improvements.map((item) => h('li', { key: item }, item)))),
-      h('div', { className: 'di-subtitle' }, `${practice.questionCount} 道题 · ${practice.attemptCount} 次作答 · 平均分 ${practice.averageScore ?? '—'}`))) : null)
+      h('div', { className: 'di-meta' }, `${practice.questionCount} 道题 · ${practice.attemptCount} 次作答 · 平均分 ${practice.averageScore ?? '—'}`))) : null)
 }
