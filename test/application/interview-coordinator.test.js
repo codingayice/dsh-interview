@@ -139,7 +139,12 @@ test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型�
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.UPDATE_PRACTICE, { practiceId, mode: 'leetcode', config: { language: 'java' } })
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.GET_LEETCODE_CATALOG)
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.EXPORT_PRACTICES, { practiceIds: [practiceId] })
-  assert.equal(dispatched.length, 0, '切换、打开、重答、修改、查询和导出均为本地操作')
+  const finished = await executeUi('leetcode-local', INTERVIEW_ACTIONS.REQUEST_FINISH)
+  assert.equal(dispatched.length, 0, '切换、打开、重答、修改、查询、导出和结束均为本地操作')
+  assert.equal(finished.state, 'completed')
+  assert.equal(finished.nextAction, 'wait_for_user')
+  assert.equal(finished.presentation.kind, 'finished')
+  assert.equal(finished.assistantResponse.text, '本次力扣练习已结束，共记录 2 道题。')
 })
 
 test('只有内容生成阶段会派发显式 Agent 任务', async () => {

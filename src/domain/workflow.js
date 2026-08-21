@@ -149,6 +149,11 @@ export function markPracticeFinishRequested(cursor, now) {
   return advance(cursor, { phase: WORKFLOW_PHASES.GENERATING_SUMMARY }, now)
 }
 
+export function finishPractice(cursor, now) {
+  assertDomain(cursor.phase !== WORKFLOW_PHASES.COMPLETED, 'PRACTICE_ALREADY_COMPLETED', '练习已经结束')
+  return advance(cursor, { phase: WORKFLOW_PHASES.COMPLETED }, now)
+}
+
 export function markPracticeCompleted(cursor, now) {
   requirePhase(cursor, WORKFLOW_PHASES.GENERATING_SUMMARY)
   return advance(cursor, { phase: WORKFLOW_PHASES.COMPLETED }, now)

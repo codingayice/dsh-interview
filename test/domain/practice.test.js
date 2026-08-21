@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   askQuestion,
+  completeLeetcodePractice,
   completePractice,
   createPractice,
   evaluateAnswer,
@@ -117,6 +118,33 @@ test('结束后的练习禁止继续出题，重新打开后恢复写入', () =>
   })
   const reopened = reopenPractice(completed, 4)
   assert.equal(askQuestion(reopened, { id: 'question-1', prompt: '问题', now: 5 }).practice.questions.length, 1)
+})
+
+test('力扣练习直接结束并只保存本次抽取的题目', () => {
+  let practice = createPractice({ id: 'leetcode-1', mode: 'leetcode', config: { language: 'java' }, now: 1 })
+  practice = askQuestion(practice, {
+    id: 'question-1', prompt: '1. 两数之和', leetcode: { slug: 'two-sum' }, now: 2,
+  }).practice
+  const completed = completeLeetcodePractice(practice, { now: 3 })
+
+  assert.equal(completed.status, 'completed')
+  assert.deepEqual(completed.summary, {
+    kind: 'leetcode',
+    questionCount: 1,
+    problems: [{
+      sequence: 1,
+      id: '1',
+      title: '两数之和',
+      slug: 'two-sum',
+      difficulty: 'easy',
+      category: '哈希',
+      url: 'https://leetcode.cn/problems/two-sum/',
+    }],
+    createdAt: 3,
+  })
+  assert.throws(() => completePractice(practice, {
+    overall: '不应生成。', strengths: ['不应生成。'], improvements: ['不应生成。'], now: 3,
+  }), { code: 'LEETCODE_ANALYSIS_NOT_ALLOWED' })
 })
 
 test('练习题数由用户主动结束控制，不设置隐式上限', () => {

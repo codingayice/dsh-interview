@@ -2,6 +2,7 @@ import { DomainError, assertDomain } from '../domain/errors.js'
 import { LEETCODE_TOP_100, LEETCODE_TOP_100_GROUPS, LEETCODE_TOP_100_SOURCE, leetcodeTop100Problem } from '../domain/leetcode-top-100.js'
 import {
   askQuestion as addQuestion,
+  completeLeetcodePractice,
   completePractice,
   createPractice,
   deleteQuestion as removeQuestion,
@@ -18,6 +19,7 @@ import {
   continuationFor,
   createCursor,
   cursorForQuestion,
+  finishPractice,
   markAnswerEvaluated,
   markAnswerRevealed,
   markAnswerSubmitted,
@@ -430,6 +432,14 @@ export class InterviewApplication {
   async requestPracticeSummary(sessionId) {
     const now = this.clock.now()
     const { cursor, practice } = await this.#context(sessionId)
+    if (practice.mode === 'leetcode') {
+      const completed = completeLeetcodePractice(practice, { now })
+      const nextCursor = finishPractice(cursor, now)
+      const events = [{ type: 'practice.completed', sessionId, practiceId: practice.id, summaryKind: 'leetcode' }]
+      await this.repository.commit({ practice: completed, unbindSessionId: cursor.sessionId })
+      await this.#publish(events)
+      return this.#result('practice-summary', toPracticeDetailDto(completed), nextCursor, { events })
+    }
     const nextCursor = markPracticeFinishRequested(cursor, now)
     const events = [{ type: 'practice.finish_requested', sessionId, practiceId: practice.id }]
     const agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_SUMMARY, { sessionId, practiceId: practice.id })]

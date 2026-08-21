@@ -275,4 +275,14 @@ test('刷力扣模式由应用层随机抽题并根据完成状态继续', async
 
   await fixture.application.selectPractice('leetcode-session-2', next.references.practiceId)
   assert.equal((await fixture.application.getSession('leetcode-session-2')).resource.data.phase, 'awaiting_solution')
+
+  const finished = await fixture.application.requestPracticeSummary('leetcode-session-2')
+  assert.equal(finished.resource.data.status, 'completed')
+  assert.equal(finished.resource.data.summary.kind, 'leetcode')
+  assert.deepEqual(finished.resource.data.summary.problems.map((problem) => problem.slug), [
+    'two-sum', 'group-anagrams', 'longest-consecutive-sequence',
+  ])
+  assert.deepEqual(finished.agentTasks, [])
+  assert.equal(await fixture.repository.getCursor('leetcode-session-2'), null)
+  assert.equal(fixture.published.at(-1).type, 'practice.completed')
 })

@@ -2,6 +2,7 @@ import React from 'react'
 import { interviewApi } from '../shared/api.js'
 import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, PhaseBadge, ScoreRail, StarRating } from '../shared/ui.js'
+import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 import { LeetcodeProblemCard } from './leetcode.js'
 
 function Evaluation({ attempt }) {
@@ -180,17 +181,25 @@ export function PracticeSummaryCard({ presentation, revision }) {
   const query = usePresentedPractice(presentation, revision)
   const practice = query.data?.resource?.data
   const summary = practice?.summary
+  const leetcode = summary?.kind === 'leetcode'
   return h(PresentedState, { query, missing: '找不到练习总结' }, summary ? h('article', { className: 'di-card', 'aria-label': '练习总结' },
     h('header', { className: 'di-card-head' },
       h('div', { className: 'di-title' }, '练习总结'),
       h(PhaseBadge, { phase: 'completed' })),
     h('div', { className: 'di-card-body' },
-      h(Markdown, null, summary.overall),
-      h('section', { className: 'di-section' },
-        h('div', { className: 'di-section-label' }, '表现亮点'),
-        h('ul', null, summary.strengths.map((item) => h('li', { key: item }, item)))),
-      h('section', { className: 'di-section' },
-        h('div', { className: 'di-section-label' }, '改进建议'),
-        h('ul', null, summary.improvements.map((item) => h('li', { key: item }, item)))),
-      h('div', { className: 'di-meta' }, `${practice.questionCount} 道题 · ${practice.attemptCount} 次作答 · 平均分 ${practice.averageScore ?? '—'}`))) : null)
+      leetcode
+        ? h(React.Fragment, null,
+            h('div', { className: 'di-meta' }, `本次共记录 ${summary.questionCount} 道题`),
+            h('ol', null, summary.problems.map((problem) => h('li', { key: `${problem.sequence}-${problem.slug}` },
+              h('a', { className: 'di-link', href: problem.url, target: '_blank', rel: 'noreferrer' }, `${problem.id}. ${problem.title}`),
+              ` · ${problem.category} · ${leetcodeDifficultyLabel(problem.difficulty)}`))))
+        : h(React.Fragment, null,
+            h(Markdown, null, summary.overall),
+            h('section', { className: 'di-section' },
+              h('div', { className: 'di-section-label' }, '表现亮点'),
+              h('ul', null, summary.strengths.map((item) => h('li', { key: item }, item)))),
+            h('section', { className: 'di-section' },
+              h('div', { className: 'di-section-label' }, '改进建议'),
+              h('ul', null, summary.improvements.map((item) => h('li', { key: item }, item)))),
+            h('div', { className: 'di-meta' }, `${practice.questionCount} 道题 · ${practice.attemptCount} 次作答 · 平均分 ${practice.averageScore ?? '—'}`)))) : null)
 }

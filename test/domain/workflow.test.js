@@ -4,6 +4,7 @@ import {
   CONTINUATION_ACTIONS,
   continuationFor,
   createCursor,
+  finishPractice,
   markAnswerEvaluated,
   markAnswerRevealed,
   markAnswerSubmitted,
@@ -132,4 +133,13 @@ test('练习结束后游标进入 completed', () => {
   cursor = markPracticeCompleted(cursor, 3)
   assert.equal(cursor.phase, WORKFLOW_PHASES.COMPLETED)
   assert.throws(() => markQuestionRetried(cursor, 'question-1', 4), { code: 'PRACTICE_ALREADY_COMPLETED' })
+})
+
+test('无需生成总结的练习可以直接结束', () => {
+  const cursor = finishPractice(
+    createCursor({ sessionId: 'session-1', practiceId: 'leetcode-1', now: 1 }),
+    2,
+  )
+  assert.equal(cursor.phase, WORKFLOW_PHASES.COMPLETED)
+  assert.throws(() => finishPractice(cursor, 3), { code: 'PRACTICE_ALREADY_COMPLETED' })
 })

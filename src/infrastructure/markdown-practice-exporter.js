@@ -84,7 +84,13 @@ export function renderPracticeMarkdown(practice, include) {
         `- 结论：${summary.verdict}`,
       ]),
     )
-    if (practice.summary) {
+    if (practice.summary?.kind === 'leetcode') {
+      lines.push(
+        '',
+        ...practice.summary.problems.map((problem) =>
+          `- [${problem.id}. ${problem.title}](${problem.url}) · ${problem.category} · ${leetcodeDifficultyLabel(problem.difficulty)}`),
+      )
+    } else if (practice.summary) {
       lines.push(
         '',
         practice.summary.overall,

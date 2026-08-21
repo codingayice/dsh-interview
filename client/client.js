@@ -254,9 +254,6 @@ function Button({ children, tone = "quiet", busy = false, ...props }) {
   return h("button", { ...props, className: `di-button is-${tone}${props.className ? ` ${props.className}` : ""}`, disabled: props.disabled || busy }, busy ? "\u5904\u7406\u4E2D\u2026" : children);
 }
 
-// src/client/features/leetcode.js
-var import_react3 = __toESM(require("react"), 1);
-
 // src/domain/leetcode-top-100.js
 var LEETCODE_TOP_100_SOURCE = Object.freeze({
   name: "LeetCode \u70ED\u9898 100",
@@ -415,6 +412,9 @@ var LEETCODE_TOP_100_GROUPS = Object.freeze(GROUPS.map((group) => Object.freeze(
 })));
 var LEETCODE_TOP_100 = Object.freeze(LEETCODE_TOP_100_GROUPS.flatMap((group) => group.problems));
 var PROBLEM_BY_SLUG = new Map(LEETCODE_TOP_100.map((problem) => [problem.slug, problem]));
+
+// src/client/features/leetcode.js
+var import_react3 = __toESM(require("react"), 1);
 
 // src/domain/leetcode-languages.js
 var DEFINITIONS = [
@@ -852,6 +852,7 @@ function PracticeSummaryCard({ presentation, revision }) {
   const query = usePresentedPractice(presentation, revision);
   const practice = query.data?.resource?.data;
   const summary = practice?.summary;
+  const leetcode = summary?.kind === "leetcode";
   return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u7EC3\u4E60\u603B\u7ED3" }, summary ? h(
     "article",
     { className: "di-card", "aria-label": "\u7EC3\u4E60\u603B\u7ED3" },
@@ -864,20 +865,34 @@ function PracticeSummaryCard({ presentation, revision }) {
     h(
       "div",
       { className: "di-card-body" },
-      h(Markdown, null, summary.overall),
-      h(
-        "section",
-        { className: "di-section" },
-        h("div", { className: "di-section-label" }, "\u8868\u73B0\u4EAE\u70B9"),
-        h("ul", null, summary.strengths.map((item) => h("li", { key: item }, item)))
-      ),
-      h(
-        "section",
-        { className: "di-section" },
-        h("div", { className: "di-section-label" }, "\u6539\u8FDB\u5EFA\u8BAE"),
-        h("ul", null, summary.improvements.map((item) => h("li", { key: item }, item)))
-      ),
-      h("div", { className: "di-meta" }, `${practice.questionCount} \u9053\u9898 \xB7 ${practice.attemptCount} \u6B21\u4F5C\u7B54 \xB7 \u5E73\u5747\u5206 ${practice.averageScore ?? "\u2014"}`)
+      leetcode ? h(
+        import_react4.default.Fragment,
+        null,
+        h("div", { className: "di-meta" }, `\u672C\u6B21\u5171\u8BB0\u5F55 ${summary.questionCount} \u9053\u9898`),
+        h("ol", null, summary.problems.map((problem) => h(
+          "li",
+          { key: `${problem.sequence}-${problem.slug}` },
+          h("a", { className: "di-link", href: problem.url, target: "_blank", rel: "noreferrer" }, `${problem.id}. ${problem.title}`),
+          ` \xB7 ${problem.category} \xB7 ${leetcodeDifficultyLabel(problem.difficulty)}`
+        )))
+      ) : h(
+        import_react4.default.Fragment,
+        null,
+        h(Markdown, null, summary.overall),
+        h(
+          "section",
+          { className: "di-section" },
+          h("div", { className: "di-section-label" }, "\u8868\u73B0\u4EAE\u70B9"),
+          h("ul", null, summary.strengths.map((item) => h("li", { key: item }, item)))
+        ),
+        h(
+          "section",
+          { className: "di-section" },
+          h("div", { className: "di-section-label" }, "\u6539\u8FDB\u5EFA\u8BAE"),
+          h("ul", null, summary.improvements.map((item) => h("li", { key: item }, item)))
+        ),
+        h("div", { className: "di-meta" }, `${practice.questionCount} \u9053\u9898 \xB7 ${practice.attemptCount} \u6B21\u4F5C\u7B54 \xB7 \u5E73\u5747\u5206 ${practice.averageScore ?? "\u2014"}`)
+      )
     )
   ) : null);
 }
@@ -1055,7 +1070,12 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
     ) : null,
     editing ? h(PracticeForm, { initial: practice, busy: command.busy === "practice.update", onSubmit: updateConfiguration, onCancel: () => setEditing(false) }) : null,
     h(ErrorNotice, null, command.error),
-    practice.summary ? h(
+    practice.summary?.kind === "leetcode" ? h(
+      "section",
+      { className: "di-section" },
+      h("div", { className: "di-section-label" }, "\u5237\u9898\u6C47\u603B"),
+      h("div", { className: "di-meta" }, `\u672C\u6B21\u5171\u8BB0\u5F55 ${practice.summary.questionCount} \u9053\u9898\uFF0C\u8BE6\u7EC6\u9898\u76EE\u89C1\u4E0B\u65B9\u3002`)
+    ) : practice.summary ? h(
       "section",
       { className: "di-section" },
       h("div", { className: "di-section-label" }, "\u7EC3\u4E60\u603B\u7ED3"),

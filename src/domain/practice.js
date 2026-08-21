@@ -228,12 +228,29 @@ export function saveExplanation(practice, { questionId, detail, memorizationPoin
 
 export function completePractice(practice, { overall, strengths, improvements, now }) {
   activePractice(practice)
+  assertDomain(practice.mode !== 'leetcode', 'LEETCODE_ANALYSIS_NOT_ALLOWED', '力扣练习不生成面试分析总结')
   assertDomain(Array.isArray(strengths) && strengths.length > 0, 'INVALID_SUMMARY_STRENGTHS', '练习总结必须包含至少一项表现亮点')
   assertDomain(Array.isArray(improvements) && improvements.length > 0, 'INVALID_SUMMARY_IMPROVEMENTS', '练习总结必须包含至少一项改进建议')
   const summary = {
+    kind: 'interview',
     overall: requiredText(overall, 'INVALID_SUMMARY', '练习总结不能为空'),
     strengths: strengths.map((item) => requiredText(item, 'INVALID_SUMMARY_STRENGTHS', '表现亮点不能为空')),
     improvements: improvements.map((item) => requiredText(item, 'INVALID_SUMMARY_IMPROVEMENTS', '改进建议不能为空')),
+    createdAt: now,
+  }
+  return withUpdatedAt(practice, now, { status: 'completed', completedAt: now, summary })
+}
+
+export function completeLeetcodePractice(practice, { now }) {
+  activePractice(practice)
+  assertDomain(practice.mode === 'leetcode', 'LEETCODE_PRACTICE_REQUIRED', '只有力扣练习可以直接生成刷题汇总')
+  const problems = practice.questions
+    .filter((question) => question.leetcode)
+    .map((question) => ({ sequence: question.sequence, ...question.leetcode }))
+  const summary = {
+    kind: 'leetcode',
+    questionCount: problems.length,
+    problems,
     createdAt: now,
   }
   return withUpdatedAt(practice, now, { status: 'completed', completedAt: now, summary })

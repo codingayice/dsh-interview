@@ -114,10 +114,10 @@ const tools = [
     name: 'interview_reopen_practice', action: INTERVIEW_ACTIONS.REOPEN_PRACTICE, description: '重新打开一条已经结束的练习。',
     parameters: idParameters('practice_id', '练习 ID'), payload: (args) => ({ practiceId: args.practice_id }),
   }),
-  atomicTool({ name: 'interview_finish_practice', action: INTERVIEW_ACTIONS.REQUEST_FINISH, description: '请求结束当前练习。必须基于返回的完整上下文生成总结，再调用 interview_complete_summary。' }),
+  atomicTool({ name: 'interview_finish_practice', action: INTERVIEW_ACTIONS.REQUEST_FINISH, description: '结束当前练习。力扣练习会立即在本地结束并汇总本次抽取的题目，收到最终响应后必须停止；其他模式必须基于返回的完整上下文生成总结，再调用 interview_complete_summary。' }),
   atomicTool({
     name: 'interview_complete_summary', action: INTERVIEW_ACTIONS.COMPLETE_SUMMARY,
-    description: '保存基于完整练习上下文生成的总结，并正式结束练习。',
+    description: '仅用于非力扣模式：保存基于完整练习上下文生成的面试分析总结，并正式结束练习。力扣练习禁止调用。',
     parameters: {
       type: 'object',
       properties: {

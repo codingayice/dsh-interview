@@ -269,6 +269,19 @@ test('结束练习必须生成并持久化完整总结', async () => {
   assert.equal(detail.resource.data.summary.overall, '完成了一次 JVM 练习。')
 })
 
+test('结束力扣练习直接归档题目且不请求模型总结', async () => {
+  const fixture = toolFixture()
+  const started = await fixture.tools.interview_start_practice.execute({ mode: 'leetcode', language: 'java' }, exec('leetcode-finish'))
+  const finished = await fixture.tools.interview_finish_practice.execute({}, exec('leetcode-finish'))
+
+  assert.equal(finished.nextAction, 'wait_for_user')
+  assert.equal(finished.presentation.kind, 'finished')
+  assert.match(finished.assistantResponse.text, /共记录 1 道题/)
+  const detail = await fixture.application.getPractice(started.presentation.practiceId)
+  assert.equal(detail.resource.data.summary.kind, 'leetcode')
+  assert.equal(detail.resource.data.summary.problems[0].slug, 'two-sum')
+})
+
 test('Agent 工具覆盖练习和题目 CRUD', async () => {
   const fixture = toolFixture()
   const started = await fixture.tools.interview_start_practice.execute({ mode: 'bagu', topic: 'JVM' }, exec())

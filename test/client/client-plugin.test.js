@@ -161,6 +161,14 @@ test('力扣练习表单必须显式选择编程语言', () => {
   assert.match(library, /config: \{ language \}/)
 })
 
+test('力扣结束卡和档案只展示本次刷题汇总', () => {
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+  assert.match(liveInterview, /summary\?\.kind === 'leetcode'/)
+  assert.match(liveInterview, /本次共记录/)
+  assert.match(library, /刷题汇总/)
+})
+
 test('力扣切题不使用本地临时卡片槽位', () => {
   const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
   const api = readFileSync(new URL('../../src/client/shared/api.js', import.meta.url), 'utf8')

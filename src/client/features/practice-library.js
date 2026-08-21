@@ -113,7 +113,10 @@ function PracticeDetail({ practice, sessionId, onDeleted }) {
         h(Button, { tone: 'danger', busy: command.busy === 'library.delete', onClick: remove }, '确认删除'))) : null,
     editing ? h(PracticeForm, { initial: practice, busy: command.busy === 'practice.update', onSubmit: updateConfiguration, onCancel: () => setEditing(false) }) : null,
     h(ErrorNotice, null, command.error),
-    practice.summary ? h('section', { className: 'di-section' },
+    practice.summary?.kind === 'leetcode' ? h('section', { className: 'di-section' },
+      h('div', { className: 'di-section-label' }, '刷题汇总'),
+      h('div', { className: 'di-meta' }, `本次共记录 ${practice.summary.questionCount} 道题，详细题目见下方。`))
+      : practice.summary ? h('section', { className: 'di-section' },
       h('div', { className: 'di-section-label' }, '练习总结'),
       h(Markdown, null, practice.summary.overall),
       h('div', { className: 'di-attempt' },

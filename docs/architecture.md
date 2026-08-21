@@ -77,12 +77,20 @@ interview_reveal_answer
 → presentation.kind = review（无 attemptId）
 ```
 
-结束练习使用独立总结阶段：
+非力扣练习使用独立总结阶段：
 
 ```text
 interview_finish_practice
 → 读取完整练习上下文并生成总结
 → interview_complete_summary
+→ presentation.kind = finished
+```
+
+力扣练习不进入总结生成阶段：
+
+```text
+interview_finish_practice
+→ 本地保存本次抽取的题目清单并结束练习
 → presentation.kind = finished
 ```
 

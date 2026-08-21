@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { askQuestion, createPractice, evaluateAnswer, saveExplanation, submitAnswer } from '../../src/domain/practice.js'
+import { askQuestion, completeLeetcodePractice, createPractice, evaluateAnswer, saveExplanation, submitAnswer } from '../../src/domain/practice.js'
 import { MarkdownPracticeExporter, renderPracticeMarkdown } from '../../src/infrastructure/markdown-practice-exporter.js'
 
 function practiceFixture() {
@@ -43,6 +43,7 @@ test('Markdown 导出力扣题目地址、题型和难度', () => {
     memorizationPoints: '查找 target - x，时间 O(n)，空间 O(n)。',
     now: 3,
   }).practice
+  practice = completeLeetcodePractice(practice, { now: 4 })
   const markdown = renderPracticeMarkdown(practice).markdown
   assert.match(markdown, /编程语言：C\+\+/)
   assert.match(markdown, /官方题库：https:\/\/leetcode\.cn\/studyplan\/top-100-liked\//)
@@ -51,6 +52,7 @@ test('Markdown 导出力扣题目地址、题型和难度', () => {
   assert.match(markdown, /### 解题要点/)
   assert.doesNotMatch(markdown, /### 直接背/)
   assert.doesNotMatch(markdown, /平均分：未评分/)
+  assert.doesNotMatch(markdown, /表现亮点|改进建议/)
 })
 
 test('导出器返回受控下载令牌并清理非法文件名字符', async () => {

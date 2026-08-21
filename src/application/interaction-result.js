@@ -201,6 +201,14 @@ function descriptor(action, result) {
         assistantResponse: exact('已切换到这道题，请重新作答。'),
       }
     case INTERVIEW_ACTIONS.REQUEST_FINISH:
+      if (data.mode === 'leetcode') {
+        return {
+          state: 'completed',
+          nextAction: 'wait_for_user',
+          presentation: { kind: 'finished', ...referencesOf(result, 'practiceId') },
+          assistantResponse: exact(`本次力扣练习已结束，共记录 ${data.summary.questionCount} 道题。`),
+        }
+      }
       return {
         state: 'generating_summary',
         nextAction: 'generate_summary',

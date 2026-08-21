@@ -1,6 +1,14 @@
 import { INTERVIEW_MODES } from '../domain/modes.js'
 import { summarizePractice } from '../domain/practice.js'
 
+function toSavedSummaryDto(summary) {
+  if (!summary) return null
+  if (summary.kind === 'leetcode') {
+    return { ...summary, problems: summary.problems.map((problem) => ({ ...problem })) }
+  }
+  return { ...summary, strengths: [...summary.strengths], improvements: [...summary.improvements] }
+}
+
 export function toQuestionDto(question) {
   const latestAttempt = question.attempts.at(-1) || null
   return {
@@ -32,7 +40,7 @@ export function toPracticeSummaryDto(practice) {
     createdAt: practice.createdAt,
     updatedAt: practice.updatedAt,
     completedAt: practice.completedAt,
-    summary: practice.summary ? { ...practice.summary, strengths: [...practice.summary.strengths], improvements: [...practice.summary.improvements] } : null,
+    summary: toSavedSummaryDto(practice.summary),
     ...summary,
   }
 }
