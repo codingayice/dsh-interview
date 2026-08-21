@@ -30,7 +30,7 @@ function CompletionButton({ problem, pending, onToggle }) {
   }, problem.completed ? '✓' : '')
 }
 
-export function LeetcodeCatalog({ sessionId = 'global' }) {
+export function LeetcodeCatalog({ sessionId }) {
   const query = useInterviewQuery('leetcode-catalog', () => interviewApi.leetcodeCatalog(), [], { cache: false })
   const command = useCommand(sessionId)
   const [pendingSlug, setPendingSlug] = React.useState('')

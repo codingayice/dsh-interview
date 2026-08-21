@@ -53,7 +53,9 @@ function practiceConfigurationPayload(args) {
 }
 
 function sessionIdOf(exec) {
-  return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || 'global'
+  const sessionId = exec?.agent?.session?.header?.id || exec?.agent?.session?.id
+  if (typeof sessionId !== 'string' || !sessionId.trim()) throw new TypeError('DSH 会话 ID 缺失')
+  return sessionId.trim()
 }
 
 function modelText(interaction) {

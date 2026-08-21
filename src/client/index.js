@@ -53,13 +53,13 @@ export function apply(ctx) {
   for (const toolName of INTERVIEW_TOOL_NAMES) {
     slots.inject('tool.call.toolview', () => slots.register(
       { name: 'tool.call.toolview', key: toolName },
-      (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId || 'global', block: props.block }),
+      (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId, block: props.block }),
     ))
   }
 
   slots.inject('conversation.input.dock', () => slots.register(
     { name: 'conversation.input.dock', id: 'interview-workspace', order: 24 },
-    (props) => h(WorkspaceDock, { sessionId: props.sessionId || 'global' }),
+    (props) => h(WorkspaceDock, { sessionId: props.sessionId }),
   ))
 
   slots.inject('conversation.input.dock', () => slots.register(
@@ -71,7 +71,7 @@ export function apply(ctx) {
             return `${order.length}:${order.at(-1) || ''}`
           })
         : ''
-      return h(TimelinePanel, { sessionId: props.sessionId || 'global', revisionSignal })
+      return h(TimelinePanel, { sessionId: props.sessionId, revisionSignal })
     },
   ))
 }

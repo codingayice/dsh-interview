@@ -27,6 +27,7 @@ function toolFixture() {
 test('工具优先使用 DSH 会话头中的稳定会话 ID', () => {
   assert.equal(sessionIdOf({ agent: { session: { id: 'runtime-id', header: { id: 'stable-id' } } } }), 'stable-id')
   assert.equal(sessionIdOf(exec('legacy-id')), 'legacy-id')
+  assert.throws(() => sessionIdOf({}), /DSH 会话 ID 缺失/)
 })
 
 test('DSH 暴露无 command 联合的原子面试工具', () => {

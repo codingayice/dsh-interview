@@ -439,7 +439,7 @@ function CompletionButton({ problem, pending, onToggle }) {
     onClick: () => onToggle(problem)
   }, problem.completed ? "\u2713" : "");
 }
-function LeetcodeCatalog({ sessionId = "global" }) {
+function LeetcodeCatalog({ sessionId }) {
   const query = useInterviewQuery("leetcode-catalog", () => interviewApi.leetcodeCatalog(), [], { cache: false });
   const command = useCommand(sessionId);
   const [pendingSlug, setPendingSlug] = import_react3.default.useState("");
@@ -1532,12 +1532,12 @@ function apply(ctx) {
   for (const toolName of INTERVIEW_TOOL_NAMES) {
     slots.inject("tool.call.toolview", () => slots.register(
       { name: "tool.call.toolview", key: toolName },
-      (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId || "global", block: props.block })
+      (props) => h(ToolResourceView, { toolName, sessionId: props.sessionId, block: props.block })
     ));
   }
   slots.inject("conversation.input.dock", () => slots.register(
     { name: "conversation.input.dock", id: "interview-workspace", order: 24 },
-    (props) => h(WorkspaceDock, { sessionId: props.sessionId || "global" })
+    (props) => h(WorkspaceDock, { sessionId: props.sessionId })
   ));
   slots.inject("conversation.input.dock", () => slots.register(
     { name: "conversation.input.dock", id: "interview-timeline", order: 25 },
@@ -1546,7 +1546,7 @@ function apply(ctx) {
         const order = snapshot?.chat?.order || [];
         return `${order.length}:${order.at(-1) || ""}`;
       }) : "";
-      return h(TimelinePanel, { sessionId: props.sessionId || "global", revisionSignal });
+      return h(TimelinePanel, { sessionId: props.sessionId, revisionSignal });
     }
   ));
 }

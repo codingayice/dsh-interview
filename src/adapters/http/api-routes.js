@@ -44,13 +44,18 @@ function query(request) {
   return new URL(request.url || '/', 'http://dsh.local').searchParams
 }
 
+function requiredSessionId(value) {
+  if (typeof value !== 'string' || !value.trim()) throw new DomainError('SESSION_ID_REQUIRED', '缺少会话 ID')
+  return value.trim()
+}
+
 export function registerApiRoutes(hostCtx, { application, coordinator, exporter }) {
   const register = (path, handler) => hostCtx.effect(() => hostCtx.webServer.register({ kind: 'exact', path, handler }))
 
   register('/interview/api/session', async (request, response) => {
     if (request.method !== 'GET') return sendJson(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持 GET' } })
     try {
-      sendJson(response, 200, await application.getSession(query(request).get('session') || 'global'))
+      sendJson(response, 200, await application.getSession(requiredSessionId(query(request).get('session'))))
     } catch (error) {
       const output = errorResponse(error); sendJson(response, output.status, output.body)
     }
@@ -97,7 +102,7 @@ export function registerApiRoutes(hostCtx, { application, coordinator, exporter 
     if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持 POST' } })
     try {
       const body = await readJsonBody(request)
-      const result = await dispatchCommand(coordinator, typeof body.session === 'string' ? body.session : 'global', body.command, body.payload)
+      const result = await dispatchCommand(coordinator, requiredSessionId(body.session), body.command, body.payload)
       sendJson(response, 200, result)
     } catch (error) {
       const output = errorResponse(error); sendJson(response, output.status, output.body)
