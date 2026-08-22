@@ -47,6 +47,25 @@ var cache = /* @__PURE__ */ new Map();
 var listeners = /* @__PURE__ */ new Set();
 var notificationListeners = /* @__PURE__ */ new Set();
 var workspaceNavigationListeners = /* @__PURE__ */ new Set();
+function cachedRequest(key, version, loader) {
+  const current = cache.get(key);
+  if (current && current.version >= version) return current.promise;
+  if (current && !current.started) {
+    current.version = version;
+    current.loader = loader;
+    return current.promise;
+  }
+  const entry = { version, loader, started: false, promise: null };
+  entry.promise = Promise.resolve().then(() => {
+    entry.started = true;
+    return entry.loader();
+  }).catch((error) => {
+    if (cache.get(key) === entry) cache.delete(key);
+    throw error;
+  });
+  cache.set(key, entry);
+  return entry.promise;
+}
 async function jsonRequest(url, options) {
   const response = await fetch(url, options);
   const value = await response.json().catch(() => null);
@@ -108,12 +127,8 @@ var interviewApi = {
     workspaceNavigationListeners.add(listener);
     return () => workspaceNavigationListeners.delete(listener);
   },
-  cached(key, loader) {
-    if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => {
-      cache.delete(key);
-      throw error;
-    }));
-    return cache.get(key);
+  cached(key, loader, version = 0) {
+    return cachedRequest(key, Number.isFinite(Number(version)) ? Number(version) : 0, loader);
   },
   invalidate() {
     cache.clear();
@@ -125,12 +140,13 @@ var interviewApi = {
 var import_react = __toESM(require("react"), 1);
 function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache2 = options.cache !== false;
+  const version = options.version || 0;
   const [state, setState] = import_react.default.useState({ loading: true, data: null, error: "" });
   const requestSequenceRef = import_react.default.useRef(0);
   const load = import_react.default.useCallback((force = false) => {
     const requestSequence = ++requestSequenceRef.current;
     setState((current) => ({ ...current, loading: current.data === null, error: "" }));
-    const request = force || !cache2 ? Promise.resolve().then(loader) : interviewApi.cached(key, loader);
+    const request = force || !cache2 ? Promise.resolve().then(loader) : interviewApi.cached(key, loader, version);
     return request.then((data) => {
       if (requestSequence === requestSequenceRef.current) setState({ loading: false, data, error: "" });
       return data;
@@ -139,10 +155,10 @@ function useInterviewQuery(key, loader, dependencies = [], options = {}) {
         setState((current) => ({ ...current, loading: false, error: error.message || "\u52A0\u8F7D\u5931\u8D25" }));
       }
     });
-  }, [key, cache2, ...dependencies]);
+  }, [key, cache2, version, ...dependencies]);
   import_react.default.useEffect(() => {
     load();
-    const unsubscribe = interviewApi.subscribe(() => load(true));
+    const unsubscribe = interviewApi.subscribe(() => load());
     return () => {
       requestSequenceRef.current += 1;
       unsubscribe();
@@ -693,8 +709,8 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
     ) : null
   );
 }
-function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "", live = false }) {
-  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
+function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "", live = false, resourceRevision = 0 }) {
+  const sessionQuery = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId, resourceRevision], { version: resourceRevision });
   const catalogQuery = useInterviewQuery("leetcode-catalog-current", () => interviewApi.leetcodeCatalog(), [], { cache: false });
   const command = useCommand(sessionId);
   const session = sessionQuery.data?.resource?.data;
@@ -977,17 +993,18 @@ function ToolErrorCard({ message }) {
 function usePresentedPractice(presentation, revision) {
   const practiceId = presentation?.practiceId;
   return useInterviewQuery(
-    `presented-practice:${practiceId || "none"}:${revision || 0}`,
+    `practice:${practiceId || "none"}`,
     () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
     [practiceId, revision],
-    { cache: false }
+    { version: revision }
   );
 }
 function usePresentedSession(sessionId, revision) {
   return useInterviewQuery(
-    `presented-session:${sessionId}:${revision || 0}`,
+    `session:${sessionId}`,
     () => interviewApi.session(sessionId),
-    [sessionId, revision]
+    [sessionId, revision],
+    { version: revision }
   );
 }
 function PresentedState({ query, children, missing }) {
@@ -1002,7 +1019,7 @@ function QuestionResourceCard({ presentation, revision, sessionId }) {
   const session = sessionQuery.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   const actions = getPresentedQuestionActions(session, presentation);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal }) : null);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language, resourceRevision: revision }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);

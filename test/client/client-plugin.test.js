@@ -189,7 +189,7 @@ test('会话中的下一题不会改变先前力扣消息卡片', () => {
   assert.match(leetcode, /live = false/)
   assert.match(leetcode, /const current = live\s*\? sessionQuestion \|\| initialQuestion\s*:\s*initialQuestion/)
   assert.match(leetcode, /const active = live[\s\S]*:\s*true/)
-  assert.match(liveInterview, /LeetcodeProblemCard, \{ sessionId, initialQuestion: question, language: practice\.config\?\.language \}/)
+  assert.match(liveInterview, /LeetcodeProblemCard, \{ sessionId, initialQuestion: question, language: practice\.config\?\.language/)
 })
 
 test('重新作答只切换题目状态且不主动打开练习工作台', () => {
@@ -286,4 +286,17 @@ test('题目命令由统一命令钩子互斥且看答案使用阶段权限', ()
   assert.doesNotMatch(liveInterview, /answerRequestedRef|answerRequested/)
   assert.match(liveInterview, /disabled: answerDisabled/)
   assert.match(liveInterview, /answerDisabled: !actions\.canReveal/)
+})
+
+test('工具卡使用稳定资源键和版本缓存合并查询', () => {
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+  const leetcode = readFileSync(new URL('../../src/client/features/leetcode.js', import.meta.url), 'utf8')
+  const hooks = readFileSync(new URL('../../src/client/shared/hooks.js', import.meta.url), 'utf8')
+
+  assert.match(liveInterview, /`practice:\$\{practiceId \|\| 'none'\}`/)
+  assert.match(liveInterview, /`session:\$\{sessionId\}`/)
+  assert.match(liveInterview, /\{ version: revision \}/)
+  assert.match(leetcode, /\{ version: resourceRevision \}/)
+  assert.match(hooks, /interviewApi\.subscribe\(\(\) => load\(\)\)/)
+  assert.doesNotMatch(liveInterview, /presented-(?:practice|session):/)
 })

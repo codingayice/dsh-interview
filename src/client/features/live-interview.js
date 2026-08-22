@@ -161,18 +161,19 @@ export function ToolErrorCard({ message }) {
 function usePresentedPractice(presentation, revision) {
   const practiceId = presentation?.practiceId
   return useInterviewQuery(
-    `presented-practice:${practiceId || 'none'}:${revision || 0}`,
+    `practice:${practiceId || 'none'}`,
     () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
     [practiceId, revision],
-    { cache: false },
+    { version: revision },
   )
 }
 
 function usePresentedSession(sessionId, revision) {
   return useInterviewQuery(
-    `presented-session:${sessionId}:${revision || 0}`,
+    `session:${sessionId}`,
     () => interviewApi.session(sessionId),
     [sessionId, revision],
+    { version: revision },
   )
 }
 
@@ -191,7 +192,7 @@ export function QuestionResourceCard({ presentation, revision, sessionId }) {
   const actions = getPresentedQuestionActions(session, presentation)
   return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question
     ? question.leetcode
-      ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language })
+      ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language, resourceRevision: revision })
       : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal })
     : null)
 }

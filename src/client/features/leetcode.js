@@ -121,8 +121,8 @@ function LeetcodeQuestionCard({ question, catalog, language, active, expanded, c
         : null)
 }
 
-export function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = '', live = false }) {
-  const sessionQuery = useInterviewQuery(`leetcode-session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false })
+export function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = '', live = false, resourceRevision = 0 }) {
+  const sessionQuery = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId, resourceRevision], { version: resourceRevision })
   const catalogQuery = useInterviewQuery('leetcode-catalog-current', () => interviewApi.leetcodeCatalog(), [], { cache: false })
   const command = useCommand(sessionId)
   const session = sessionQuery.data?.resource?.data

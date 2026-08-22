@@ -3,6 +3,29 @@ const listeners = new Set()
 const notificationListeners = new Set()
 const workspaceNavigationListeners = new Set()
 
+function cachedRequest(key, version, loader) {
+  const current = cache.get(key)
+  if (current && current.version >= version) return current.promise
+  if (current && !current.started) {
+    current.version = version
+    current.loader = loader
+    return current.promise
+  }
+
+  const entry = { version, loader, started: false, promise: null }
+  entry.promise = Promise.resolve()
+    .then(() => {
+      entry.started = true
+      return entry.loader()
+    })
+    .catch((error) => {
+      if (cache.get(key) === entry) cache.delete(key)
+      throw error
+    })
+  cache.set(key, entry)
+  return entry.promise
+}
+
 async function jsonRequest(url, options) {
   const response = await fetch(url, options)
   const value = await response.json().catch(() => null)
@@ -66,9 +89,8 @@ export const interviewApi = {
     workspaceNavigationListeners.add(listener)
     return () => workspaceNavigationListeners.delete(listener)
   },
-  cached(key, loader) {
-    if (!cache.has(key)) cache.set(key, Promise.resolve().then(loader).catch((error) => { cache.delete(key); throw error }))
-    return cache.get(key)
+  cached(key, loader, version = 0) {
+    return cachedRequest(key, Number.isFinite(Number(version)) ? Number(version) : 0, loader)
   },
   invalidate() {
     cache.clear()

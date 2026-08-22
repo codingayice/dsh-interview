@@ -3,12 +3,13 @@ import { interviewApi } from './api.js'
 
 export function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache = options.cache !== false
+  const version = options.version || 0
   const [state, setState] = React.useState({ loading: true, data: null, error: '' })
   const requestSequenceRef = React.useRef(0)
   const load = React.useCallback((force = false) => {
     const requestSequence = ++requestSequenceRef.current
     setState((current) => ({ ...current, loading: current.data === null, error: '' }))
-    const request = force || !cache ? Promise.resolve().then(loader) : interviewApi.cached(key, loader)
+    const request = force || !cache ? Promise.resolve().then(loader) : interviewApi.cached(key, loader, version)
     return request
       .then((data) => {
         if (requestSequence === requestSequenceRef.current) setState({ loading: false, data, error: '' })
@@ -19,11 +20,11 @@ export function useInterviewQuery(key, loader, dependencies = [], options = {}) 
           setState((current) => ({ ...current, loading: false, error: error.message || '加载失败' }))
         }
       })
-  }, [key, cache, ...dependencies])
+  }, [key, cache, version, ...dependencies])
 
   React.useEffect(() => {
     load()
-    const unsubscribe = interviewApi.subscribe(() => load(true))
+    const unsubscribe = interviewApi.subscribe(() => load())
     return () => {
       requestSequenceRef.current += 1
       unsubscribe()
