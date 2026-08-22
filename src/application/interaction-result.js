@@ -1,5 +1,5 @@
 import { INTERVIEW_ACTIONS } from './interview-actions.js'
-import { ARTIFACT_KINDS, artifactForSession, createInteractionArtifact } from './interaction-artifact.js'
+import { ARTIFACT_KINDS, artifactForSession, assertInteractionArtifactContract, createInteractionArtifact } from './interaction-artifact.js'
 
 const PROTOCOL = 'dsh-interview/interaction-v2'
 
@@ -264,11 +264,12 @@ function descriptor(action, result) {
 }
 
 export function createInteractionResult(action, result) {
+  const outcome = assertInteractionArtifactContract(action, descriptor(action, result))
   return {
     protocol: PROTOCOL,
     action,
     revision: result.revision ?? 0,
-    ...descriptor(action, result),
+    ...outcome,
     resource: result.resource,
     events: result.events || [],
     agentTasks: result.agentTasks || [],

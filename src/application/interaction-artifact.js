@@ -46,3 +46,33 @@ export function artifactForSession(data, references = {}) {
   }
   return null
 }
+
+const REQUIRED_ARTIFACT_BY_ACTION = Object.freeze({
+  [INTERVIEW_ACTIONS.PRESENT_QUESTION]: ARTIFACT_KINDS.QUESTION,
+  [INTERVIEW_ACTIONS.OPEN_QUESTION]: ARTIFACT_KINDS.QUESTION,
+  [INTERVIEW_ACTIONS.RETRY_QUESTION]: ARTIFACT_KINDS.QUESTION,
+  [INTERVIEW_ACTIONS.COMPLETE_REVIEW]: ARTIFACT_KINDS.REVIEW,
+  [INTERVIEW_ACTIONS.COMPLETE_SUMMARY]: ARTIFACT_KINDS.FINISHED,
+})
+
+export function assertInteractionArtifactContract(action, outcome) {
+  const requiredKind = REQUIRED_ARTIFACT_BY_ACTION[action]
+  if (requiredKind && outcome.artifact?.kind !== requiredKind) {
+    throw new TypeError(`${action} 必须产生 ${requiredKind} 交互产物`)
+  }
+  if (outcome.artifact && outcome.assistantResponse?.mode !== 'exact') {
+    throw new TypeError(`交互产物 ${outcome.artifact.kind} 必须配合固定辅助文本输出`)
+  }
+  if (outcome.artifact?.kind === ARTIFACT_KINDS.QUESTION
+    && !['awaiting_answer', 'awaiting_solution'].includes(outcome.state)) {
+    throw new TypeError(`question 交互产物不能用于 ${String(outcome.state)} 状态`)
+  }
+  if (outcome.artifact?.kind === ARTIFACT_KINDS.REVIEW && outcome.state !== 'awaiting_next') {
+    throw new TypeError(`review 交互产物不能用于 ${String(outcome.state)} 状态`)
+  }
+  if (outcome.artifact?.kind === ARTIFACT_KINDS.FINISHED && outcome.state !== 'completed') {
+    throw new TypeError(`finished 交互产物不能用于 ${String(outcome.state)} 状态`)
+  }
+  return outcome
+}
+import { INTERVIEW_ACTIONS } from './interview-actions.js'
