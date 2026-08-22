@@ -9,6 +9,16 @@ export const PRACTICE_CONFIGURATION_POLICY = [
   '只有当前模式的全部必填配置都明确后才能调用 interview_start_practice。',
 ].join('')
 
+export const ANSWER_SUBMISSION_POLICY = [
+  '作答识别规则：awaiting_answer 只表示当前允许提交回答，不代表用户下一条消息必然是作答。',
+  '仅当用户明确表示正在回答当前题，或消息内容明显直接回应当前题目时，才能调用 interview_submit_answer。',
+  '与当前题无关的消息应正常回答，不调用任何练习工具，也不改变练习状态。',
+  '用户询问题意、补充条件、请求提示或讨论插件时不得保存为作答；按当前模式提供必要澄清后继续等待回答。',
+  '用户明确表示不会并要求讲解时调用 interview_reveal_answer，不创建作答或评价。',
+  '无法可靠判断是否为作答时，先询问用户这是正式回答还是希望澄清，不得自行提交。',
+  '提交时必须原样保存用户的真实回答，不得补写、改写或替用户回答。',
+].join('')
+
 export const QUESTION_GENERATION_POLICY = [
   '出题规则：每轮只生成一道题。',
   '题目必须简单、明确、简短，只考察一个核心知识点，建议使用一个问句且不超过 80 个汉字。',

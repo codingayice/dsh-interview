@@ -270,6 +270,22 @@ test('生成规范只在负责保存对应内容的工具中完整声明一次',
   assert.doesNotMatch(fixture.tools.interview_present_question.parameters.properties.prompt.description, /出题规则/)
 })
 
+test('提交回答工具明确区分正式作答、无关消息和澄清请求', () => {
+  const fixture = toolFixture()
+  const submit = fixture.tools.interview_submit_answer.description
+  const otherDescriptions = Object.values(fixture.tools)
+    .filter((tool) => tool.name !== 'interview_submit_answer')
+    .map((tool) => tool.description)
+
+  assert.match(submit, /awaiting_answer 只表示当前允许提交回答/)
+  assert.match(submit, /与当前题无关的消息应正常回答/)
+  assert.match(submit, /询问题意、补充条件、请求提示或讨论插件时不得保存为作答/)
+  assert.match(submit, /明确表示不会并要求讲解时调用 interview_reveal_answer/)
+  assert.match(submit, /无法可靠判断是否为作答时，先询问用户/)
+  assert.match(submit, /不得补写、改写或替用户回答/)
+  assert.ok(otherDescriptions.every((description) => !description.includes('作答识别规则')))
+})
+
 test('完整响应协议只由 Agent 事件注入', () => {
   const fixture = toolFixture()
   const eventInstruction = instructionFor({

@@ -2,7 +2,7 @@ import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 import { toAgentInteractionResult } from '../../application/interaction-result.js'
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
 import { TOOL_RESULT_PROTOCOL } from './assistant-response-policy.js'
-import { CONTINUE_PRACTICE_POLICY, LEETCODE_EXPLANATION_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
+import { ANSWER_SUBMISSION_POLICY, CONTINUE_PRACTICE_POLICY, LEETCODE_EXPLANATION_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
 import { LEETCODE_LANGUAGE_IDS } from '../../domain/leetcode-languages.js'
 
 const emptyParameters = Object.freeze({ type: 'object', properties: {}, additionalProperties: false })
@@ -209,7 +209,7 @@ const tools = [
   atomicTool({
     name: 'interview_submit_answer',
     action: INTERVIEW_ACTIONS.SUBMIT_ANSWER,
-    description: '原样保存用户对当前题目的回答。成功后必须按 nextAction 继续生成评价。',
+    description: `原样保存用户对当前题目的正式回答。成功后必须按 nextAction 继续生成评价。${ANSWER_SUBMISSION_POLICY}`,
     parameters: {
       type: 'object',
       properties: {
