@@ -805,86 +805,6 @@ function getArtifactQuestionActions(session, artifact) {
 }
 
 // src/client/features/live-interview.js
-function Evaluation({ attempt }) {
-  if (!attempt?.evaluation) return null;
-  const evaluation = attempt.evaluation;
-  return h(
-    "div",
-    { className: "di-section" },
-    h("div", { className: "di-section-label" }, "\u672C\u6B21\u8BC4\u4EF7"),
-    h(
-      "div",
-      { className: "di-score-row" },
-      h("span", { className: "di-score-number" }, evaluation.score),
-      h(ScoreRail, { score: evaluation.score })
-    ),
-    h("div", { style: { marginTop: "12px" } }, h(Markdown, null, evaluation.feedback)),
-    Object.keys(evaluation.dimensions || {}).length ? h("div", { className: "di-attempt" }, Object.entries(evaluation.dimensions).map(([name2, score]) => h("div", { className: "di-attempt-head", key: name2 }, h("span", null, name2), h("span", null, `${score}/10`)))) : null
-  );
-}
-function Explanation({ explanation }) {
-  if (!explanation) return null;
-  return h(
-    "div",
-    { className: "di-section" },
-    h("div", { className: "di-section-label" }, "\u53C2\u8003\u8BB2\u89E3"),
-    h(Markdown, null, explanation.detail),
-    explanation.memorizationPoints ? h(
-      "div",
-      { className: "di-attempt" },
-      h("div", { className: "di-section-label" }, "\u76F4\u63A5\u80CC"),
-      h(Markdown, null, explanation.memorizationPoints)
-    ) : null
-  );
-}
-function LiveInterviewCard({ sessionId }) {
-  const query = useInterviewQuery(`session:${sessionId}`, () => interviewApi.session(sessionId), [sessionId], { cache: false });
-  const command = useCommand(sessionId);
-  if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
-  if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
-  const session = query.data?.resource?.data;
-  if (!session?.selected) return h("div", { className: "di-card" }, h(Empty, { title: "\u8FD8\u6CA1\u6709\u5F00\u59CB\u7EC3\u4E60", detail: "\u7528\u81EA\u7136\u8BED\u8A00\u63CF\u8FF0\u9762\u8BD5\u6A21\u5F0F\u548C\u4E3B\u9898\u5373\u53EF\u5F00\u59CB\u3002" }));
-  const question = session.currentQuestion;
-  if (question?.leetcode) return h(LeetcodeProblemCard, { key: question.id, sessionId, initialQuestion: question, live: true });
-  const latestAttempt = question?.attempts?.at(-1) || null;
-  const run = (name2, payload) => command.run(name2, payload).catch(() => {
-  });
-  return h(
-    "article",
-    { className: "di-card", "aria-label": "\u5F53\u524D\u9762\u8BD5\u9898" },
-    h(
-      "header",
-      { className: "di-card-head" },
-      h("div", { className: "di-title" }, session.practice.topic),
-      h(PhaseBadge, { phase: session.phase })
-    ),
-    h(
-      "div",
-      { className: "di-card-body" },
-      question ? h(
-        import_react4.default.Fragment,
-        null,
-        h("div", { className: "di-question-text" }, h(Markdown, null, question.prompt)),
-        latestAttempt ? h(
-          "div",
-          { className: "di-attempt" },
-          h("div", { className: "di-attempt-head" }, h("span", null, `\u7B2C ${latestAttempt.sequence} \u6B21\u4F5C\u7B54`), h("span", null, latestAttempt.evaluation ? `${latestAttempt.evaluation.score}/10` : "\u7B49\u5F85\u8BC4\u4EF7")),
-          h(Markdown, null, latestAttempt.answer)
-        ) : null,
-        h(Evaluation, { attempt: latestAttempt }),
-        h(Explanation, { explanation: question.explanation })
-      ) : h(Empty, { title: "\u9762\u8BD5\u5B98\u6B63\u5728\u51C6\u5907\u4E0B\u4E00\u9898", detail: "\u9898\u76EE\u751F\u6210\u540E\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u8FD9\u91CC\u3002" }),
-      h(ErrorNotice, null, command.error),
-      h(
-        "div",
-        { className: "di-actions" },
-        session.phase === "awaiting_next" ? h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898") : null,
-        question && session.phase === "awaiting_next" ? h(Button, { busy: command.busy === "question.retry", onClick: () => run("question.retry", { questionId: question.id }) }, "\u91CD\u65B0\u4F5C\u7B54") : null,
-        session.phase !== "completed" ? h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
-      )
-    )
-  );
-}
 function CompactResultCard({ title, detail, tone = "quiet" }) {
   return h(
     "div",
@@ -1950,8 +1870,6 @@ function ToolResourceView({ toolName, sessionId, block }) {
       return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
     case "finished":
       return h(PracticeSummaryCard, { artifact: view, revision: view.revision });
-    case "live-session":
-      return h(LiveInterviewCard, { sessionId });
     default:
       return null;
   }

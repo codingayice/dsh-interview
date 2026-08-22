@@ -7,7 +7,6 @@ export const ARTIFACT_KINDS = Object.freeze({
   DELETED: 'deleted',
   EXPORTED: 'exported',
   FINISHED: 'finished',
-  LIVE_SESSION: 'live-session',
 })
 
 const REFERENCE_REQUIREMENTS = Object.freeze({

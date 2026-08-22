@@ -86,7 +86,7 @@ function descriptor(action, result) {
         return {
           state: data.phase,
           nextAction,
-          artifact: createInteractionArtifact(ARTIFACT_KINDS.LIVE_SESSION),
+          artifact: null,
           assistantResponse: exact('当前练习已结束，如需继续请先确认重新打开。'),
           context: referencesOf(result, 'practiceId'),
         }
@@ -131,20 +131,21 @@ function descriptor(action, result) {
         artifact: null,
         assistantResponse: exact(`已切换到当前练习：${data.practice.topic}。`),
         context: data,
-      }
+    }
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: {
-      const needsQuestion = data.phase === 'awaiting_question'
-      const needsExplanation = data.phase === 'generating_explanation'
-      const generating = needsQuestion || needsExplanation
+      const nextAction = data.resumeAction
+      const generating = [
+        'generate_question',
+        'evaluate_answer',
+        'generate_explanation',
+        'generate_leetcode_explanation',
+        'generate_summary',
+      ].includes(nextAction)
       return {
         state: data.phase,
-        nextAction: needsQuestion
-          ? 'generate_question'
-          : needsExplanation
-            ? data.currentQuestion?.leetcode ? 'generate_leetcode_explanation' : 'generate_explanation'
-            : 'wait_for_user',
-        artifact: generating ? null : createInteractionArtifact(ARTIFACT_KINDS.LIVE_SESSION),
-        assistantResponse: generating ? continueSilently() : exact('练习已切换，请继续作答。'),
+        nextAction: generating ? nextAction : 'wait_for_user',
+        artifact: null,
+        assistantResponse: generating ? continueSilently() : exact('练习已重新打开。'),
         context: data,
       }
     }

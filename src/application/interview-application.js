@@ -537,13 +537,36 @@ export class InterviewApplication {
     let cursor = createCursor({ sessionId, practiceId: practice.id, now })
     const latestQuestion = practice.questions.at(-1) || null
     if (latestQuestion) cursor = await this.#cursorForQuestion(cursor, latestQuestion, now)
+    const resumeAction = continuationFor(cursor)
     const events = [{ type: 'practice.reopened', sessionId, practiceId: practice.id }]
-    const agentTasks = latestQuestion ? [] : [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
-      sessionId, practiceId: practice.id, reason: 'practice_reopened',
-    })]
+    let agentTasks = []
+    if (resumeAction === CONTINUATION_ACTIONS.GENERATE_QUESTION) {
+      agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_QUESTION, {
+        sessionId, practiceId: practice.id, reason: 'practice_reopened',
+      })]
+    } else if (resumeAction === CONTINUATION_ACTIONS.EVALUATE_ANSWER) {
+      const attempt = latestQuestion?.attempts.find((item) => item.id === cursor.attemptId)
+      assertDomain(Boolean(attempt), 'ATTEMPT_NOT_FOCUSED', '找不到重新打开后待评价的作答')
+      agentTasks = [agentTask(AGENT_TASK_TYPES.EVALUATE_ANSWER, {
+        sessionId, practiceId: practice.id, questionId: latestQuestion.id, attemptId: attempt.id,
+      })]
+    } else if (resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION) {
+      const taskType = latestQuestion?.leetcode
+        ? AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION
+        : AGENT_TASK_TYPES.GENERATE_REVIEW
+      agentTasks = [agentTask(taskType, {
+        sessionId, practiceId: practice.id, questionId: latestQuestion.id,
+        ...(cursor.attemptId ? { attemptId: cursor.attemptId } : {}),
+      })]
+    }
     await this.repository.commit({ practice, cursor })
     await this.#publish(events)
-    return this.#result('practice-reopened', toSessionDto(cursor, practice), cursor, { events, agentTasks })
+    return this.#result('practice-reopened', {
+      ...toSessionDto(cursor, practice),
+      resumeAction: latestQuestion?.leetcode && resumeAction === CONTINUATION_ACTIONS.GENERATE_EXPLANATION
+        ? CONTINUATION_ACTIONS.GENERATE_LEETCODE_EXPLANATION
+        : resumeAction,
+    }, cursor, { events, agentTasks })
   }
 
   async listPractices(filters = {}) {

@@ -205,3 +205,31 @@ test('UI 重答和已有讲解只投递后端当前产物，不重复执行业�
   assert.equal(renderedReview.artifact.kind, 'review')
   assert.equal(renderedReview.assistantResponse.text, '答案讲解已打开，请查看卡片。')
 })
+
+test('重新打开练习按后端阶段恢复任务且不再生成工作台卡片', async () => {
+  const fixture = applicationFixture()
+  const dispatched = []
+  const coordinator = new InterviewCoordinator({
+    application: fixture.application,
+    eventBridge: { dispatch(tasks) { dispatched.push(...tasks) } },
+  })
+  const execute = (action, payload = {}, source = 'agent') => coordinator.execute({
+    sessionId: 'reopen-artifact', action, payload, source,
+  })
+
+  const started = await execute(INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'bagu', config: { topic: '并发编程' } })
+  await execute(INTERVIEW_ACTIONS.PRESENT_QUESTION, { prompt: '什么是可见性？' })
+  await execute(INTERVIEW_ACTIONS.SUBMIT_ANSWER, { answer: '线程可以看到其他线程的修改。' })
+  await execute(INTERVIEW_ACTIONS.REQUEST_FINISH)
+  await execute(INTERVIEW_ACTIONS.COMPLETE_SUMMARY, {
+    overall: '练习结束。', strengths: ['完成作答。'], improvements: ['补充细节。'],
+  })
+
+  const reopened = await execute(INTERVIEW_ACTIONS.REOPEN_PRACTICE, {
+    practiceId: started.resource.data.practice.id,
+  }, 'ui')
+  assert.equal(reopened.artifact, null)
+  assert.equal(reopened.nextAction, 'evaluate_answer')
+  assert.equal(reopened.assistantResponse.mode, 'continue')
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.EVALUATE_ANSWER])
+})

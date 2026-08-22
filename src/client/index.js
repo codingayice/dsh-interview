@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   CompactResultCard,
-  LiveInterviewCard,
   PracticeSummaryCard,
   QuestionResourceCard,
   ReviewResourceCard,
@@ -40,7 +39,6 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case 'deleted': return h(CompactResultCard, { title: '练习已删除', detail: '档案和对应会话游标已经清理。', tone: 'completed' })
     case 'exported': return h(CompactResultCard, { title: 'Markdown 已生成', detail: '打开练习档案可以下载本次导出。' })
     case 'finished': return h(PracticeSummaryCard, { artifact: view, revision: view.revision })
-    case 'live-session': return h(LiveInterviewCard, { sessionId })
     default: return null
   }
 }
