@@ -34,7 +34,7 @@ export const CONTINUE_PRACTICE_POLICY = [
   'nextAction=generate_question 时先调用 interview_read_practice_context，再生成一道题并调用 interview_present_question。',
   'nextAction=evaluate_answer 时读取完整上下文，对返回的当前原始回答生成评价并调用 interview_save_evaluation，随后继续完成讲解。',
   'nextAction=generate_explanation 时读取完整上下文，生成详细讲解和直接背并调用 interview_complete_review。',
-  `nextAction=generate_leetcode_explanation 时读取完整上下文，严格按力扣讲解规则生成内容并调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
+  'nextAction=generate_leetcode_explanation 时读取完整上下文，严格遵守 interview_complete_review 的力扣讲解约束生成内容并调用该工具。',
   'nextAction=generate_summary 时读取完整上下文，生成总结并调用 interview_complete_summary。',
   'nextAction=select_practice、show_current_question 或 confirm_reopen 时遵守 assistantResponse 立即停止，不得继续生成内容。',
 ].join('')

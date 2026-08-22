@@ -97,7 +97,7 @@ const tools = [
   }),
   atomicTool({
     name: 'interview_update_practice', action: INTERVIEW_ACTIONS.UPDATE_PRACTICE,
-    description: `完整替换指定练习的模式配置。所有字段必须由用户明确提供，禁止保留或补全未明确字段。${PRACTICE_CONFIGURATION_POLICY}`,
+    description: '完整替换指定练习的模式配置。只传入用户明确提供的当前模式全部必填字段，禁止保留、推断或补全其他字段。',
     parameters: practiceConfigurationParameters({ includePracticeId: true }),
     payload: practiceConfigurationPayload,
   }),
@@ -142,7 +142,7 @@ const tools = [
     description: `保存并通过 UI 展示一道已经生成完成的面试题。你必须先自行生成题目，再把题目放入必填 prompt；本工具不会替你生成题目，禁止空参数调用。${QUESTION_GENERATION_POLICY}`,
     parameters: {
       type: 'object',
-      properties: { prompt: { type: 'string', minLength: 1, maxLength: 120, description: `可以直接向候选人展示的单个简短问题。${QUESTION_GENERATION_POLICY}` } },
+      properties: { prompt: { type: 'string', minLength: 1, maxLength: 120, description: '可以直接向候选人展示的一道简短问题。' } },
       required: ['prompt'],
       additionalProperties: false,
     },
@@ -161,7 +161,7 @@ const tools = [
     payload: (args) => ({ practiceId: args.practice_id, questionId: args.question_id }),
   }),
   atomicTool({
-    name: 'interview_update_question', action: INTERVIEW_ACTIONS.UPDATE_QUESTION, description: `修改指定题目的题干，不改变历次作答、评价和讲解。${QUESTION_GENERATION_POLICY}`,
+    name: 'interview_update_question', action: INTERVIEW_ACTIONS.UPDATE_QUESTION, description: '修改指定题目的题干，不改变历次作答、评价和讲解。新题干仍必须是一道简短、单一问题。',
     parameters: {
       type: 'object',
       properties: {
@@ -191,14 +191,14 @@ const tools = [
     name: 'interview_open_question', action: INTERVIEW_ACTIONS.OPEN_QUESTION, description: '打开并通过 UI 展示指定历史题目，不创建新题。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
   }),
-  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: `请求进入下一题。刷力扣模式由插件直接随机抽题；其他模式成功后必须先调用 interview_read_practice_context 读取已保存配置和历史，再按照 nextAction 生成题目并调用 interview_present_question。${QUESTION_GENERATION_POLICY}` }),
+  atomicTool({ name: 'interview_request_next', action: INTERVIEW_ACTIONS.REQUEST_NEXT, description: '请求进入下一题。刷力扣模式由插件直接随机抽题；其他模式严格按照返回的 nextAction 继续生成并展示题目。' }),
   atomicTool({
     name: 'interview_retry_question', action: INTERVIEW_ACTIONS.RETRY_QUESTION, description: '把指定历史题切换为当前待回答题目。',
     parameters: idParameters('question_id', '题目 ID'), payload: (args) => ({ questionId: args.question_id }),
   }),
   atomicTool({
     name: 'interview_reveal_answer', action: INTERVIEW_ACTIONS.REVEAL_ANSWER,
-    description: `用户明确选择查看当前面试题答案或讲解当前力扣题时调用。不得伪造作答或评价；nextAction=generate_explanation 时生成面试知识讲解和直接背；nextAction=generate_leetcode_explanation 时读取练习配置并只生成指定语言的一份完整答案代码；最后调用 interview_complete_review。${LEETCODE_EXPLANATION_POLICY}`,
+    description: '用户明确选择查看当前面试题答案或讲解当前力扣题时调用。不得伪造作答或评价；按照返回的 nextAction 生成内容，并严格遵守 interview_complete_review 的对应讲解约束。',
     parameters: {
       type: 'object',
       properties: { question_id: { type: 'string', minLength: 1, description: '当前题目 ID；省略时使用会话当前题。' } },
