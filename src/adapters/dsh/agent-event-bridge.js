@@ -13,7 +13,7 @@ function pluginMessage(text) {
 function instructionFor(task) {
   switch (task.type) {
     case AGENT_TASK_TYPES.GENERATE_QUESTION:
-      return `面试工作流事件：需要生成题目。practice_id=${task.practiceId}，reason=${task.reason}。先调用 interview_get_status，再必须调用 interview_read_practice_context 读取已保存的模式专属配置和全部历史。严格遵守 interview_present_question 的出题约束自行生成一道题，然后把非空题目作为 prompt 调用该工具；该工具只保存和展示，不会替你生成题目。${ASSISTANT_RESPONSE_PROTOCOL}`
+      return `面试工作流事件：后端状态机要求生成题目。practice_id=${task.practiceId}，reason=${task.reason}。必须调用 interview_read_practice_context 读取已保存的模式专属配置和全部历史。严格遵守 interview_present_question 的出题约束生成一道题，然后把非空题目作为 prompt 调用该工具；题目必须先由后端保存为领域对象，再由 question 产物卡片展示，禁止通过普通 Assistant Text 出题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.EVALUATE_ANSWER:
       return `面试工作流事件：需要恢复评价。practice_id=${task.practiceId}，question_id=${task.questionId}，attempt_id=${task.attemptId}。必须调用 interview_read_practice_context，找到上述作答的原始回答，生成评分与点评并调用 interview_save_evaluation；如果工具要求生成讲解，必须继续调用 interview_complete_review。不得创建新作答或新题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.GENERATE_REVIEW:

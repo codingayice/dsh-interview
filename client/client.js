@@ -1852,7 +1852,6 @@ function WorkspaceDock({ sessionId }) {
 var INTERVIEW_TOOL_NAMES = Object.freeze([
   "interview_start_practice",
   "interview_update_practice",
-  "interview_get_status",
   "interview_continue_practice",
   "interview_select_practice",
   "interview_reopen_practice",

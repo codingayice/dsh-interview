@@ -47,7 +47,7 @@ test('协调器把 Agent 协议错误标记为可恢复且不交给 UI', async (
   assert.equal(invalid.error.audience, 'agent')
   assert.equal(invalid.error.recoverable, true)
   assert.equal(invalid.artifact, null)
-  assert.equal(invalid.nextAction, 'read_status_and_retry')
+  assert.equal(invalid.nextAction, 'resume_workflow')
 })
 
 test('UI 入口由协调器统一派发后续生成事件', async () => {

@@ -281,7 +281,7 @@ export function createAgentProtocolError(action, error) {
     action,
     revision: 0,
     state: 'recovering',
-    nextAction: 'read_status_and_retry',
+    nextAction: 'resume_workflow',
     artifact: null,
     assistantResponse: continueSilently(),
     error: {
@@ -297,8 +297,10 @@ export function createAgentProtocolError(action, error) {
 }
 
 export function toAgentInteractionResult(interaction) {
-  const assistantInstruction = interaction.assistantResponse.mode === 'continue'
-    ? '继续执行 nextAction 指定的必要步骤，不要向用户输出普通文本。'
+  const assistantInstruction = interaction.error?.recoverable
+    ? '调用 interview_continue_practice，从后端权威状态恢复工作流；不要猜测状态或输出普通文本。'
+    : interaction.assistantResponse.mode === 'continue'
+      ? '继续执行 nextAction 指定的必要步骤，不要向用户输出普通文本。'
     : `立即结束当前工具链，最终回复必须且只能是“${interaction.assistantResponse.text}”，不得复述 UI 产物内容。`
   return {
     protocol: interaction.protocol,

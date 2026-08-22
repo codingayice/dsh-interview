@@ -101,10 +101,9 @@ const tools = [
     parameters: practiceConfigurationParameters({ includePracticeId: true }),
     payload: practiceConfigurationPayload,
   }),
-  atomicTool({ name: 'interview_get_status', action: INTERVIEW_ACTIONS.GET_STATUS, description: '读取当前面试会话的权威状态。只在需要判断 nextAction 或用户明确查询状态时调用。' }),
   atomicTool({
     name: 'interview_continue_practice', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE,
-    description: `从当前权威阶段恢复练习，不把“继续”简单等同于“下一题”。trigger 仅供插件题目展示事件按指令传入，用户主动继续时禁止自行填写。${CONTINUE_PRACTICE_POLICY}`,
+    description: `用户明确表达继续、接着练或恢复练习时必须调用的唯一入口。从后端权威阶段恢复业务并返回当前应展示的 UI 产物，不把“继续”简单等同于“下一题”。禁止读取历史上下文后通过普通 Assistant Text 自行复述题目、点评或总结。trigger 仅供插件题目展示事件按指令传入，用户主动继续时禁止自行填写。${CONTINUE_PRACTICE_POLICY}`,
     parameters: {
       type: 'object',
       properties: {

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { InterviewCoordinator } from '../../src/application/interview-coordinator.js'
+import { INTERVIEW_ACTIONS } from '../../src/application/interview-actions.js'
 import { createToolDefinitions, INTERVIEW_TOOL_NAMES, modelText, sessionIdOf } from '../../src/adapters/dsh/tool-definitions.js'
 import { instructionFor } from '../../src/adapters/dsh/agent-event-bridge.js'
 import { AGENT_TASK_TYPES } from '../../src/application/agent-tasks.js'
@@ -59,7 +60,9 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_start_practice.description, /简历、面试官风格、是否手撕代码、面试难度/)
   assert.match(fixture.tools.interview_start_practice.description, /不得询问题数、是否追问/)
   assert.match(fixture.tools.interview_continue_practice.description, /不把“继续”简单等同于“下一题”/)
+  assert.match(fixture.tools.interview_continue_practice.description, /必须调用的唯一入口/)
   assert.match(fixture.tools.interview_continue_practice.description, /必须严格执行工具返回的 nextAction/)
+  assert.equal(fixture.tools.interview_get_status, undefined)
   assert.deepEqual(fixture.tools.interview_continue_practice.parameters.properties.trigger.enum, ['practice_started', 'next_requested'])
   assert.match(fixture.tools.interview_reveal_answer.description, /interview_complete_review 的对应讲解约束/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
@@ -82,7 +85,9 @@ test('力扣工具直接抽题、展示目录并保存显式完成状态', async
   const explanation = await fixture.tools.interview_reveal_answer.execute({}, exec('leetcode-session'))
   assert.equal(explanation.nextAction, 'generate_leetcode_explanation')
   assert.equal(explanation.context.explanationType, 'leetcode_solution')
-  const explanationStatus = await fixture.tools.interview_get_status.execute({}, exec('leetcode-session'))
+  const explanationStatus = await fixture.coordinator.execute({
+    sessionId: 'leetcode-session', action: INTERVIEW_ACTIONS.GET_STATUS,
+  })
   assert.equal(explanationStatus.nextAction, 'generate_leetcode_explanation')
   const explained = await fixture.tools.interview_complete_review.execute({
     detail: [
@@ -152,6 +157,7 @@ test('继续工具按阶段恢复并向模型返回确定的下一动作', async
   assert.equal(answering.nextAction, 'wait_for_user')
   assert.equal(answering.artifact.kind, 'question')
   assert.equal(answering.assistantResponse.text, '已恢复当前题，请继续作答。')
+  assert.doesNotMatch(modelText(answering)[0].text, /什么是类加载器/)
 
   await fixture.tools.interview_submit_answer.execute({ answer: '负责加载类。' }, exec('continue-session'))
   const evaluating = await fixture.tools.interview_continue_practice.execute({}, exec('continue-session'))
@@ -228,6 +234,7 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.match(question, /非空题目作为 prompt/)
   assert.match(question, /interview_present_question 的出题约束/)
   assert.match(question, /必须调用 interview_read_practice_context/)
+  assert.doesNotMatch(question, /interview_get_status/)
   const reveal = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_REVIEW, practiceId: 'p1', questionId: 'q1', reason: 'answer_revealed' })
   assert.match(reveal, /禁止创建用户作答、评分或评价/)
   assert.match(reveal, /interview_complete_review/)
