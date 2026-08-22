@@ -70,13 +70,11 @@ function descriptor(action, result) {
       }
       if (nextAction === 'show_current_question') {
         const leetcode = Boolean(data.question?.leetcode)
-        const response = leetcode && data.trigger === 'next_requested'
+        const response = leetcode && data.deliveryReason === 'next_requested'
           ? '已抽取下一题。'
-          : leetcode && data.trigger === 'practice_started'
-            ? '已抽取题目，请开始刷题。'
-            : leetcode
-              ? '已恢复当前力扣题，请继续刷题。'
-              : '已恢复当前题，请继续作答。'
+          : leetcode
+            ? '已恢复当前力扣题，请继续刷题。'
+            : '已恢复当前题，请继续作答。'
         return {
           state: data.phase,
           nextAction: 'wait_for_user',
@@ -106,6 +104,24 @@ function descriptor(action, result) {
         artifact: null,
         assistantResponse: continueSilently(),
         context,
+      }
+    }
+    case INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT: {
+      const currentArtifact = artifactForSession(data, result.references)
+      const messages = {
+        practice_started: '已随机抽取一道力扣题，请开始刷题。',
+        practice_continued: data.currentQuestion?.leetcode
+          ? '已恢复当前力扣题，请继续刷题。'
+          : '已恢复当前题，请继续作答。',
+        next_requested: '已抽取下一题。',
+        question_retried: '已切换到这道题，请重新作答。',
+        answer_revealed: '答案讲解已打开，请查看卡片。',
+      }
+      return {
+        state: data.phase,
+        nextAction: 'wait_for_user',
+        artifact: currentArtifact,
+        assistantResponse: exact(messages[data.deliveryReason] || '当前练习内容已打开，请查看卡片。'),
       }
     }
     case INTERVIEW_ACTIONS.SELECT_PRACTICE:

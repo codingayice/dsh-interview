@@ -22,8 +22,8 @@ function instructionFor(task) {
         : `面试工作流事件：需要恢复点评讲解。practice_id=${task.practiceId}，question_id=${task.questionId}。必须调用 interview_read_practice_context，基于题目和已有评价生成详细讲解与直接背，然后调用 interview_complete_review。不得重复评价、创建作答或出题。${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION:
       return `力扣练习事件：用户请求当前题讲解。practice_id=${task.practiceId}，question_id=${task.questionId}。必须调用 interview_read_practice_context 读取当前力扣题和 config.language，严格遵守 interview_complete_review 的力扣讲解约束生成内容并调用该工具保存；不得创建作答、评分、评价或新题。${ASSISTANT_RESPONSE_PROTOCOL}`
-    case AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION:
-      return `力扣题目展示事件：插件已经随机抽取并保存题目。practice_id=${task.practiceId}，question_id=${task.questionId}，trigger=${task.reason}。必须只调用 interview_continue_practice，并原样传入 trigger=${task.reason}，读取并展示当前权威题目卡片。禁止调用 interview_request_next、interview_present_question 或自行生成题目，避免重复抽题。${ASSISTANT_RESPONSE_PROTOCOL}`
+    case AGENT_TASK_TYPES.DELIVER_ARTIFACT:
+      return `交互产物投递事件：后端已经完成业务动作并确定当前权威 UI 产物。practice_id=${task.practiceId}，question_id=${task.questionId}，reason=${task.reason}。必须只调用 interview_render_current_artifact，并原样传入 reason=${task.reason}；该工具只负责把后端产物放到当前对话的最新位置。禁止调用任何业务工具，禁止生成、改写或复述题目、点评、讲解和总结。${ASSISTANT_RESPONSE_PROTOCOL}`
     case AGENT_TASK_TYPES.GENERATE_SUMMARY:
       return `面试工作流事件：用户要求结束练习。practice_id=${task.practiceId}。必须调用 interview_read_practice_context 读取练习配置、全部题目、全部历次作答、评价和讲解；基于这些真实数据生成总体总结、表现亮点和改进建议，然后调用 interview_complete_summary。禁止继续出题。${ASSISTANT_RESPONSE_PROTOCOL}`
     default:

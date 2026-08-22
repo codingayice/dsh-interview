@@ -120,7 +120,7 @@ test('选择练习向模型提供完整上下文并只返回切换确认', async
   assert.equal(selected.context.practice.questions[0].prompt, '什么是 JMM？')
 })
 
-test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型调用', async () => {
+test('力扣抽题触发产物投递事件且其他本地管理保持零模型调用', async () => {
   const fixture = applicationFixture()
   const dispatched = []
   const coordinator = new InterviewCoordinator({
@@ -130,12 +130,12 @@ test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型�
   const executeUi = (sessionId, action, payload = {}) => coordinator.execute({ sessionId, action, payload, source: 'ui' })
 
   const leetcode = await executeUi('leetcode-local', INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'leetcode', config: { language: 'java' } })
-  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION])
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.DELIVER_ARTIFACT])
   dispatched.length = 0
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.SET_LEETCODE_COMPLETION, { slug: 'two-sum', completed: true })
   assert.equal(dispatched.length, 0, '完成状态仍然是纯本地操作')
   await executeUi('leetcode-local', INTERVIEW_ACTIONS.REQUEST_NEXT)
-  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION])
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.DELIVER_ARTIFACT])
   dispatched.length = 0
 
   const current = await fixture.application.getSession('leetcode-local')
@@ -169,4 +169,39 @@ test('只有内容生成阶段会派发显式 Agent 任务', async () => {
   await coordinator.execute({ sessionId: 'paid-boundary', action: INTERVIEW_ACTIONS.PRESENT_QUESTION, payload: { prompt: '什么是 JMM？' }, source: 'agent' })
   await executeUi(INTERVIEW_ACTIONS.REVEAL_ANSWER)
   assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.GENERATE_REVIEW])
+})
+
+test('UI 重答和已有讲解只投递后端当前产物，不重复执行业务动作', async () => {
+  const fixture = applicationFixture()
+  const dispatched = []
+  const coordinator = new InterviewCoordinator({
+    application: fixture.application,
+    eventBridge: { dispatch(tasks) { dispatched.push(...tasks) } },
+  })
+  const execute = (action, payload = {}, source = 'agent') => coordinator.execute({
+    sessionId: 'artifact-delivery', action, payload, source,
+  })
+
+  await execute(INTERVIEW_ACTIONS.START_PRACTICE, { mode: 'bagu', config: { topic: 'JVM' } })
+  const question = await execute(INTERVIEW_ACTIONS.PRESENT_QUESTION, { prompt: '什么是双亲委派？' })
+  await execute(INTERVIEW_ACTIONS.REVEAL_ANSWER)
+  await execute(INTERVIEW_ACTIONS.COMPLETE_REVIEW, {
+    detail: '类加载请求优先向父加载器委派。',
+    memorizationPoints: '向上委派，向下加载。',
+  })
+
+  const retried = await execute(INTERVIEW_ACTIONS.RETRY_QUESTION, { questionId: question.artifact.questionId }, 'ui')
+  assert.equal(retried.artifact.kind, 'question')
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.DELIVER_ARTIFACT])
+  const renderedQuestion = await execute(INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT, { reason: 'question_retried' })
+  assert.equal(renderedQuestion.artifact.kind, 'question')
+  assert.equal(renderedQuestion.assistantResponse.text, '已切换到这道题，请重新作答。')
+
+  dispatched.length = 0
+  const revealed = await execute(INTERVIEW_ACTIONS.REVEAL_ANSWER, {}, 'ui')
+  assert.equal(revealed.artifact.kind, 'review')
+  assert.deepEqual(dispatched.map((task) => task.type), [AGENT_TASK_TYPES.DELIVER_ARTIFACT])
+  const renderedReview = await execute(INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT, { reason: 'answer_revealed' })
+  assert.equal(renderedReview.artifact.kind, 'review')
+  assert.equal(renderedReview.assistantResponse.text, '答案讲解已打开，请查看卡片。')
 })

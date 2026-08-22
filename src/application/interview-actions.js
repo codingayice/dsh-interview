@@ -3,6 +3,7 @@ export const INTERVIEW_ACTIONS = Object.freeze({
   UPDATE_PRACTICE: 'practice.update',
   GET_STATUS: 'session.status',
   CONTINUE_PRACTICE: 'practice.continue',
+  RENDER_CURRENT_ARTIFACT: 'artifact.render_current',
   SELECT_PRACTICE: 'practice.select',
   REOPEN_PRACTICE: 'practice.reopen',
   REQUEST_FINISH: 'practice.request_finish',

@@ -33,4 +33,7 @@ test('内容完成动作必须返回匹配的 UI 产物和固定辅助文本', (
     artifact: createInteractionArtifact(ARTIFACT_KINDS.REVIEW, { practiceId: 'p1', questionId: 'q1' }),
     assistantResponse: { mode: 'continue' },
   }), /固定辅助文本/)
+  assert.throws(() => assertInteractionArtifactContract(INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT, {
+    state: 'awaiting_answer', artifact: null, assistantResponse: { mode: 'exact' },
+  }), /必须产生交互产物/)
 })

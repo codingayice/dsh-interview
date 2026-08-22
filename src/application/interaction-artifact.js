@@ -55,10 +55,17 @@ const REQUIRED_ARTIFACT_BY_ACTION = Object.freeze({
   [INTERVIEW_ACTIONS.COMPLETE_SUMMARY]: ARTIFACT_KINDS.FINISHED,
 })
 
+const REQUIRED_ARTIFACT_ACTIONS = new Set([
+  INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT,
+])
+
 export function assertInteractionArtifactContract(action, outcome) {
   const requiredKind = REQUIRED_ARTIFACT_BY_ACTION[action]
   if (requiredKind && outcome.artifact?.kind !== requiredKind) {
     throw new TypeError(`${action} 必须产生 ${requiredKind} 交互产物`)
+  }
+  if (REQUIRED_ARTIFACT_ACTIONS.has(action) && !outcome.artifact) {
+    throw new TypeError(`${action} 必须产生交互产物`)
   }
   if (outcome.artifact && outcome.assistantResponse?.mode !== 'exact') {
     throw new TypeError(`交互产物 ${outcome.artifact.kind} 必须配合固定辅助文本输出`)

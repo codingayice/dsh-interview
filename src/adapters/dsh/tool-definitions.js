@@ -103,12 +103,21 @@ const tools = [
   }),
   atomicTool({
     name: 'interview_continue_practice', action: INTERVIEW_ACTIONS.CONTINUE_PRACTICE,
-    description: `用户明确表达继续、接着练或恢复练习时必须调用的唯一入口。从后端权威阶段恢复业务并返回当前应展示的 UI 产物，不把“继续”简单等同于“下一题”。禁止读取历史上下文后通过普通 Assistant Text 自行复述题目、点评或总结。trigger 仅供插件题目展示事件按指令传入，用户主动继续时禁止自行填写。${CONTINUE_PRACTICE_POLICY}`,
+    description: `用户明确表达继续、接着练或恢复练习时必须调用的唯一入口。从后端权威阶段恢复业务并返回当前应展示的 UI 产物，不把“继续”简单等同于“下一题”。禁止读取历史上下文后通过普通 Assistant Text 自行复述题目、点评或总结。${CONTINUE_PRACTICE_POLICY}`,
+  }),
+  atomicTool({
+    name: 'interview_render_current_artifact', action: INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT,
+    description: '仅响应插件注入的交互产物投递事件，把后端已经确定的当前题目或点评讲解渲染到对话最新位置。它不执行继续、下一题、重新作答或看答案等业务动作；没有插件事件时禁止调用。',
     parameters: {
       type: 'object',
       properties: {
-        trigger: { type: 'string', enum: ['practice_started', 'next_requested'], description: '插件事件明确提供的题目展示来源。' },
+        reason: {
+          type: 'string',
+          enum: ['practice_started', 'practice_continued', 'next_requested', 'question_retried', 'answer_revealed'],
+          description: '插件投递事件中明确给出的展示原因，必须原样传入。',
+        },
       },
+      required: ['reason'],
       additionalProperties: false,
     },
   }),

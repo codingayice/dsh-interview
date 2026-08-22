@@ -63,7 +63,10 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_continue_practice.description, /必须调用的唯一入口/)
   assert.match(fixture.tools.interview_continue_practice.description, /必须严格执行工具返回的 nextAction/)
   assert.equal(fixture.tools.interview_get_status, undefined)
-  assert.deepEqual(fixture.tools.interview_continue_practice.parameters.properties.trigger.enum, ['practice_started', 'next_requested'])
+  assert.deepEqual(fixture.tools.interview_continue_practice.parameters, { type: 'object', properties: {}, additionalProperties: false })
+  assert.deepEqual(fixture.tools.interview_render_current_artifact.parameters.properties.reason.enum, [
+    'practice_started', 'practice_continued', 'next_requested', 'question_retried', 'answer_revealed',
+  ])
   assert.match(fixture.tools.interview_reveal_answer.description, /interview_complete_review 的对应讲解约束/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
   assert.match(fixture.tools.interview_complete_review.parameters.properties.detail.description, /练习配置语言的一份完整答案代码/)
@@ -165,16 +168,16 @@ test('继续工具按阶段恢复并向模型返回确定的下一动作', async
   assert.equal(evaluating.context.answer, '负责加载类。')
 })
 
-test('力扣题目展示事件区分新抽题与恢复文案', async () => {
+test('力扣题目投递与用户主动恢复使用不同入口', async () => {
   const fixture = toolFixture()
   await fixture.tools.interview_start_practice.execute({ mode: 'leetcode', language: 'java' }, exec('leetcode-announcement'))
 
-  const started = await fixture.tools.interview_continue_practice.execute({ trigger: 'practice_started' }, exec('leetcode-announcement'))
-  assert.equal(started.assistantResponse.text, '已抽取题目，请开始刷题。')
+  const started = await fixture.tools.interview_render_current_artifact.execute({ reason: 'practice_started' }, exec('leetcode-announcement'))
+  assert.equal(started.assistantResponse.text, '已随机抽取一道力扣题，请开始刷题。')
 
   const requested = await fixture.tools.interview_request_next.execute({}, exec('leetcode-announcement'))
   assert.equal(requested.assistantResponse.text, '已抽取下一题。')
-  const next = await fixture.tools.interview_continue_practice.execute({ trigger: 'next_requested' }, exec('leetcode-announcement'))
+  const next = await fixture.tools.interview_render_current_artifact.execute({ reason: 'next_requested' }, exec('leetcode-announcement'))
   assert.equal(next.assistantResponse.text, '已抽取下一题。')
 
   const resumed = await fixture.tools.interview_continue_practice.execute({}, exec('leetcode-announcement'))
@@ -243,12 +246,12 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.match(leetcodeExplanation, /config\.language/)
   assert.match(leetcodeExplanation, /interview_complete_review/)
   assert.doesNotMatch(leetcodeExplanation, /可直接背诵/)
-  const leetcodeArtifact = instructionFor({ type: AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, practiceId: 'p2', questionId: 'q3', reason: 'next_requested' })
-  assert.match(leetcodeArtifact, /interview_continue_practice/)
-  assert.match(leetcodeArtifact, /已经随机抽取并保存题目/)
-  assert.match(leetcodeArtifact, /trigger=next_requested/)
-  assert.match(leetcodeArtifact, /禁止调用 interview_request_next/)
-  assert.match(leetcodeArtifact, /禁止调用.*interview_present_question/)
+  const artifactDelivery = instructionFor({ type: AGENT_TASK_TYPES.DELIVER_ARTIFACT, practiceId: 'p2', questionId: 'q3', reason: 'next_requested' })
+  assert.match(artifactDelivery, /interview_render_current_artifact/)
+  assert.match(artifactDelivery, /后端已经完成业务动作/)
+  assert.match(artifactDelivery, /reason=next_requested/)
+  assert.match(artifactDelivery, /禁止调用任何业务工具/)
+  assert.match(artifactDelivery, /禁止生成、改写或复述/)
   const summary = instructionFor({ type: AGENT_TASK_TYPES.GENERATE_SUMMARY, practiceId: 'p1' })
   assert.match(summary, /全部历次作答、评价和讲解/)
   assert.match(summary, /interview_complete_summary/)

@@ -36,6 +36,8 @@ const AGENT_RECOVERABLE_CODES = new Set([
   'INVALID_LEETCODE_LANGUAGE',
   'LEETCODE_SOLUTION_LANGUAGE_REQUIRED',
   'LEETCODE_SOLUTION_LANGUAGE_MISMATCH',
+  'INVALID_ARTIFACT_DELIVERY',
+  'ARTIFACT_NOT_READY',
 ])
 
 async function executeApplicationAction(application, sessionId, action, payload) {
@@ -44,6 +46,7 @@ async function executeApplicationAction(application, sessionId, action, payload)
     case INTERVIEW_ACTIONS.UPDATE_PRACTICE: return application.updatePractice(payload.practiceId, payload)
     case INTERVIEW_ACTIONS.GET_STATUS: return application.getSession(sessionId)
     case INTERVIEW_ACTIONS.CONTINUE_PRACTICE: return application.continuePractice(sessionId, payload)
+    case INTERVIEW_ACTIONS.RENDER_CURRENT_ARTIFACT: return application.renderCurrentArtifact(sessionId, payload)
     case INTERVIEW_ACTIONS.SELECT_PRACTICE: return application.selectPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.REOPEN_PRACTICE: return application.reopenPractice(sessionId, payload.practiceId)
     case INTERVIEW_ACTIONS.REQUEST_FINISH: return application.requestPracticeSummary(sessionId)

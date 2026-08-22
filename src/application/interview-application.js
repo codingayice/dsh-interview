@@ -34,7 +34,7 @@ import {
   WORKFLOW_PHASES,
 } from '../domain/workflow.js'
 import { buildInsights, toPracticeDetailDto, toPracticeSummaryDto, toQuestionDto, toSessionDto } from './dto.js'
-import { AGENT_TASK_TYPES, agentTask } from './agent-tasks.js'
+import { AGENT_TASK_TYPES, ARTIFACT_DELIVERY_REASONS, agentTask } from './agent-tasks.js'
 import { validateApplicationPorts } from './ports.js'
 
 function requiredId(value, name) {
@@ -131,8 +131,8 @@ export class InterviewApplication {
       { type: 'practice.started', sessionId, practiceId: nextPractice.id, mode: 'leetcode' },
       { type: 'leetcode.problem_drawn', sessionId, practiceId: nextPractice.id, questionId: drawn.question.id },
     ]
-    const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
-      sessionId, practiceId: nextPractice.id, questionId: drawn.question.id, reason: 'next_requested',
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.DELIVER_ARTIFACT, {
+      sessionId, practiceId: nextPractice.id, questionId: drawn.question.id, reason: ARTIFACT_DELIVERY_REASONS.NEXT_REQUESTED,
     })]
     await this.repository.commit({ practices: [completed, nextPractice], cursor: nextCursor })
     await this.#publish(events)
@@ -161,8 +161,8 @@ export class InterviewApplication {
         { type: 'practice.started', sessionId, practiceId: practice.id, mode: practice.mode },
         { type: 'leetcode.problem_drawn', sessionId, practiceId: practice.id, questionId: drawn.question.id },
       ]
-      const agentTasks = [agentTask(AGENT_TASK_TYPES.PRESENT_LEETCODE_QUESTION, {
-        sessionId, practiceId: practice.id, questionId: drawn.question.id, reason: 'practice_started',
+      const agentTasks = [agentTask(AGENT_TASK_TYPES.DELIVER_ARTIFACT, {
+        sessionId, practiceId: practice.id, questionId: drawn.question.id, reason: ARTIFACT_DELIVERY_REASONS.PRACTICE_STARTED,
       })]
       await this.repository.commit({ practice, cursor })
       await this.#publish(events)
@@ -191,7 +191,28 @@ export class InterviewApplication {
     return this.#result('session', toSessionDto(cursor, practice), cursor)
   }
 
-  async continuePractice(sessionId, { trigger = null } = {}) {
+  async renderCurrentArtifact(sessionId, { reason } = {}) {
+    const cursor = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
+    assertDomain(Boolean(cursor), 'SESSION_NOT_SELECTED', '当前会话还没有选择练习')
+    const practice = await this.#practice(cursor.practiceId)
+    assertDomain(
+      Object.values(ARTIFACT_DELIVERY_REASONS).includes(reason),
+      'INVALID_ARTIFACT_DELIVERY',
+      '无效的交互产物展示原因',
+    )
+    const question = cursor.questionId ? findQuestion(practice, cursor.questionId) : null
+    const displayable = Boolean(question) && (
+      [WORKFLOW_PHASES.AWAITING_ANSWER, WORKFLOW_PHASES.AWAITING_SOLUTION].includes(cursor.phase)
+      || (cursor.phase === WORKFLOW_PHASES.AWAITING_NEXT && question.explanation)
+    )
+    assertDomain(displayable, 'ARTIFACT_NOT_READY', '当前阶段没有可展示的题目或点评讲解')
+    return this.#result('artifact-delivery', {
+      ...toSessionDto(cursor, practice),
+      deliveryReason: reason,
+    }, cursor)
+  }
+
+  async continuePractice(sessionId) {
     const selected = await this.repository.getCursor(requiredId(sessionId, 'sessionId'))
     if (!selected) {
       return this.#result('continuation', {
@@ -216,12 +237,13 @@ export class InterviewApplication {
         selected: true,
         phase: nextCursor.phase,
         resumeAction: CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION,
-        trigger: trigger || 'next_requested',
+        deliveryReason: ARTIFACT_DELIVERY_REASONS.NEXT_REQUESTED,
         practiceId: next.references.practiceId,
         questionId: next.references.questionId,
         question: next.resource.data,
       }, nextCursor, {
         events: next.events,
+        agentTasks: next.agentTasks,
       })
     }
 
@@ -266,6 +288,11 @@ export class InterviewApplication {
       agentTasks = [agentTask(AGENT_TASK_TYPES.GENERATE_SUMMARY, {
         sessionId, practiceId: practice.id, reason: 'practice_continued',
       })]
+    } else if (resumeAction === CONTINUATION_ACTIONS.SHOW_CURRENT_QUESTION) {
+      agentTasks = [agentTask(AGENT_TASK_TYPES.DELIVER_ARTIFACT, {
+        sessionId, practiceId: practice.id, questionId: question.id,
+        reason: ARTIFACT_DELIVERY_REASONS.PRACTICE_CONTINUED,
+      })]
     }
 
     if (cursor !== selected) await this.repository.commit({ cursor })
@@ -273,7 +300,6 @@ export class InterviewApplication {
       selected: true,
       phase: cursor.phase,
       resumeAction,
-      ...(trigger ? { trigger } : {}),
       practiceId: practice.id,
       questionId: cursor.questionId,
       attemptId: cursor.attemptId,
@@ -386,10 +412,15 @@ export class InterviewApplication {
     const taskType = question.leetcode
       ? AGENT_TASK_TYPES.GENERATE_LEETCODE_EXPLANATION
       : AGENT_TASK_TYPES.GENERATE_REVIEW
-    const agentTasks = reviewReady ? [] : [agentTask(taskType, {
-      sessionId, practiceId: practice.id, questionId,
-      ...(question.leetcode ? {} : { reason: 'answer_revealed' }),
-    })]
+    const agentTasks = reviewReady
+      ? [agentTask(AGENT_TASK_TYPES.DELIVER_ARTIFACT, {
+          sessionId, practiceId: practice.id, questionId,
+          reason: ARTIFACT_DELIVERY_REASONS.ANSWER_REVEALED,
+        })]
+      : [agentTask(taskType, {
+          sessionId, practiceId: practice.id, questionId,
+          ...(question.leetcode ? {} : { reason: 'answer_revealed' }),
+        })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
     return this.#result('answer-revealed', { questionId, reviewReady, explanationType }, nextCursor, { events, agentTasks })
@@ -461,9 +492,13 @@ export class InterviewApplication {
     findQuestion(practice, questionId)
     const nextCursor = markQuestionRetried(cursor, questionId, now)
     const events = [{ type: 'question.retry_requested', sessionId, practiceId: practice.id, questionId }]
+    const agentTasks = [agentTask(AGENT_TASK_TYPES.DELIVER_ARTIFACT, {
+      sessionId, practiceId: practice.id, questionId,
+      reason: ARTIFACT_DELIVERY_REASONS.QUESTION_RETRIED,
+    })]
     await this.repository.commit({ cursor: nextCursor })
     await this.#publish(events)
-    return this.#result('question-retried', toSessionDto(nextCursor, practice), nextCursor, { events })
+    return this.#result('question-retried', toSessionDto(nextCursor, practice), nextCursor, { events, agentTasks })
   }
 
   async requestPracticeSummary(sessionId) {

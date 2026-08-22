@@ -3,8 +3,16 @@ export const AGENT_TASK_TYPES = Object.freeze({
   EVALUATE_ANSWER: 'answer.evaluate',
   GENERATE_REVIEW: 'review.generate',
   GENERATE_LEETCODE_EXPLANATION: 'leetcode.explain',
-  PRESENT_LEETCODE_QUESTION: 'leetcode.present',
+  DELIVER_ARTIFACT: 'artifact.deliver',
   GENERATE_SUMMARY: 'practice.summarize',
+})
+
+export const ARTIFACT_DELIVERY_REASONS = Object.freeze({
+  PRACTICE_STARTED: 'practice_started',
+  PRACTICE_CONTINUED: 'practice_continued',
+  NEXT_REQUESTED: 'next_requested',
+  QUESTION_RETRIED: 'question_retried',
+  ANSWER_REVEALED: 'answer_revealed',
 })
 
 export function agentTask(type, context) {
