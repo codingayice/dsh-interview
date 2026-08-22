@@ -207,6 +207,11 @@ function useCommand(sessionId) {
 // src/client/shared/ui.js
 var import_react2 = __toESM(require("react"), 1);
 var primitives = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
+
+// src/protocol/interaction-protocol.js
+var INTERACTION_PROTOCOL = "dsh-interview/interaction-v2";
+
+// src/client/shared/ui.js
 var h = import_react2.default.createElement;
 var MarkdownText2 = primitives.MarkdownText;
 function Markdown({ children }) {
@@ -262,7 +267,7 @@ function resultText(block) {
 function parseInteractionResult(block) {
   try {
     const value = JSON.parse(resultText(block));
-    return value?.protocol === "dsh-interview/interaction-v1" ? value : null;
+    return value?.protocol === INTERACTION_PROTOCOL ? value : null;
   } catch {
     return null;
   }

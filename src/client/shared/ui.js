@@ -1,5 +1,6 @@
 import React from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
+import { INTERACTION_PROTOCOL } from '../../protocol/interaction-protocol.js'
 
 export const h = React.createElement
 
@@ -56,7 +57,7 @@ function resultText(block) {
 export function parseInteractionResult(block) {
   try {
     const value = JSON.parse(resultText(block))
-    return value?.protocol === 'dsh-interview/interaction-v1' ? value : null
+    return value?.protocol === INTERACTION_PROTOCOL ? value : null
   } catch {
     return null
   }

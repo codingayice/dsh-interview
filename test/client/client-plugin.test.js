@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { INTERVIEW_TOOL_NAMES } from '../../src/protocol/interview-tool-names.js'
+import { INTERACTION_PROTOCOL } from '../../src/protocol/interaction-protocol.js'
 
 function loadPlugin() {
   const source = readFileSync(new URL('../../client/client.js', import.meta.url), 'utf8')
@@ -34,7 +35,7 @@ function loadPlugin() {
 function settled(interaction, extra = {}) {
   return {
     kind: 'tool-result',
-    content: [{ type: 'text', text: JSON.stringify({ protocol: 'dsh-interview/interaction-v1', ...interaction }) }],
+    content: [{ type: 'text', text: JSON.stringify({ protocol: INTERACTION_PROTOCOL, ...interaction }) }],
     ...extra,
   }
 }
@@ -105,6 +106,23 @@ test('工具视图只按结构化 artifact 渲染用户可见卡片', () => {
     content: [{ type: 'text', text: 'Error: invalid arguments: prompt is required' }],
   })
   assert.equal(invalidArguments.kind, 'hidden')
+})
+
+test('Client 与服务端共享交互协议版本并拒绝过期结果', () => {
+  const { plugin } = loadPlugin()
+  const artifact = { kind: 'question', practiceId: 'p1', questionId: 'q1' }
+
+  assert.equal(
+    plugin.resolveToolView('interview_present_question', settled({ revision: 1, artifact })).kind,
+    'question',
+  )
+  assert.equal(
+    plugin.resolveToolView('interview_present_question', {
+      kind: 'tool-result',
+      content: [{ type: 'text', text: JSON.stringify({ protocol: 'dsh-interview/interaction-v1', revision: 1, artifact }) }],
+    }).kind,
+    'hidden',
+  )
 })
 
 test('界面只对主标题使用粗体且不渲染装饰性副标题', () => {

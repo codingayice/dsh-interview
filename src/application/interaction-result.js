@@ -1,7 +1,6 @@
 import { INTERVIEW_ACTIONS } from './interview-actions.js'
 import { ARTIFACT_KINDS, artifactForSession, assertInteractionArtifactContract, createInteractionArtifact } from './interaction-artifact.js'
-
-const PROTOCOL = 'dsh-interview/interaction-v2'
+import { INTERACTION_PROTOCOL } from '../protocol/interaction-protocol.js'
 
 const exact = (text) => ({ mode: 'exact', text, mustNotRepeatArtifact: true })
 const continueSilently = () => ({ mode: 'continue', text: null, mustNotRepeatArtifact: true })
@@ -283,7 +282,7 @@ function descriptor(action, result) {
 export function createInteractionResult(action, result) {
   const outcome = assertInteractionArtifactContract(action, descriptor(action, result))
   return {
-    protocol: PROTOCOL,
+    protocol: INTERACTION_PROTOCOL,
     action,
     revision: result.revision ?? 0,
     ...outcome,
@@ -295,7 +294,7 @@ export function createInteractionResult(action, result) {
 
 export function createAgentProtocolError(action, error) {
   return {
-    protocol: PROTOCOL,
+    protocol: INTERACTION_PROTOCOL,
     action,
     revision: 0,
     state: 'recovering',
@@ -334,4 +333,4 @@ export function toAgentInteractionResult(interaction) {
   }
 }
 
-export { PROTOCOL as INTERACTION_PROTOCOL }
+export { INTERACTION_PROTOCOL }
