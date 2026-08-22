@@ -1,13 +1,13 @@
-export function isPresentedQuestionCurrent(session, presentation) {
+export function isArtifactQuestionCurrent(session, artifact) {
   return Boolean(
     session?.selected
-    && session.practice?.id === presentation?.practiceId
-    && session.questionId === presentation?.questionId,
+    && session.practice?.id === artifact?.practiceId
+    && session.questionId === artifact?.questionId,
   )
 }
 
-export function getPresentedQuestionActions(session, presentation) {
-  const current = isPresentedQuestionCurrent(session, presentation)
+export function getArtifactQuestionActions(session, artifact) {
+  const current = isArtifactQuestionCurrent(session, artifact)
   return {
     canReveal: current && session.phase === 'awaiting_answer',
     canContinue: current && session.phase === 'awaiting_next',

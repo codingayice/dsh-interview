@@ -19,20 +19,22 @@ test('协调器把应用结果转换为状态驱动的结构化交互', async ()
     payload: { prompt: '什么是 JMM？' },
   })
 
-  assert.equal(started.protocol, 'dsh-interview/interaction-v1')
+  assert.equal(started.protocol, 'dsh-interview/interaction-v2')
   assert.equal(started.nextAction, 'generate_question')
   assert.equal(started.assistantResponse.mode, 'continue')
-  assert.equal(asked.presentation.kind, 'question')
-  assert.equal(asked.presentation.practiceId, started.resource.data.practice.id)
-  assert.equal(asked.presentation.questionId, asked.resource.data.id)
-  assert.notEqual(asked.presentation.practiceId, asked.presentation.questionId)
-  const detail = await fixture.application.getPractice(asked.presentation.practiceId)
-  assert.equal(detail.resource.data.questions[0].id, asked.presentation.questionId)
+  assert.equal(asked.artifact.kind, 'question')
+  assert.equal(asked.artifact.practiceId, started.resource.data.practice.id)
+  assert.equal(asked.artifact.questionId, asked.resource.data.id)
+  assert.notEqual(asked.artifact.practiceId, asked.artifact.questionId)
+  const detail = await fixture.application.getPractice(asked.artifact.practiceId)
+  assert.equal(detail.resource.data.questions[0].id, asked.artifact.questionId)
   assert.equal(asked.assistantResponse.text, '已出题，请开始作答。')
 
   const status = await coordinator.execute({ sessionId: 'session-1', action: INTERVIEW_ACTIONS.GET_STATUS })
-  assert.equal(status.presentation, null)
-  assert.equal(status.assistantResponse.mode, 'continue')
+  assert.equal(status.artifact.kind, 'question')
+  assert.equal(status.artifact.questionId, asked.resource.data.id)
+  assert.equal(status.assistantResponse.mode, 'exact')
+  assert.equal(status.assistantResponse.text, '当前题已打开，请继续作答。')
   assert.equal(status.context.currentQuestion.id, asked.resource.data.id)
 })
 
@@ -44,7 +46,7 @@ test('协调器把 Agent 协议错误标记为可恢复且不交给 UI', async (
 
   assert.equal(invalid.error.audience, 'agent')
   assert.equal(invalid.error.recoverable, true)
-  assert.equal(invalid.presentation, null)
+  assert.equal(invalid.artifact, null)
   assert.equal(invalid.nextAction, 'read_status_and_retry')
 })
 
@@ -113,7 +115,7 @@ test('选择练习向模型提供完整上下文并只返回切换确认', async
     sessionId: 'session-2', action: INTERVIEW_ACTIONS.SELECT_PRACTICE,
     payload: { practiceId: started.resource.data.practice.id },
   })
-  assert.equal(selected.presentation, null)
+  assert.equal(selected.artifact, null)
   assert.equal(selected.assistantResponse.text, '已切换到当前练习：JVM。')
   assert.equal(selected.context.practice.questions[0].prompt, '什么是 JMM？')
 })
@@ -147,7 +149,7 @@ test('力扣抽题触发 Agent 展示事件且其他本地管理保持零模型�
   assert.equal(dispatched.length, 0, '打开、修改、查询、导出和结束均为本地操作')
   assert.equal(finished.state, 'completed')
   assert.equal(finished.nextAction, 'wait_for_user')
-  assert.equal(finished.presentation.kind, 'finished')
+  assert.equal(finished.artifact.kind, 'finished')
   assert.equal(finished.assistantResponse.text, '本次力扣练习已结束，共记录 1 道题。')
 })
 

@@ -4,7 +4,7 @@ import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, PhaseBadge, ScoreRail, StarRating } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 import { LeetcodeProblemCard } from './leetcode.js'
-import { getPresentedQuestionActions } from './question-actions.js'
+import { getArtifactQuestionActions } from './question-actions.js'
 
 function Evaluation({ attempt }) {
   if (!attempt?.evaluation) return null
@@ -158,8 +158,8 @@ export function ToolErrorCard({ message }) {
     h('span', null, message))
 }
 
-function usePresentedPractice(presentation, revision) {
-  const practiceId = presentation?.practiceId
+function useArtifactPractice(artifact, revision) {
+  const practiceId = artifact?.practiceId
   return useInterviewQuery(
     `practice:${practiceId || 'none'}`,
     () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
@@ -168,7 +168,7 @@ function usePresentedPractice(presentation, revision) {
   )
 }
 
-function usePresentedSession(sessionId, revision) {
+function useArtifactSession(sessionId, revision) {
   return useInterviewQuery(
     `session:${sessionId}`,
     () => interviewApi.session(sessionId),
@@ -177,46 +177,46 @@ function usePresentedSession(sessionId, revision) {
   )
 }
 
-function PresentedState({ query, children, missing }) {
+function ArtifactState({ query, children, missing }) {
   if (query.loading && !query.data) return h('div', { className: 'di-card' }, h(Loading))
   if (query.error) return h('div', { className: 'di-card' }, h(ErrorNotice, null, query.error))
   return children || h('div', { className: 'di-card' }, h(Empty, { title: missing }))
 }
 
-export function QuestionResourceCard({ presentation, revision, sessionId }) {
-  const query = usePresentedPractice(presentation, revision)
-  const sessionQuery = usePresentedSession(sessionId, revision)
+export function QuestionResourceCard({ artifact, revision, sessionId }) {
+  const query = useArtifactPractice(artifact, revision)
+  const sessionQuery = useArtifactSession(sessionId, revision)
   const practice = query.data?.resource?.data
   const session = sessionQuery.data?.resource?.data
-  const question = practice?.questions?.find((item) => item.id === presentation.questionId)
-  const actions = getPresentedQuestionActions(session, presentation)
-  return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question
+  const question = practice?.questions?.find((item) => item.id === artifact.questionId)
+  const actions = getArtifactQuestionActions(session, artifact)
+  return h(ArtifactState, { query, missing: '找不到题目卡片数据' }, question
     ? question.leetcode
       ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language, resourceRevision: revision })
       : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal })
     : null)
 }
 
-export function ReviewResourceCard({ presentation, revision, sessionId }) {
-  const query = usePresentedPractice(presentation, revision)
-  const sessionQuery = usePresentedSession(sessionId, revision)
+export function ReviewResourceCard({ artifact, revision, sessionId }) {
+  const query = useArtifactPractice(artifact, revision)
+  const sessionQuery = useArtifactSession(sessionId, revision)
   const practice = query.data?.resource?.data
   const session = sessionQuery.data?.resource?.data
-  const question = practice?.questions?.find((item) => item.id === presentation.questionId)
-  const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null
-  const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
-  const actions = getPresentedQuestionActions(session, presentation)
-  return h(PresentedState, { query, missing: '找不到讲解数据' }, complete
+  const question = practice?.questions?.find((item) => item.id === artifact.questionId)
+  const attempt = artifact.attemptId ? question?.attempts?.find((item) => item.id === artifact.attemptId) : null
+  const complete = question?.explanation && (!artifact.attemptId || attempt?.evaluation)
+  const actions = getArtifactQuestionActions(session, artifact)
+  return h(ArtifactState, { query, missing: '找不到讲解数据' }, complete
     ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actions.canContinue })
     : null)
 }
 
-export function PracticeSummaryCard({ presentation, revision }) {
-  const query = usePresentedPractice(presentation, revision)
+export function PracticeSummaryCard({ artifact, revision }) {
+  const query = useArtifactPractice(artifact, revision)
   const practice = query.data?.resource?.data
   const summary = practice?.summary
   const leetcode = summary?.kind === 'leetcode'
-  return h(PresentedState, { query, missing: '找不到练习总结' }, summary ? h('article', { className: 'di-card', 'aria-label': '练习总结' },
+  return h(ArtifactState, { query, missing: '找不到练习总结' }, summary ? h('article', { className: 'di-card', 'aria-label': '练习总结' },
     h('header', { className: 'di-card-head' },
       h('div', { className: 'di-title' }, '练习总结'),
       h(PhaseBadge, { phase: 'completed' })),

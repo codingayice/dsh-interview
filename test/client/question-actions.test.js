@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getPresentedQuestionActions, isPresentedQuestionCurrent } from '../../src/client/features/question-actions.js'
+import { getArtifactQuestionActions, isArtifactQuestionCurrent } from '../../src/client/features/question-actions.js'
 
-const presentation = { practiceId: 'practice-1', questionId: 'question-1' }
+const artifact = { practiceId: 'practice-1', questionId: 'question-1' }
 
 function session(phase, overrides = {}) {
   return {
@@ -15,14 +15,14 @@ function session(phase, overrides = {}) {
 }
 
 test('只有当前会话绑定的题目被视为当前题', () => {
-  assert.equal(isPresentedQuestionCurrent(session('awaiting_answer'), presentation), true)
-  assert.equal(isPresentedQuestionCurrent(session('awaiting_answer', { questionId: 'question-2' }), presentation), false)
-  assert.equal(isPresentedQuestionCurrent(session('awaiting_answer', { practice: { id: 'practice-2' } }), presentation), false)
-  assert.equal(isPresentedQuestionCurrent({ selected: false }, presentation), false)
+  assert.equal(isArtifactQuestionCurrent(session('awaiting_answer'), artifact), true)
+  assert.equal(isArtifactQuestionCurrent(session('awaiting_answer', { questionId: 'question-2' }), artifact), false)
+  assert.equal(isArtifactQuestionCurrent(session('awaiting_answer', { practice: { id: 'practice-2' } }), artifact), false)
+  assert.equal(isArtifactQuestionCurrent({ selected: false }, artifact), false)
 })
 
 test('当前待回答题目只允许查看答案', () => {
-  assert.deepEqual(getPresentedQuestionActions(session('awaiting_answer'), presentation), {
+  assert.deepEqual(getArtifactQuestionActions(session('awaiting_answer'), artifact), {
     canReveal: true,
     canContinue: false,
     canRetry: false,
@@ -31,13 +31,13 @@ test('当前待回答题目只允许查看答案', () => {
 })
 
 test('当前点评卡只在等待下一题阶段开放操作', () => {
-  assert.deepEqual(getPresentedQuestionActions(session('awaiting_next'), presentation), {
+  assert.deepEqual(getArtifactQuestionActions(session('awaiting_next'), artifact), {
     canReveal: false,
     canContinue: true,
     canRetry: true,
     canFinish: true,
   })
-  assert.deepEqual(getPresentedQuestionActions(session('generating_explanation'), presentation), {
+  assert.deepEqual(getArtifactQuestionActions(session('generating_explanation'), artifact), {
     canReveal: false,
     canContinue: false,
     canRetry: false,
@@ -47,7 +47,7 @@ test('当前点评卡只在等待下一题阶段开放操作', () => {
 
 test('历史题目在任何阶段都不能操作', () => {
   const historical = session('awaiting_next', { questionId: 'question-2' })
-  assert.deepEqual(getPresentedQuestionActions(historical, presentation), {
+  assert.deepEqual(getArtifactQuestionActions(historical, artifact), {
     canReveal: false,
     canContinue: false,
     canRetry: false,

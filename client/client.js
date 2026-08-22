@@ -789,13 +789,13 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "",
 }
 
 // src/client/features/question-actions.js
-function isPresentedQuestionCurrent(session, presentation) {
+function isArtifactQuestionCurrent(session, artifact) {
   return Boolean(
-    session?.selected && session.practice?.id === presentation?.practiceId && session.questionId === presentation?.questionId
+    session?.selected && session.practice?.id === artifact?.practiceId && session.questionId === artifact?.questionId
   );
 }
-function getPresentedQuestionActions(session, presentation) {
-  const current = isPresentedQuestionCurrent(session, presentation);
+function getArtifactQuestionActions(session, artifact) {
+  const current = isArtifactQuestionCurrent(session, artifact);
   return {
     canReveal: current && session.phase === "awaiting_answer",
     canContinue: current && session.phase === "awaiting_next",
@@ -1008,8 +1008,8 @@ function ToolErrorCard({ message }) {
     h("span", null, message)
   );
 }
-function usePresentedPractice(presentation, revision) {
-  const practiceId = presentation?.practiceId;
+function useArtifactPractice(artifact, revision) {
+  const practiceId = artifact?.practiceId;
   return useInterviewQuery(
     `practice:${practiceId || "none"}`,
     () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
@@ -1017,7 +1017,7 @@ function usePresentedPractice(presentation, revision) {
     { version: revision }
   );
 }
-function usePresentedSession(sessionId, revision) {
+function useArtifactSession(sessionId, revision) {
   return useInterviewQuery(
     `session:${sessionId}`,
     () => interviewApi.session(sessionId),
@@ -1025,37 +1025,37 @@ function usePresentedSession(sessionId, revision) {
     { version: revision }
   );
 }
-function PresentedState({ query, children, missing }) {
+function ArtifactState({ query, children, missing }) {
   if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
   if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
   return children || h("div", { className: "di-card" }, h(Empty, { title: missing }));
 }
-function QuestionResourceCard({ presentation, revision, sessionId }) {
-  const query = usePresentedPractice(presentation, revision);
-  const sessionQuery = usePresentedSession(sessionId, revision);
+function QuestionResourceCard({ artifact, revision, sessionId }) {
+  const query = useArtifactPractice(artifact, revision);
+  const sessionQuery = useArtifactSession(sessionId, revision);
   const practice = query.data?.resource?.data;
   const session = sessionQuery.data?.resource?.data;
-  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  const actions = getPresentedQuestionActions(session, presentation);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language, resourceRevision: revision }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal }) : null);
+  const question = practice?.questions?.find((item) => item.id === artifact.questionId);
+  const actions = getArtifactQuestionActions(session, artifact);
+  return h(ArtifactState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language, resourceRevision: revision }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal }) : null);
 }
-function ReviewResourceCard({ presentation, revision, sessionId }) {
-  const query = usePresentedPractice(presentation, revision);
-  const sessionQuery = usePresentedSession(sessionId, revision);
+function ReviewResourceCard({ artifact, revision, sessionId }) {
+  const query = useArtifactPractice(artifact, revision);
+  const sessionQuery = useArtifactSession(sessionId, revision);
   const practice = query.data?.resource?.data;
   const session = sessionQuery.data?.resource?.data;
-  const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null;
-  const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
-  const actions = getPresentedQuestionActions(session, presentation);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actions.canContinue }) : null);
+  const question = practice?.questions?.find((item) => item.id === artifact.questionId);
+  const attempt = artifact.attemptId ? question?.attempts?.find((item) => item.id === artifact.attemptId) : null;
+  const complete = question?.explanation && (!artifact.attemptId || attempt?.evaluation);
+  const actions = getArtifactQuestionActions(session, artifact);
+  return h(ArtifactState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actions.canContinue }) : null);
 }
-function PracticeSummaryCard({ presentation, revision }) {
-  const query = usePresentedPractice(presentation, revision);
+function PracticeSummaryCard({ artifact, revision }) {
+  const query = useArtifactPractice(artifact, revision);
   const practice = query.data?.resource?.data;
   const summary = practice?.summary;
   const leetcode = summary?.kind === "leetcode";
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u7EC3\u4E60\u603B\u7ED3" }, summary ? h(
+  return h(ArtifactState, { query, missing: "\u627E\u4E0D\u5230\u7EC3\u4E60\u603B\u7ED3" }, summary ? h(
     "article",
     { className: "di-card", "aria-label": "\u7EC3\u4E60\u603B\u7ED3" },
     h(
@@ -1377,7 +1377,7 @@ function PracticeLibrary({
     const result = await run("session.start", payload);
     if (!result) return;
     setCreating(false);
-    setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null);
+    setSelectedId(result.artifact?.practiceId || result.resource?.data?.practice?.id || null);
     interviewApi.navigateWorkspace("active");
   };
   const activate = async (practice) => {
@@ -1926,8 +1926,8 @@ function resolveToolView(toolName, block) {
   if (state === "error" && toolErrorAudience(block) === "agent") return { kind: "hidden" };
   if (state === "error") return { kind: "error", message: toolErrorMessage(block) };
   const result = parseInteractionResult(block);
-  if (!result || result.error?.audience === "agent" || !result.presentation) return { kind: "hidden" };
-  return { ...result.presentation, revision: result.revision, toolName };
+  if (!result || result.error?.audience === "agent" || !result.artifact) return { kind: "hidden" };
+  return { ...result.artifact, revision: result.revision, toolName };
 }
 function ToolResourceView({ toolName, sessionId, block }) {
   const view = resolveToolView(toolName, block);
@@ -1935,9 +1935,9 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "error":
       return h(ToolErrorCard, { message: view.message });
     case "question":
-      return h(QuestionResourceCard, { presentation: view, revision: view.revision, sessionId });
+      return h(QuestionResourceCard, { artifact: view, revision: view.revision, sessionId });
     case "review":
-      return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId });
+      return h(ReviewResourceCard, { artifact: view, revision: view.revision, sessionId });
     case "library":
       return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId });
     case "insights":
@@ -1949,7 +1949,7 @@ function ToolResourceView({ toolName, sessionId, block }) {
     case "exported":
       return h(CompactResultCard, { title: "Markdown \u5DF2\u751F\u6210", detail: "\u6253\u5F00\u7EC3\u4E60\u6863\u6848\u53EF\u4EE5\u4E0B\u8F7D\u672C\u6B21\u5BFC\u51FA\u3002" });
     case "finished":
-      return h(PracticeSummaryCard, { presentation: view, revision: view.revision });
+      return h(PracticeSummaryCard, { artifact: view, revision: view.revision });
     case "live-session":
       return h(LiveInterviewCard, { sessionId });
     default:

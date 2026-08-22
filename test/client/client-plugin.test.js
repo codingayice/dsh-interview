@@ -65,14 +65,14 @@ test('Client 只使用 DSH 当前会话身份且不共享练习游标', () => {
   assert.match(source, /sessionId: props\.sessionId/)
 })
 
-test('工具视图只按结构化 presentation 渲染用户可见卡片', () => {
+test('工具视图只按结构化 artifact 渲染用户可见卡片', () => {
   const { plugin } = loadPlugin()
   assert.equal(plugin.resolveToolView('interview_start_practice', { argsRaw: '{}' }).kind, 'hidden')
-  assert.equal(plugin.resolveToolView('interview_start_practice', settled({ revision: 1, presentation: null })).kind, 'hidden')
+  assert.equal(plugin.resolveToolView('interview_start_practice', settled({ revision: 1, artifact: null })).kind, 'hidden')
 
   const question = plugin.resolveToolView('interview_present_question', settled({
     revision: 2,
-    presentation: { kind: 'question', practiceId: 'p1', questionId: 'q1' },
+    artifact: { kind: 'question', practiceId: 'p1', questionId: 'q1' },
   }))
   assert.deepEqual(JSON.parse(JSON.stringify(question)), {
     kind: 'question', practiceId: 'p1', questionId: 'q1', revision: 2, toolName: 'interview_present_question',
@@ -80,7 +80,7 @@ test('工具视图只按结构化 presentation 渲染用户可见卡片', () => 
 
   const review = plugin.resolveToolView('interview_complete_review', settled({
     revision: 5,
-    presentation: { kind: 'review', practiceId: 'p1', questionId: 'q1', attemptId: 'a1' },
+    artifact: { kind: 'review', practiceId: 'p1', questionId: 'q1', attemptId: 'a1' },
   }))
   assert.deepEqual(JSON.parse(JSON.stringify(review)), {
     kind: 'review', practiceId: 'p1', questionId: 'q1', attemptId: 'a1', revision: 5, toolName: 'interview_complete_review',
@@ -88,7 +88,7 @@ test('工具视图只按结构化 presentation 渲染用户可见卡片', () => 
 
   const recoverable = plugin.resolveToolView('interview_present_question', settled({
     revision: 0,
-    presentation: null,
+    artifact: null,
     error: { audience: 'agent', recoverable: true },
   }))
   assert.equal(recoverable.kind, 'hidden')

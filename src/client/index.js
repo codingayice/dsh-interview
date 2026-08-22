@@ -24,22 +24,22 @@ export function resolveToolView(toolName, block) {
   if (state === 'error' && toolErrorAudience(block) === 'agent') return { kind: 'hidden' }
   if (state === 'error') return { kind: 'error', message: toolErrorMessage(block) }
   const result = parseInteractionResult(block)
-  if (!result || result.error?.audience === 'agent' || !result.presentation) return { kind: 'hidden' }
-  return { ...result.presentation, revision: result.revision, toolName }
+  if (!result || result.error?.audience === 'agent' || !result.artifact) return { kind: 'hidden' }
+  return { ...result.artifact, revision: result.revision, toolName }
 }
 
 function ToolResourceView({ toolName, sessionId, block }) {
   const view = resolveToolView(toolName, block)
   switch (view.kind) {
     case 'error': return h(ToolErrorCard, { message: view.message })
-    case 'question': return h(QuestionResourceCard, { presentation: view, revision: view.revision, sessionId })
-    case 'review': return h(ReviewResourceCard, { presentation: view, revision: view.revision, sessionId })
+    case 'question': return h(QuestionResourceCard, { artifact: view, revision: view.revision, sessionId })
+    case 'review': return h(ReviewResourceCard, { artifact: view, revision: view.revision, sessionId })
     case 'library': return h(PracticeLibrary, { sessionId, initialPracticeId: view.practiceId })
     case 'insights': return h(InsightsCard)
     case 'leetcode-catalog': return h(LeetcodeCatalog, { sessionId })
     case 'deleted': return h(CompactResultCard, { title: '练习已删除', detail: '档案和对应会话游标已经清理。', tone: 'completed' })
     case 'exported': return h(CompactResultCard, { title: 'Markdown 已生成', detail: '打开练习档案可以下载本次导出。' })
-    case 'finished': return h(PracticeSummaryCard, { presentation: view, revision: view.revision })
+    case 'finished': return h(PracticeSummaryCard, { artifact: view, revision: view.revision })
     case 'live-session': return h(LiveInterviewCard, { sessionId })
     default: return null
   }

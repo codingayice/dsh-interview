@@ -199,7 +199,7 @@ export function PracticeLibrary({
     const result = await run('session.start', payload)
     if (!result) return
     setCreating(false)
-    setSelectedId(result.presentation?.practiceId || result.resource?.data?.practice?.id || null)
+    setSelectedId(result.artifact?.practiceId || result.resource?.data?.practice?.id || null)
     interviewApi.navigateWorkspace('active')
   }
   const activate = async (practice) => {
