@@ -1,7 +1,7 @@
 import { INTERVIEW_ACTIONS } from '../../application/interview-actions.js'
 import { toAgentInteractionResult } from '../../application/interaction-result.js'
 import { INTERVIEW_TOOL_NAMES } from '../../protocol/interview-tool-names.js'
-import { ASSISTANT_RESPONSE_PROTOCOL } from './assistant-response-policy.js'
+import { TOOL_RESULT_PROTOCOL } from './assistant-response-policy.js'
 import { CONTINUE_PRACTICE_POLICY, LEETCODE_EXPLANATION_POLICY, PRACTICE_CONFIGURATION_POLICY, QUESTION_GENERATION_POLICY } from './interview-prompt-policy.js'
 import { LEETCODE_LANGUAGE_IDS } from '../../domain/leetcode-languages.js'
 
@@ -73,7 +73,7 @@ const output = {
 function atomicTool({ name, description, action, parameters = emptyParameters, payload = (args) => args }) {
   return (coordinator) => ({
     name,
-    description: `${description}${ASSISTANT_RESPONSE_PROTOCOL}`,
+    description: `${description}${TOOL_RESULT_PROTOCOL}`,
     parameters,
     output,
     execute(args, exec) {

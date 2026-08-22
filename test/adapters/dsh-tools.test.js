@@ -36,6 +36,8 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.deepEqual(definitions.map((tool) => tool.name), INTERVIEW_TOOL_NAMES)
   assert.ok(definitions.every((tool) => tool.parameters.type === 'object'), '所有函数参数 Schema 顶层必须声明 type: object')
   assert.ok(definitions.every((tool) => !Object.hasOwn(tool.parameters.properties || {}, 'command')))
+  assert.ok(definitions.every((tool) => tool.description.endsWith('调用后必须严格执行返回的 assistantInstruction。')))
+  assert.ok(definitions.every((tool) => !tool.description.includes('assistantResponse.mode=continue')))
 
   const presentQuestion = fixture.tools.interview_present_question
   assert.deepEqual(presentQuestion.parameters.required, ['prompt'])
@@ -256,6 +258,19 @@ test('事件桥接使用原子工具名并明确 prompt 必填语义', () => {
   assert.equal(instructionFor({ type: 'practice.selected', practiceId: 'p1' }), null)
   assert.equal(instructionFor({ type: 'leetcode.problem_drawn', practiceId: 'p1' }), null)
   assert.equal(instructionFor({ type: 'answer.submitted' }), null)
+})
+
+test('完整响应协议只由 Agent 事件注入', () => {
+  const fixture = toolFixture()
+  const eventInstruction = instructionFor({
+    type: AGENT_TASK_TYPES.GENERATE_QUESTION,
+    practiceId: 'practice-1',
+    reason: 'practice_started',
+  })
+
+  assert.match(eventInstruction, /assistantResponse\.mode=continue/)
+  assert.match(eventInstruction, /mode=exact/)
+  assert.ok(Object.values(fixture.tools).every((tool) => !tool.description.includes('assistantResponse.mode=continue')))
 })
 
 test('HTTP 错误响应包含稳定错误码', () => {
