@@ -276,3 +276,14 @@ test('只有当前待下一题的点评卡允许继续、重答或结束', () =>
   assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'question\.retry'/)
   assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'session\.finish'/)
 })
+
+test('看答案点击后立即锁定且只允许当前待回答题目操作', () => {
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+
+  assert.match(liveInterview, /answerRequestedRef\.current = true/)
+  assert.match(liveInterview, /if \(answerDisabled \|\| answerRequestedRef\.current\) return/)
+  assert.match(liveInterview, /disabled: answerDisabled \|\| answerRequested/)
+  assert.match(liveInterview, /session\.phase === 'awaiting_answer'/)
+  assert.match(liveInterview, /!question\?\.explanation/)
+  assert.match(liveInterview, /answerDisabled: !answerEnabled/)
+})

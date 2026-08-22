@@ -844,11 +844,22 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
     detail ? h("div", { className: "di-card-body" }, detail) : null
   );
 }
-function QuestionResultCard({ sessionId, question }) {
+function QuestionResultCard({ sessionId, question, answerDisabled = false }) {
   if (!question) return null;
   const command = useCommand(sessionId);
-  const revealAnswer = () => command.run("question.reveal", { questionId: question.id }).catch(() => {
-  });
+  const answerRequestedRef = import_react4.default.useRef(false);
+  const [answerRequested, setAnswerRequested] = import_react4.default.useState(false);
+  const revealAnswer = async () => {
+    if (answerDisabled || answerRequestedRef.current) return;
+    answerRequestedRef.current = true;
+    setAnswerRequested(true);
+    try {
+      await command.run("question.reveal", { questionId: question.id });
+    } catch {
+      answerRequestedRef.current = false;
+      setAnswerRequested(false);
+    }
+  };
   return h(
     "article",
     { className: "di-card di-question-card", "aria-label": "\u9762\u8BD5\u9898" },
@@ -859,6 +870,7 @@ function QuestionResultCard({ sessionId, question }) {
     ),
     h(Button, {
       className: "di-answer-button",
+      disabled: answerDisabled || answerRequested,
       busy: command.busy === "question.reveal",
       onClick: revealAnswer,
       "aria-label": "\u67E5\u770B\u672C\u9898\u7B54\u6848"
@@ -976,9 +988,12 @@ function PresentedState({ query, children, missing }) {
 }
 function QuestionResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
+  const sessionQuery = usePresentedSession(sessionId, revision);
   const practice = query.data?.resource?.data;
+  const session = sessionQuery.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question }) : null);
+  const answerEnabled = session?.selected && session.practice?.id === presentation.practiceId && session.questionId === presentation.questionId && session.phase === "awaiting_answer" && !question?.explanation;
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !answerEnabled }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
