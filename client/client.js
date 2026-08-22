@@ -750,6 +750,22 @@ function LeetcodeProblemCard({ sessionId, initialQuestion = null, language = "",
   });
 }
 
+// src/client/features/question-actions.js
+function isPresentedQuestionCurrent(session, presentation) {
+  return Boolean(
+    session?.selected && session.practice?.id === presentation?.practiceId && session.questionId === presentation?.questionId
+  );
+}
+function getPresentedQuestionActions(session, presentation) {
+  const current = isPresentedQuestionCurrent(session, presentation);
+  return {
+    canReveal: current && session.phase === "awaiting_answer",
+    canContinue: current && session.phase === "awaiting_next",
+    canRetry: current && session.phase === "awaiting_next",
+    canFinish: current && session.phase === "awaiting_next"
+  };
+}
+
 // src/client/features/live-interview.js
 function Evaluation({ attempt }) {
   if (!attempt?.evaluation) return null;
@@ -992,8 +1008,8 @@ function QuestionResourceCard({ presentation, revision, sessionId }) {
   const practice = query.data?.resource?.data;
   const session = sessionQuery.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
-  const answerEnabled = session?.selected && session.practice?.id === presentation.practiceId && session.questionId === presentation.questionId && session.phase === "awaiting_answer" && !question?.explanation;
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !answerEnabled }) : null);
+  const actions = getPresentedQuestionActions(session, presentation);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u9898\u76EE\u5361\u7247\u6570\u636E" }, question ? question.leetcode ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language }) : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal }) : null);
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
@@ -1003,8 +1019,8 @@ function ReviewResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null;
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
-  const actionsEnabled = session?.selected && session.practice?.id === presentation.practiceId && session.questionId === presentation.questionId && session.phase === "awaiting_next";
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actionsEnabled }) : null);
+  const actions = getPresentedQuestionActions(session, presentation);
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actions.canContinue }) : null);
 }
 function PracticeSummaryCard({ presentation, revision }) {
   const query = usePresentedPractice(presentation, revision);

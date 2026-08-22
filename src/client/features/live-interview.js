@@ -4,6 +4,7 @@ import { useCommand, useInterviewQuery } from '../shared/hooks.js'
 import { Button, Empty, ErrorNotice, h, Icon, Loading, Markdown, PhaseBadge, ScoreRail, StarRating } from '../shared/ui.js'
 import { leetcodeDifficultyLabel } from '../../domain/leetcode-top-100.js'
 import { LeetcodeProblemCard } from './leetcode.js'
+import { getPresentedQuestionActions } from './question-actions.js'
 
 function Evaluation({ attempt }) {
   if (!attempt?.evaluation) return null
@@ -199,15 +200,11 @@ export function QuestionResourceCard({ presentation, revision, sessionId }) {
   const practice = query.data?.resource?.data
   const session = sessionQuery.data?.resource?.data
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
-  const answerEnabled = session?.selected
-    && session.practice?.id === presentation.practiceId
-    && session.questionId === presentation.questionId
-    && session.phase === 'awaiting_answer'
-    && !question?.explanation
+  const actions = getPresentedQuestionActions(session, presentation)
   return h(PresentedState, { query, missing: '找不到题目卡片数据' }, question
     ? question.leetcode
       ? h(LeetcodeProblemCard, { sessionId, initialQuestion: question, language: practice.config?.language })
-      : h(QuestionResultCard, { sessionId, question, answerDisabled: !answerEnabled })
+      : h(QuestionResultCard, { sessionId, question, answerDisabled: !actions.canReveal })
     : null)
 }
 
@@ -219,12 +216,9 @@ export function ReviewResourceCard({ presentation, revision, sessionId }) {
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
-  const actionsEnabled = session?.selected
-    && session.practice?.id === presentation.practiceId
-    && session.questionId === presentation.questionId
-    && session.phase === 'awaiting_next'
+  const actions = getPresentedQuestionActions(session, presentation)
   return h(PresentedState, { query, missing: '找不到讲解数据' }, complete
-    ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actionsEnabled })
+    ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actions.canContinue })
     : null)
 }
 
