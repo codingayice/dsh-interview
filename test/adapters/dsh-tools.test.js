@@ -62,6 +62,8 @@ test('DSH 暴露无 command 联合的原子面试工具', () => {
   assert.match(fixture.tools.interview_reveal_answer.description, /generate_leetcode_explanation/)
   assert.match(fixture.tools.interview_reveal_answer.description, /只生成指定语言的一份完整答案代码/)
   assert.deepEqual(fixture.tools.interview_complete_review.parameters.required, ['detail', 'memorization_points'])
+  assert.match(fixture.tools.interview_complete_review.parameters.properties.detail.description, /练习配置语言的一份完整答案代码/)
+  assert.doesNotMatch(fixture.tools.interview_complete_review.parameters.properties.detail.description, /五种/)
   assert.equal(fixture.tools.interview_complete_review.parameters.properties.memorization_points.minLength, 1)
   assert.deepEqual(fixture.tools.interview_complete_summary.parameters.required, ['overall', 'strengths', 'improvements'])
   assert.deepEqual(fixture.tools.interview_set_leetcode_completion.parameters.required, ['slug', 'completed'])

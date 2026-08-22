@@ -246,7 +246,7 @@ const tools = [
     parameters: {
       type: 'object',
       properties: {
-        detail: { type: 'string', minLength: 1, description: '完整讲解；力扣题必须包含五种指定语言的完整答案代码。' },
+        detail: { type: 'string', minLength: 1, description: '完整讲解；力扣题必须包含练习配置语言的一份完整答案代码。' },
         memorization_points: { type: 'string', minLength: 1, description: '面试题填写直接背；力扣题填写精炼解题要点。' },
         question_id: { type: 'string', minLength: 1 },
       },
