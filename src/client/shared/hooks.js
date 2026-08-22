@@ -35,7 +35,10 @@ export function useInterviewQuery(key, loader, dependencies = [], options = {}) 
 
 export function useCommand(sessionId) {
   const [state, setState] = React.useState({ busy: '', error: '' })
+  const inFlightRef = React.useRef(false)
   const run = React.useCallback(async (command, payload = {}) => {
+    if (inFlightRef.current) return null
+    inFlightRef.current = true
     setState({ busy: command, error: '' })
     try {
       return await interviewApi.command(sessionId, command, payload)
@@ -43,6 +46,7 @@ export function useCommand(sessionId) {
       setState({ busy: '', error: error.message || '操作失败' })
       throw error
     } finally {
+      inFlightRef.current = false
       setState((current) => ({ ...current, busy: '' }))
     }
   }, [sessionId])

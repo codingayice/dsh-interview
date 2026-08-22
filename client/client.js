@@ -152,7 +152,10 @@ function useInterviewQuery(key, loader, dependencies = [], options = {}) {
 }
 function useCommand(sessionId) {
   const [state, setState] = import_react.default.useState({ busy: "", error: "" });
+  const inFlightRef = import_react.default.useRef(false);
   const run = import_react.default.useCallback(async (command, payload = {}) => {
+    if (inFlightRef.current) return null;
+    inFlightRef.current = true;
     setState({ busy: command, error: "" });
     try {
       return await interviewApi.command(sessionId, command, payload);
@@ -160,6 +163,7 @@ function useCommand(sessionId) {
       setState({ busy: "", error: error.message || "\u64CD\u4F5C\u5931\u8D25" });
       throw error;
     } finally {
+      inFlightRef.current = false;
       setState((current) => ({ ...current, busy: "" }));
     }
   }, [sessionId]);
@@ -863,19 +867,8 @@ function CompactResultCard({ title, detail, tone = "quiet" }) {
 function QuestionResultCard({ sessionId, question, answerDisabled = false }) {
   if (!question) return null;
   const command = useCommand(sessionId);
-  const answerRequestedRef = import_react4.default.useRef(false);
-  const [answerRequested, setAnswerRequested] = import_react4.default.useState(false);
-  const revealAnswer = async () => {
-    if (answerDisabled || answerRequestedRef.current) return;
-    answerRequestedRef.current = true;
-    setAnswerRequested(true);
-    try {
-      await command.run("question.reveal", { questionId: question.id });
-    } catch {
-      answerRequestedRef.current = false;
-      setAnswerRequested(false);
-    }
-  };
+  const revealAnswer = () => command.run("question.reveal", { questionId: question.id }).catch(() => {
+  });
   return h(
     "article",
     { className: "di-card di-question-card", "aria-label": "\u9762\u8BD5\u9898" },
@@ -886,7 +879,7 @@ function QuestionResultCard({ sessionId, question, answerDisabled = false }) {
     ),
     h(Button, {
       className: "di-answer-button",
-      disabled: answerDisabled || answerRequested,
+      disabled: answerDisabled,
       busy: command.busy === "question.reveal",
       onClick: revealAnswer,
       "aria-label": "\u67E5\u770B\u672C\u9898\u7B54\u6848"

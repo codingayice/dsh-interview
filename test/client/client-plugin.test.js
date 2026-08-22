@@ -276,11 +276,14 @@ test('只有当前待下一题的点评卡允许继续、重答或结束', () =>
   assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'session\.finish'/)
 })
 
-test('看答案点击后立即锁定且只允许当前待回答题目操作', () => {
+test('题目命令由统一命令钩子互斥且看答案使用阶段权限', () => {
   const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+  const hooks = readFileSync(new URL('../../src/client/shared/hooks.js', import.meta.url), 'utf8')
 
-  assert.match(liveInterview, /answerRequestedRef\.current = true/)
-  assert.match(liveInterview, /if \(answerDisabled \|\| answerRequestedRef\.current\) return/)
-  assert.match(liveInterview, /disabled: answerDisabled \|\| answerRequested/)
+  assert.match(hooks, /if \(inFlightRef\.current\) return null/)
+  assert.match(hooks, /inFlightRef\.current = true/)
+  assert.match(hooks, /inFlightRef\.current = false/)
+  assert.doesNotMatch(liveInterview, /answerRequestedRef|answerRequested/)
+  assert.match(liveInterview, /disabled: answerDisabled/)
   assert.match(liveInterview, /answerDisabled: !actions\.canReveal/)
 })
