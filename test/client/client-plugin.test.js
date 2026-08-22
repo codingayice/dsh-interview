@@ -238,6 +238,8 @@ test('长时间轴使用独立滚动区且详情浮层位于滚动区之外', ()
   assert.match(timeline, /className: 'di-time-list'/)
   assert.match(timeline, /selectedQuestion && selectedView \? h\('section', \{ className: 'di-time-flyout'/)
   assert.match(styles, /\.di-time-list\{[^}]*max-height:calc\(100vh - 144px\)[^}]*overflow-y:auto/)
+  assert.match(styles, /\.di-time-list\{[^}]*scrollbar-width:none[^}]*-ms-overflow-style:none/)
+  assert.match(styles, /\.di-time-list::\-webkit-scrollbar\{display:none\}/)
   assert.doesNotMatch(styles, /\.di-timeline\{[^}]*max-height:/)
 })
 
