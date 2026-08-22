@@ -1,6 +1,7 @@
 # dsh-interview：会点评、会讲解的 AI 面试陪练
 
 [![npm](https://img.shields.io/npm/v/dsh-interview)](https://www.npmjs.com/package/dsh-interview)
+[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-339933?logo=node.js&logoColor=white)](./package.json)
 [![license](https://img.shields.io/github/license/codingayice/dsh-interview)](./LICENSE)
 
