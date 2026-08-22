@@ -230,3 +230,49 @@ test('工作台配置与筛选统一使用自定义下拉组件', () => {
   assert.match(ui, /document\.addEventListener\('pointerdown'/)
   assert.match(ui, /event\.key === 'ArrowDown'/)
 })
+
+test('长时间轴使用独立滚动区且详情浮层位于滚动区之外', () => {
+  const timeline = readFileSync(new URL('../../src/client/features/timeline.js', import.meta.url), 'utf8')
+  const styles = readFileSync(new URL('../../src/client/shared/styles.js', import.meta.url), 'utf8')
+
+  assert.match(timeline, /className: 'di-time-list'/)
+  assert.match(timeline, /selectedQuestion && selectedView \? h\('section', \{ className: 'di-time-flyout'/)
+  assert.match(styles, /\.di-time-list\{[^}]*max-height:calc\(100vh - 144px\)[^}]*overflow-y:auto/)
+  assert.doesNotMatch(styles, /\.di-timeline\{[^}]*max-height:/)
+})
+
+test('练习工作台入口支持拖动、边界约束和位置持久化', () => {
+  const workspace = readFileSync(new URL('../../src/client/features/workspace-dock.js', import.meta.url), 'utf8')
+  const styles = readFileSync(new URL('../../src/client/shared/styles.js', import.meta.url), 'utf8')
+
+  assert.match(workspace, /onPointerDown: startLauncherDrag/)
+  assert.match(workspace, /onPointerMove: moveLauncher/)
+  assert.match(workspace, /onPointerUp: finishLauncherDrag/)
+  assert.match(workspace, /clampLauncherPosition/)
+  assert.match(workspace, /localStorage\?\.setItem\(LAUNCHER_POSITION_KEY/)
+  assert.match(workspace, /suppressLauncherClickRef/)
+  assert.match(styles, /\.di-workspace-launcher\{[^}]*cursor:grab[^}]*touch-action:none/)
+})
+
+test('进行中练习的全部模式不携带模式条件且忽略过期请求', () => {
+  const library = readFileSync(new URL('../../src/client/features/practice-library.js', import.meta.url), 'utf8')
+  const hooks = readFileSync(new URL('../../src/client/shared/hooks.js', import.meta.url), 'utf8')
+
+  assert.match(library, /modeFilter = MODE_OPTIONS\.some\(\(option\) => option\.value === mode\) \? mode : undefined/)
+  assert.match(library, /mode: modeFilter/)
+  assert.match(library, /modeFilter \|\| 'all'/)
+  assert.match(hooks, /requestSequenceRef/)
+  assert.match(hooks, /requestSequence === requestSequenceRef\.current/)
+  assert.match(hooks, /requestSequenceRef\.current \+= 1/)
+})
+
+test('只有当前待下一题的点评卡允许继续、重答或结束', () => {
+  const liveInterview = readFileSync(new URL('../../src/client/features/live-interview.js', import.meta.url), 'utf8')
+
+  assert.match(liveInterview, /session\.questionId === presentation\.questionId/)
+  assert.match(liveInterview, /session\.phase === 'awaiting_next'/)
+  assert.match(liveInterview, /actionsDisabled: !actionsEnabled/)
+  assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'question\.next'/)
+  assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'question\.retry'/)
+  assert.match(liveInterview, /disabled: actionsDisabled, busy: command\.busy === 'session\.finish'/)
+})

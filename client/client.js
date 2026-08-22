@@ -126,14 +126,27 @@ var import_react = __toESM(require("react"), 1);
 function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache2 = options.cache !== false;
   const [state, setState] = import_react.default.useState({ loading: true, data: null, error: "" });
+  const requestSequenceRef = import_react.default.useRef(0);
   const load = import_react.default.useCallback((force = false) => {
+    const requestSequence = ++requestSequenceRef.current;
     setState((current) => ({ ...current, loading: current.data === null, error: "" }));
     const request = force || !cache2 ? Promise.resolve().then(loader) : interviewApi.cached(key, loader);
-    return request.then((data) => setState({ loading: false, data, error: "" })).catch((error) => setState((current) => ({ ...current, loading: false, error: error.message || "\u52A0\u8F7D\u5931\u8D25" })));
+    return request.then((data) => {
+      if (requestSequence === requestSequenceRef.current) setState({ loading: false, data, error: "" });
+      return data;
+    }).catch((error) => {
+      if (requestSequence === requestSequenceRef.current) {
+        setState((current) => ({ ...current, loading: false, error: error.message || "\u52A0\u8F7D\u5931\u8D25" }));
+      }
+    });
   }, [key, cache2, ...dependencies]);
   import_react.default.useEffect(() => {
     load();
-    return interviewApi.subscribe(() => load(true));
+    const unsubscribe = interviewApi.subscribe(() => load(true));
+    return () => {
+      requestSequenceRef.current += 1;
+      unsubscribe();
+    };
   }, [load]);
   return { ...state, reload: () => load(true) };
 }
@@ -853,7 +866,7 @@ function QuestionResultCard({ sessionId, question }) {
     h(ErrorNotice, null, command.error)
   );
 }
-function ReviewResultCard({ sessionId, question, attempt }) {
+function ReviewResultCard({ sessionId, question, attempt, actionsDisabled = false }) {
   if (!question || !question.explanation || attempt && !attempt.evaluation) return null;
   const command = useCommand(sessionId);
   const run = (name2, payload) => command.run(name2, payload).catch(() => {
@@ -925,9 +938,9 @@ function ReviewResultCard({ sessionId, question, attempt }) {
       h(
         "div",
         { className: "di-review-actions" },
-        isLeetcode ? h(Button, { tone: "primary", disabled: nextRequested, onClick: next }, nextRequested ? "\u5DF2\u51FA\u4E0B\u4E00\u9898" : "\u968F\u673A\u4E0B\u4E00\u9898") : h(Button, { tone: "primary", busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
-        !isLeetcode ? h(Button, { busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54") : null,
-        !isLeetcode ? h(Button, { busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
+        isLeetcode ? h(Button, { tone: "primary", disabled: actionsDisabled || nextRequested, onClick: next }, nextRequested ? "\u5DF2\u51FA\u4E0B\u4E00\u9898" : "\u968F\u673A\u4E0B\u4E00\u9898") : h(Button, { tone: "primary", disabled: actionsDisabled, busy: command.busy === "question.next", onClick: () => run("question.next") }, "\u4E0B\u4E00\u9898"),
+        !isLeetcode ? h(Button, { disabled: actionsDisabled, busy: command.busy === "question.retry", onClick: retry }, h(Icon, { name: "swap" }), "\u91CD\u65B0\u4F5C\u7B54") : null,
+        !isLeetcode ? h(Button, { disabled: actionsDisabled, busy: command.busy === "session.finish", onClick: () => run("session.finish") }, "\u7ED3\u675F\u7EC3\u4E60") : null
       )
     )
   );
@@ -949,6 +962,13 @@ function usePresentedPractice(presentation, revision) {
     { cache: false }
   );
 }
+function usePresentedSession(sessionId, revision) {
+  return useInterviewQuery(
+    `presented-session:${sessionId}:${revision || 0}`,
+    () => interviewApi.session(sessionId),
+    [sessionId, revision]
+  );
+}
 function PresentedState({ query, children, missing }) {
   if (query.loading && !query.data) return h("div", { className: "di-card" }, h(Loading));
   if (query.error) return h("div", { className: "di-card" }, h(ErrorNotice, null, query.error));
@@ -962,11 +982,14 @@ function QuestionResourceCard({ presentation, revision, sessionId }) {
 }
 function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision);
+  const sessionQuery = usePresentedSession(sessionId, revision);
   const practice = query.data?.resource?.data;
+  const session = sessionQuery.data?.resource?.data;
   const question = practice?.questions?.find((item) => item.id === presentation.questionId);
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null;
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation);
-  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null);
+  const actionsEnabled = session?.selected && session.practice?.id === presentation.practiceId && session.questionId === presentation.questionId && session.phase === "awaiting_next";
+  return h(PresentedState, { query, missing: "\u627E\u4E0D\u5230\u8BB2\u89E3\u6570\u636E" }, complete ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actionsEnabled }) : null);
 }
 function PracticeSummaryCard({ presentation, revision }) {
   const query = usePresentedPractice(presentation, revision);
@@ -1282,8 +1305,10 @@ function PracticeLibrary({
   const [creating, setCreating] = import_react5.default.useState(false);
   const command = useCommand(sessionId);
   const effectiveStatus = statusScope === "active" ? "active" : "completed";
-  const filters = { query: queryText, mode, status: effectiveStatus };
-  const list = useInterviewQuery(`practices:${queryText}:${mode}:${effectiveStatus}`, () => interviewApi.practices(filters), [queryText, mode, effectiveStatus]);
+  const normalizedQuery = queryText.trim();
+  const modeFilter = MODE_OPTIONS.some((option) => option.value === mode) ? mode : void 0;
+  const filters = { query: normalizedQuery || void 0, mode: modeFilter, status: effectiveStatus };
+  const list = useInterviewQuery(`practices:${normalizedQuery}:${modeFilter || "all"}:${effectiveStatus}`, () => interviewApi.practices(filters), [normalizedQuery, modeFilter, effectiveStatus]);
   const practices = list.data?.resource?.data || [];
   const visibleSelectedId = practices.some((practice) => practice.id === selectedId) ? selectedId : null;
   const detail = useInterviewQuery(`practice:${visibleSelectedId || "none"}`, () => visibleSelectedId ? interviewApi.practice(visibleSelectedId) : Promise.resolve(null), [visibleSelectedId]);
@@ -1508,23 +1533,25 @@ function TimelinePanel({ sessionId, revisionSignal }) {
   const detailQuery = useInterviewQuery(`timeline-practice:${practiceId || "none"}:${revisionSignal}`, () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null), [practiceId, revisionSignal], { cache: false });
   const practice = detailQuery.data?.resource?.data;
   if (!session?.selected || !practice?.questions?.length) return null;
-  return h("nav", {
-    className: "di-timeline",
-    "aria-label": "\u9898\u76EE\u65F6\u95F4\u8F74",
-    onKeyDown: (event) => {
-      if (event.key === "Escape") setSelection(null);
-    }
-  }, practice.questions.map((question) => {
-    const views = question.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS;
-    const activeView = selection?.questionId === question.id ? selection.view : null;
-    const activeLabel = views.find((item) => item.id === activeView)?.label;
-    return h(
-      "div",
-      {
-        className: `di-time-item${session.questionId === question.id ? " is-current" : ""}${activeView ? " has-view" : ""}`,
+  const selectedQuestion = practice.questions.find((question) => question.id === selection?.questionId);
+  const selectedViews = selectedQuestion?.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS;
+  const selectedView = selectedViews.some((item) => item.id === selection?.view) ? selection.view : null;
+  const selectedLabel = selectedViews.find((item) => item.id === selectedView)?.label;
+  return h(
+    "nav",
+    {
+      className: "di-timeline",
+      "aria-label": "\u9898\u76EE\u65F6\u95F4\u8F74",
+      onKeyDown: (event) => {
+        if (event.key === "Escape") setSelection(null);
+      }
+    },
+    h("div", { className: "di-time-list" }, practice.questions.map((question) => {
+      const active = selection?.questionId === question.id;
+      return h("div", {
+        className: `di-time-item${session.questionId === question.id ? " is-current" : ""}${active ? " has-view" : ""}`,
         key: question.id
-      },
-      h(
+      }, h(
         "button",
         {
           className: "di-time-node",
@@ -1534,31 +1561,31 @@ function TimelinePanel({ sessionId, revisionSignal }) {
         },
         h("span", { className: "di-time-dot", "aria-hidden": "true" }),
         h("span", null, `Q${String(question.sequence).padStart(2, "0")}`)
-      ),
-      activeView ? h(
-        "section",
-        { className: "di-time-flyout", "aria-label": `${activeLabel}\u5185\u5BB9` },
+      ));
+    })),
+    selectedQuestion && selectedView ? h(
+      "section",
+      { className: "di-time-flyout", "aria-label": `${selectedLabel}\u5185\u5BB9` },
+      h(
+        "header",
+        { className: "di-time-flyout-head" },
         h(
-          "header",
-          { className: "di-time-flyout-head" },
-          h(
-            "div",
-            { className: "di-time-tabs", role: "tablist", "aria-label": `\u7B2C ${question.sequence} \u9898\u8BE6\u60C5` },
-            views.map((item) => h("button", {
-              className: `di-time-tab${activeView === item.id ? " is-active" : ""}`,
-              type: "button",
-              role: "tab",
-              key: item.id,
-              "aria-selected": activeView === item.id,
-              onClick: () => setSelection({ questionId: question.id, view: item.id })
-            }, item.label))
-          ),
-          h("button", { type: "button", onClick: () => setSelection(null), "aria-label": "\u5173\u95ED" }, "\xD7")
+          "div",
+          { className: "di-time-tabs", role: "tablist", "aria-label": `\u7B2C ${selectedQuestion.sequence} \u9898\u8BE6\u60C5` },
+          selectedViews.map((item) => h("button", {
+            className: `di-time-tab${selectedView === item.id ? " is-active" : ""}`,
+            type: "button",
+            role: "tab",
+            key: item.id,
+            "aria-selected": selectedView === item.id,
+            onClick: () => setSelection({ questionId: selectedQuestion.id, view: item.id })
+          }, item.label))
         ),
-        h("div", { className: "di-time-flyout-body", role: "tabpanel" }, h(TimelineContent, { question, view: activeView }))
-      ) : null
-    );
-  }));
+        h("button", { type: "button", onClick: () => setSelection(null), "aria-label": "\u5173\u95ED" }, "\xD7")
+      ),
+      h("div", { className: "di-time-flyout-body", role: "tabpanel" }, h(TimelineContent, { question: selectedQuestion, view: selectedView }))
+    ) : null
+  );
 }
 
 // src/client/features/workspace-dock.js
@@ -1568,6 +1595,28 @@ var WORKSPACE_TABS = Object.freeze([
   { id: "library", label: "\u7EC3\u4E60\u6863\u6848", icon: "archive" },
   { id: "leetcode", label: "\u70ED\u9898 100", icon: "flame" }
 ]);
+var LAUNCHER_POSITION_KEY = "dsh-interview:workspace-launcher-position";
+var LAUNCHER_MARGIN = 8;
+function loadLauncherPosition() {
+  try {
+    const value = JSON.parse(globalThis.localStorage?.getItem(LAUNCHER_POSITION_KEY) || "null");
+    return Number.isFinite(value?.left) && Number.isFinite(value?.top) ? value : null;
+  } catch {
+    return null;
+  }
+}
+function clampLauncherPosition(position, width, height) {
+  return {
+    left: Math.min(Math.max(LAUNCHER_MARGIN, position.left), Math.max(LAUNCHER_MARGIN, globalThis.innerWidth - width - LAUNCHER_MARGIN)),
+    top: Math.min(Math.max(LAUNCHER_MARGIN, position.top), Math.max(LAUNCHER_MARGIN, globalThis.innerHeight - height - LAUNCHER_MARGIN))
+  };
+}
+function saveLauncherPosition(position) {
+  try {
+    globalThis.localStorage?.setItem(LAUNCHER_POSITION_KEY, JSON.stringify(position));
+  } catch {
+  }
+}
 function WorkspaceContent({ tab, sessionId }) {
   if (tab === "active") return h(PracticeLibrary, {
     sessionId,
@@ -1588,6 +1637,13 @@ function WorkspaceDock({ sessionId }) {
   const [open, setOpen] = import_react7.default.useState(false);
   const [tab, setTab] = import_react7.default.useState("active");
   const [notice, setNotice] = import_react7.default.useState("");
+  const [launcherPosition, setLauncherPosition] = import_react7.default.useState(loadLauncherPosition);
+  const [draggingLauncher, setDraggingLauncher] = import_react7.default.useState(false);
+  const launcherRef = import_react7.default.useRef(null);
+  const launcherPositionRef = import_react7.default.useRef(launcherPosition);
+  const launcherDragRef = import_react7.default.useRef(null);
+  const suppressLauncherClickRef = import_react7.default.useRef(false);
+  launcherPositionRef.current = launcherPosition;
   const activeQuery = useInterviewQuery(
     `workspace-active-count:${open}`,
     () => interviewApi.practices({ status: "active" }),
@@ -1611,15 +1667,80 @@ function WorkspaceDock({ sessionId }) {
     if (WORKSPACE_TABS.some((item) => item.id === nextTab)) setTab(nextTab);
     setOpen(true);
   }), []);
+  import_react7.default.useEffect(() => {
+    const keepLauncherInViewport = () => {
+      const rect = launcherRef.current?.getBoundingClientRect();
+      const current = launcherPositionRef.current;
+      if (!rect || !current) return;
+      const next = clampLauncherPosition(current, rect.width, rect.height);
+      launcherPositionRef.current = next;
+      setLauncherPosition(next);
+      saveLauncherPosition(next);
+    };
+    keepLauncherInViewport();
+    globalThis.addEventListener?.("resize", keepLauncherInViewport);
+    return () => globalThis.removeEventListener?.("resize", keepLauncherInViewport);
+  }, []);
+  const startLauncherDrag = (event) => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    launcherDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+      position: { left: rect.left, top: rect.top }
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDraggingLauncher(true);
+  };
+  const moveLauncher = (event) => {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return;
+    drag.moved = true;
+    drag.position = clampLauncherPosition({ left: drag.left + deltaX, top: drag.top + deltaY }, drag.width, drag.height);
+    setLauncherPosition(drag.position);
+  };
+  const finishLauncherDrag = (event) => {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (drag.moved) {
+      suppressLauncherClickRef.current = true;
+      saveLauncherPosition(drag.position);
+    }
+    launcherDragRef.current = null;
+    setDraggingLauncher(false);
+  };
   return h(
     import_react7.default.Fragment,
     null,
     h("button", {
+      ref: launcherRef,
       type: "button",
-      className: `di-workspace-launcher${open ? " is-open" : ""}`,
+      className: `di-workspace-launcher${open ? " is-open" : ""}${draggingLauncher ? " is-dragging" : ""}`,
+      style: launcherPosition ? { left: `${launcherPosition.left}px`, top: `${launcherPosition.top}px`, right: "auto", bottom: "auto" } : void 0,
       "aria-expanded": open,
       "aria-controls": "di-interview-workspace",
-      onClick: () => setOpen((value) => !value)
+      onPointerDown: startLauncherDrag,
+      onPointerMove: moveLauncher,
+      onPointerUp: finishLauncherDrag,
+      onPointerCancel: finishLauncherDrag,
+      onClick: (event) => {
+        if (suppressLauncherClickRef.current) {
+          suppressLauncherClickRef.current = false;
+          event.preventDefault();
+          return;
+        }
+        setOpen((value) => !value);
+      }
     }, h("span", { className: "di-workspace-mark", "aria-hidden": "true" }, "I"), "\u7EC3\u4E60\u5DE5\u4F5C\u53F0"),
     open ? h(
       "div",
@@ -1718,8 +1839,8 @@ var STYLE_TEXT = `
 .di-ledger{width:min(1080px,100%);border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-history-head{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 24px;border-bottom:1px solid var(--di-line)}.di-ledger-title{margin:0;font-size:18px;font-weight:var(--di-weight-title)}.di-history-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-input,.di-select{min-width:0;border:1px solid var(--di-line);border-radius:7px;padding:8px 10px;background:var(--di-white);color:var(--di-ink)}.di-input{flex:1}.di-textarea{min-height:150px;resize:vertical;line-height:1.6}.di-practice-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 24px;border-bottom:1px solid var(--di-line);background:#fbfcfe}.di-field{display:grid;gap:6px;font-size:13px;font-weight:var(--di-weight-text)}.di-field-wide{grid-column:1/-1}.di-history-scroll{overflow-x:auto}.di-history-table{width:100%;border-collapse:collapse;font-size:13px}.di-history-table th{padding:10px 24px;color:var(--di-muted);font-weight:var(--di-weight-text);text-align:left;background:#fbfcfe}.di-history-table td{padding:10px 24px;border-top:1px solid var(--di-line);white-space:nowrap}.di-history-table tr.is-selected td{background:var(--di-blue-soft)}.di-history-topic{appearance:none;border:0;padding:0;background:transparent;color:var(--di-ink);font:inherit;font-size:13px;font-weight:var(--di-weight-text);line-height:1.4;cursor:pointer;text-align:left}.di-history-topic:hover{color:var(--di-blue)}.di-history-time{color:var(--di-muted)}.di-history-score{font-size:14px}.di-history-score.is-good{color:var(--di-green)}.di-history-score.is-mid{color:#e69600}.di-history-score.is-empty{color:var(--di-muted)}.di-row-actions{display:flex;justify-content:flex-end;gap:10px}.di-icon-button{width:34px;height:32px;padding:0}.di-icon-button.is-delete{color:var(--di-red);border-color:#ffe0e2;background:#fffafa}.di-delete-confirm{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 24px;padding:11px 13px;border:1px solid #ffd8dc;border-radius:8px;background:#fff8f8;font-size:13px}.di-delete-confirm .di-actions{margin:0}.di-history-detail{border-top:1px solid var(--di-line);background:#fbfcfe}.di-detail{padding:22px 24px;max-height:620px;overflow:auto}.di-detail-heading{display:flex;align-items:baseline;justify-content:space-between;gap:18px}.di-detail-question{padding:15px 0;border-bottom:1px solid var(--di-line)}.di-detail-question-head{display:flex;gap:10px;align-items:flex-start}.di-detail-question-text{flex:1;line-height:1.6}.di-detail-actions{display:flex;gap:6px;margin-top:10px}.di-sequence{font-size:12px;font-weight:var(--di-weight-text);color:var(--di-blue)}.di-confirm{margin-top:10px;padding:10px;border:1px solid #ffd8dc;border-radius:7px}
 .di-lc-problem-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:28px;padding:25px 28px;overflow:visible}.di-lc-problem-card.is-history{box-shadow:none}.di-lc-problem-main{min-width:0}.di-lc-problem-title{display:flex;align-items:baseline;gap:11px;font-size:21px;font-weight:var(--di-weight-title);line-height:1.35}.di-lc-problem-title>span{font-size:13px;font-weight:var(--di-weight-text);color:var(--di-muted)}.di-lc-problem-meta{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:12px;color:var(--di-muted)}.di-lc-problem-meta .is-complete{color:var(--di-green);font-weight:var(--di-weight-text)}.di-lc-problem-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;max-width:510px}.di-lc-problem-actions>.di-button{text-decoration:none}.di-lc-difficulty{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:var(--di-weight-text)}.di-lc-difficulty.is-easy{color:#087a45;background:#edf9f3}.di-lc-difficulty.is-medium{color:#a86300;background:#fff7e7}.di-lc-difficulty.is-hard{color:#cf3139;background:#fff0f1}
 .di-lc-catalog{width:min(1080px,100%);margin-top:12px;border:1px solid var(--di-line);border-radius:14px;background:var(--di-white);overflow:hidden;box-shadow:var(--di-shadow)}.di-lc-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 28px 18px}.di-lc-title{margin:0;font-size:24px;font-weight:var(--di-weight-title);line-height:1.15}.di-lc-catalog-summary{display:flex;align-items:center;gap:16px}.di-lc-source{color:var(--di-muted);font-size:12px;text-decoration:none}.di-lc-source:hover{color:var(--di-blue)}.di-lc-progress-copy{display:flex;align-items:baseline;gap:5px;color:var(--di-muted)}.di-lc-progress-value{font-size:26px;font-weight:var(--di-weight-text);color:var(--di-green)}.di-lc-progress{height:3px;margin:0 28px 6px;border-radius:99px;background:#edf0f5;overflow:hidden}.di-lc-progress>i{display:block;height:100%;border-radius:inherit;background:var(--di-green);transition:width .2s ease}.di-lc-groups{padding:4px 28px 28px}.di-lc-group{display:grid;grid-template-columns:132px minmax(0,1fr);padding:22px 0;border-top:1px solid var(--di-line)}.di-lc-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-right:24px}.di-lc-group-head h3{margin:0;font-size:14px;font-weight:var(--di-weight-text)}.di-lc-group-head span{color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums}.di-lc-problems{min-width:0}.di-lc-row{display:grid;grid-template-columns:24px minmax(0,1fr) 52px;align-items:center;gap:10px;min-height:38px;padding:3px 4px;border-radius:7px}.di-lc-row:hover{background:var(--di-paper)}.di-lc-row.is-complete .di-lc-problem-link{color:var(--di-muted)}.di-lc-check{appearance:none;width:19px;height:19px;border:1.5px solid #b9c2d2;border-radius:5px;background:var(--di-white);color:#fff;font:var(--di-weight-text) 12px/16px "Segoe UI",sans-serif;cursor:pointer}.di-lc-check:hover{border-color:var(--di-green)}.di-lc-check:focus-visible,.di-lc-problem-link:focus-visible,.di-lc-source:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-lc-check.is-complete{border-color:var(--di-green);background:var(--di-green)}.di-lc-check:disabled{opacity:.55;cursor:wait}.di-lc-problem-link{display:flex;align-items:baseline;gap:9px;min-width:0;color:var(--di-ink);font-size:13px;font-weight:var(--di-weight-text);text-decoration:none}.di-lc-problem-link:hover{color:var(--di-blue)}.di-lc-problem-id{width:30px;flex:0 0 auto;color:var(--di-muted);font-size:11px;font-variant-numeric:tabular-nums;text-align:right}.di-lc-open{opacity:0;color:var(--di-blue);transition:opacity .15s ease}.di-lc-row:hover .di-lc-open{opacity:1}
-.di-workspace-launcher,.di-workspace-panel,.di-local-toast{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;box-sizing:border-box}.di-workspace-launcher{appearance:none;position:fixed;z-index:55;right:18px;bottom:22px;display:flex;align-items:center;gap:8px;border:1px solid #cfd8eb;border-radius:999px;padding:8px 13px 8px 8px;background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(28,39,67,.12);color:var(--di-ink);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;backdrop-filter:blur(10px)}.di-workspace-launcher:hover,.di-workspace-launcher.is-open{border-color:#aebfff;color:var(--di-blue)}.di-workspace-launcher:focus-visible,.di-workspace-tabs button:focus-visible,.di-workspace-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-workspace-mark{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:50%;background:var(--di-blue);color:#fff;font:var(--di-weight-text) 11px/1 ui-monospace,"Cascadia Mono",monospace}.di-workspace-panel{position:fixed;z-index:54;right:18px;bottom:68px;width:min(1120px,calc(100vw - 36px));height:min(760px,calc(100vh - 92px));border:1px solid var(--di-line);border-radius:15px;background:#fbfcfe;box-shadow:0 24px 70px rgba(18,28,52,.2);overflow:hidden;color:var(--di-ink)}.di-workspace-head{display:flex;align-items:center;justify-content:space-between;height:70px;padding:0 22px 0 25px;border-bottom:1px solid var(--di-line);background:var(--di-white)}.di-workspace-head h2{margin:0;font-size:19px;font-weight:var(--di-weight-title)}.di-workspace-head>button{appearance:none;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--di-muted);font-size:24px;cursor:pointer}.di-workspace-head>button:hover{background:var(--di-paper);color:var(--di-ink)}.di-workspace-layout{display:grid;grid-template-columns:120px minmax(0,1fr);height:calc(100% - 70px)}.di-workspace-tabs{display:flex;flex-direction:column;padding:18px 0;border-right:1px solid var(--di-line);background:#f4f7fb}.di-workspace-tabs button{appearance:none;position:relative;border:0;padding:12px 16px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1.2 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;text-align:left;cursor:pointer}.di-workspace-tabs button::before{content:"";position:absolute;top:8px;bottom:8px;left:0;width:3px;border-radius:0 3px 3px 0;background:transparent}.di-workspace-tabs button:hover{color:var(--di-ink)}.di-workspace-tabs button.is-active{color:var(--di-blue);background:var(--di-white)}.di-workspace-tabs button.is-active::before{background:var(--di-blue)}.di-workspace-content{min-width:0;padding:18px;overflow:auto}.di-workspace-content>.di-card,.di-workspace-content>.di-ledger,.di-workspace-content>.di-lc-catalog{width:100%;margin-top:0;box-shadow:none}.di-local-toast{position:fixed;z-index:70;right:18px;bottom:76px;max-width:min(360px,calc(100vw - 36px));padding:11px 14px;border:1px solid #cfe5d8;border-radius:9px;background:#f3faf6;box-shadow:0 10px 30px rgba(24,65,43,.13);color:#116d40;font-size:13px;font-weight:var(--di-weight-text)}
-.di-timeline{position:fixed;right:18px;top:112px;z-index:40;display:grid;gap:14px;width:56px;max-height:calc(100vh - 144px);padding:4px 0;overflow:visible;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink)}.di-time-item{position:relative;min-height:34px}.di-time-item:not(:last-child)::after{content:"";position:absolute;z-index:-1;top:27px;right:43px;width:1px;height:25px;background:var(--di-line)}.di-time-node{appearance:none;display:flex;align-items:center;gap:7px;width:56px;height:30px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 11px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:color .15s ease,background .15s ease}.di-time-node:hover,.di-time-node:focus-visible,.di-time-item.has-view .di-time-node{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-node:focus-visible,.di-time-tab:focus-visible,.di-time-flyout-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-time-dot{width:7px;height:7px;flex:0 0 auto;border:2px solid #b7c0d0;border-radius:50%;background:var(--di-white)}.di-time-item.is-current .di-time-dot{border-color:var(--di-blue);background:var(--di-blue);box-shadow:0 0 0 4px rgba(36,92,255,.1)}.di-time-flyout{position:fixed;right:82px;top:112px;width:min(390px,calc(100vw - 112px));max-height:calc(100vh - 144px);overflow:hidden;border:1px solid var(--di-line);border-radius:11px;background:var(--di-white);box-shadow:0 16px 42px rgba(23,32,51,.14)}.di-time-flyout-head{display:flex;align-items:stretch;border-bottom:1px solid var(--di-line)}.di-time-tabs{display:flex;align-items:stretch;min-width:0;padding-left:14px}.di-time-tab{appearance:none;position:relative;border:0;padding:13px 2px 11px;margin-right:20px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer}.di-time-tab::after{content:"";position:absolute;right:0;bottom:-1px;left:0;height:2px;border-radius:2px;background:transparent}.di-time-tab:hover{color:var(--di-ink)}.di-time-tab.is-active{color:var(--di-blue)}.di-time-tab.is-active::after{background:var(--di-blue)}.di-time-flyout-head>button{appearance:none;width:42px;border:0;margin-left:auto;background:transparent;color:var(--di-muted);font-size:20px;line-height:1;cursor:pointer}.di-time-flyout-head>button:hover{color:var(--di-ink);background:var(--di-paper)}.di-time-flyout-body{max-height:calc(100vh - 188px);padding:15px 16px;overflow:auto;font-size:13px;line-height:1.7}.di-time-records{display:grid;gap:16px}.di-time-record{padding-bottom:15px;border-bottom:1px solid var(--di-line)}.di-time-record:last-child{padding-bottom:0;border-bottom:0}.di-time-record-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-content-label{margin-bottom:4px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-record-review{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--di-paper)}.di-time-answer>.di-time-memorize{margin-top:14px;padding:12px;border-radius:8px;background:var(--di-green-soft)}.di-time-empty{padding:16px 4px;text-align:center;color:var(--di-muted)}
+.di-workspace-launcher,.di-workspace-panel,.di-local-toast{font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;box-sizing:border-box}.di-workspace-launcher{appearance:none;position:fixed;z-index:55;right:18px;bottom:22px;display:flex;align-items:center;gap:8px;border:1px solid #cfd8eb;border-radius:999px;padding:8px 13px 8px 8px;background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(28,39,67,.12);color:var(--di-ink);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:grab;touch-action:none;user-select:none;backdrop-filter:blur(10px)}.di-workspace-launcher.is-dragging{cursor:grabbing}.di-workspace-launcher:hover,.di-workspace-launcher.is-open{border-color:#aebfff;color:var(--di-blue)}.di-workspace-launcher:focus-visible,.di-workspace-tabs button:focus-visible,.di-workspace-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-workspace-mark{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:50%;background:var(--di-blue);color:#fff;font:var(--di-weight-text) 11px/1 ui-monospace,"Cascadia Mono",monospace}.di-workspace-panel{position:fixed;z-index:54;right:18px;bottom:68px;width:min(1120px,calc(100vw - 36px));height:min(760px,calc(100vh - 92px));border:1px solid var(--di-line);border-radius:15px;background:#fbfcfe;box-shadow:0 24px 70px rgba(18,28,52,.2);overflow:hidden;color:var(--di-ink)}.di-workspace-head{display:flex;align-items:center;justify-content:space-between;height:70px;padding:0 22px 0 25px;border-bottom:1px solid var(--di-line);background:var(--di-white)}.di-workspace-head h2{margin:0;font-size:19px;font-weight:var(--di-weight-title)}.di-workspace-head>button{appearance:none;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--di-muted);font-size:24px;cursor:pointer}.di-workspace-head>button:hover{background:var(--di-paper);color:var(--di-ink)}.di-workspace-layout{display:grid;grid-template-columns:120px minmax(0,1fr);height:calc(100% - 70px)}.di-workspace-tabs{display:flex;flex-direction:column;padding:18px 0;border-right:1px solid var(--di-line);background:#f4f7fb}.di-workspace-tabs button{appearance:none;position:relative;border:0;padding:12px 16px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1.2 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;text-align:left;cursor:pointer}.di-workspace-tabs button::before{content:"";position:absolute;top:8px;bottom:8px;left:0;width:3px;border-radius:0 3px 3px 0;background:transparent}.di-workspace-tabs button:hover{color:var(--di-ink)}.di-workspace-tabs button.is-active{color:var(--di-blue);background:var(--di-white)}.di-workspace-tabs button.is-active::before{background:var(--di-blue)}.di-workspace-content{min-width:0;padding:18px;overflow:auto}.di-workspace-content>.di-card,.di-workspace-content>.di-ledger,.di-workspace-content>.di-lc-catalog{width:100%;margin-top:0;box-shadow:none}.di-local-toast{position:fixed;z-index:70;right:18px;bottom:76px;max-width:min(360px,calc(100vw - 36px));padding:11px 14px;border:1px solid #cfe5d8;border-radius:9px;background:#f3faf6;box-shadow:0 10px 30px rgba(24,65,43,.13);color:#116d40;font-size:13px;font-weight:var(--di-weight-text)}
+.di-timeline{position:fixed;right:10px;top:112px;z-index:40;width:64px;overflow:visible;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;color:var(--di-ink)}.di-time-list{display:grid;gap:14px;max-height:calc(100vh - 144px);padding:4px 8px 4px 0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}.di-time-item{position:relative;width:56px;min-height:34px}.di-time-item:not(:last-child)::after{content:"";position:absolute;z-index:-1;top:27px;right:43px;width:1px;height:25px;background:var(--di-line)}.di-time-node{appearance:none;display:flex;align-items:center;gap:7px;width:56px;height:30px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 11px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;transition:color .15s ease,background .15s ease}.di-time-node:hover,.di-time-node:focus-visible,.di-time-item.has-view .di-time-node{color:var(--di-blue);background:var(--di-blue-soft)}.di-time-node:focus-visible,.di-time-tab:focus-visible,.di-time-flyout-head>button:focus-visible{outline:3px solid rgba(36,92,255,.18);outline-offset:2px}.di-time-dot{width:7px;height:7px;flex:0 0 auto;border:2px solid #b7c0d0;border-radius:50%;background:var(--di-white)}.di-time-item.is-current .di-time-dot{border-color:var(--di-blue);background:var(--di-blue);box-shadow:0 0 0 4px rgba(36,92,255,.1)}.di-time-flyout{position:fixed;right:82px;top:112px;width:min(390px,calc(100vw - 112px));max-height:calc(100vh - 144px);overflow:hidden;border:1px solid var(--di-line);border-radius:11px;background:var(--di-white);box-shadow:0 16px 42px rgba(23,32,51,.14)}.di-time-flyout-head{display:flex;align-items:stretch;border-bottom:1px solid var(--di-line)}.di-time-tabs{display:flex;align-items:stretch;min-width:0;padding-left:14px}.di-time-tab{appearance:none;position:relative;border:0;padding:13px 2px 11px;margin-right:20px;background:transparent;color:var(--di-muted);font:var(--di-weight-text) 12px/1 "Segoe UI Variable","Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer}.di-time-tab::after{content:"";position:absolute;right:0;bottom:-1px;left:0;height:2px;border-radius:2px;background:transparent}.di-time-tab:hover{color:var(--di-ink)}.di-time-tab.is-active{color:var(--di-blue)}.di-time-tab.is-active::after{background:var(--di-blue)}.di-time-flyout-head>button{appearance:none;width:42px;border:0;margin-left:auto;background:transparent;color:var(--di-muted);font-size:20px;line-height:1;cursor:pointer}.di-time-flyout-head>button:hover{color:var(--di-ink);background:var(--di-paper)}.di-time-flyout-body{max-height:calc(100vh - 188px);padding:15px 16px;overflow:auto;font-size:13px;line-height:1.7}.di-time-records{display:grid;gap:16px}.di-time-record{padding-bottom:15px;border-bottom:1px solid var(--di-line)}.di-time-record:last-child{padding-bottom:0;border-bottom:0}.di-time-record-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-content-label{margin-bottom:4px;color:var(--di-muted);font-size:11px;font-weight:var(--di-weight-text)}.di-time-record-review{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--di-paper)}.di-time-answer>.di-time-memorize{margin-top:14px;padding:12px;border-radius:8px;background:var(--di-green-soft)}.di-time-empty{padding:16px 4px;text-align:center;color:var(--di-muted)}
 .di-lc-problem-card>.di-section,.di-lc-problem-card>.di-notice{grid-column:1/-1}
 .di-workspace-backdrop{position:fixed;z-index:53;inset:0;display:grid;place-items:center;padding:32px;background:rgba(241,245,249,.82);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}.di-workspace-panel{position:relative;right:auto;bottom:auto;width:min(1024px,calc(100vw - 64px));height:min(720px,calc(100vh - 64px));min-height:640px;border:1px solid rgba(226,232,240,.8);border-radius:16px;background:#fff;box-shadow:0 20px 25px -5px rgba(148,163,184,.18),0 8px 10px -6px rgba(148,163,184,.16)}.di-workspace-head{height:64px;padding:0 24px;border-bottom-color:#f1f5f9;background:rgba(255,255,255,.8);backdrop-filter:blur(8px)}.di-workspace-brand{display:flex;align-items:center;gap:10px}.di-workspace-brand-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:#2563eb;box-shadow:none}.di-workspace-head h2{font-size:16px;letter-spacing:-.015em}.di-workspace-head>button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;color:#94a3b8}.di-workspace-head>button:hover{color:#334155;background:#f1f5f9}.di-workspace-layout{grid-template-columns:208px minmax(0,1fr);height:calc(100% - 64px)}.di-workspace-tabs{gap:4px;padding:12px;border-right-color:#f1f5f9;background:rgba(248,250,252,.7)}.di-workspace-tabs button{display:flex;align-items:center;gap:10px;border-radius:12px;padding:9px 12px;color:#475569;font-size:12px;line-height:1.2}.di-workspace-tabs button::before{display:none}.di-workspace-tabs button:hover{color:#0f172a;background:#f1f5f9}.di-workspace-tabs button.is-active{color:#2563eb;background:rgba(239,246,255,.7);box-shadow:none}.di-workspace-count{margin-left:auto;min-width:20px;padding:2px 6px;border-radius:999px;background:#2563eb;color:#fff;font-size:10px;line-height:1.2;text-align:center}.di-workspace-content{padding:24px;background:#fff}.di-workspace-content>.di-ledger,.di-workspace-content>.di-lc-catalog{border:0;border-radius:0;background:#fff;box-shadow:none;overflow:visible}.di-history-head{min-height:auto;padding:0 0 20px;border:0}.di-ledger-title{font-size:18px}.di-history-head .di-button{height:34px;padding:0 14px;border-radius:12px;box-shadow:0 1px 2px rgba(37,99,235,.18)}.di-history-filters{gap:10px;margin-bottom:20px;padding:0;border:0;background:#fff}.di-history-filters .di-input{padding-left:14px}.di-input,.di-select{height:34px;border-color:#e2e8f0;border-radius:12px;font-size:12px}.di-input:hover,.di-select:hover{border-color:#cbd5e1}.di-history-scroll{border:1px solid #f1f5f9;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}.di-history-table th{padding:12px 16px;border:0;border-bottom:1px solid #f1f5f9;background:rgba(248,250,252,.6);color:#94a3b8;font-size:12px}.di-history-table td{padding:14px 16px;border-top-color:#f1f5f9;color:#334155}.di-history-table tbody tr{transition:background .15s ease}.di-history-table tbody tr:hover td{background:rgba(248,250,252,.5)}.di-history-table tr.is-selected td{background:#eff6ff}.di-history-topic{max-width:280px;overflow:hidden;text-overflow:ellipsis;color:#1e293b}.di-mode-badge{display:inline-flex;padding:3px 8px;border-radius:6px;background:#eef2ff;color:#4338ca;font-size:11px}.di-mode-badge.is-leetcode{background:#eff6ff;color:#2563eb}.di-mode-badge.is-scenario{background:#f0fdf4;color:#15803d}.di-mode-badge.is-mock{background:#fff7ed;color:#c2410c}.di-row-actions{gap:4px;opacity:.8}.di-history-table tr:hover .di-row-actions{opacity:1}.di-icon-button{width:28px;height:28px;border-color:transparent;border-radius:8px;background:transparent;color:#94a3b8}.di-icon-button:hover:not(:disabled){transform:none;color:#334155;background:#f1f5f9;box-shadow:none}.di-icon-button.is-delete{border-color:transparent;background:transparent;color:#94a3b8}.di-icon-button.is-delete:hover:not(:disabled){color:#e11d48;background:#fff1f2}.di-history-empty{min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;border:1px dashed #e2e8f0;border-radius:12px;background:rgba(248,250,252,.4);color:#94a3b8;font-size:12px;text-align:center}.di-history-empty-icon{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;margin-bottom:12px;border-radius:16px;background:#f1f5f9;color:#94a3b8;box-shadow:inset 0 1px 2px rgba(15,23,42,.04)}.di-history-empty-title{margin-bottom:4px;color:#334155;font-size:14px;font-weight:var(--di-weight-title)}.di-history-detail{margin-top:18px;border:1px solid #f1f5f9;border-radius:12px;background:#fff}.di-detail{padding:20px}.di-detail-heading{padding-bottom:14px;border-bottom:1px solid #f1f5f9}.di-practice-form{margin-bottom:20px;border:1px solid #f1f5f9;border-radius:12px;background:#f8fafc}.di-modal-backdrop{position:absolute;z-index:20;inset:0;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.3);backdrop-filter:blur(4px)}.di-confirm-modal{width:min(384px,100%);padding:20px;border:1px solid #f1f5f9;border-radius:16px;background:#fff;box-shadow:0 25px 50px -12px rgba(15,23,42,.3)}.di-confirm-copy{display:flex;align-items:flex-start;gap:14px}.di-confirm-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:0 0 auto;border-radius:12px;background:#fff1f2;color:#e11d48}.di-confirm-modal h4{margin:0;color:#0f172a;font-size:14px;font-weight:var(--di-weight-title)}.di-confirm-modal p{margin:4px 0 0;color:#64748b;font-size:12px;line-height:1.6}.di-confirm-modal .di-actions{justify-content:flex-end;margin-top:16px;padding-top:10px;border-top:1px solid #f8fafc}.di-confirm-modal .di-button{padding:7px 12px;border-color:transparent}.di-confirm-modal .di-button.is-danger{background:#e11d48;border-color:#e11d48;color:#fff}.di-lc-catalog-head{padding:0 0 20px}.di-lc-heading{display:flex;align-items:center;gap:8px}.di-lc-title{font-size:18px}.di-lc-source{padding:3px 8px;border-radius:999px;background:#eff6ff;color:#2563eb;font-size:11px}.di-lc-catalog-summary{gap:8px;padding:6px 14px;border:1px solid #f1f5f9;border-radius:12px;background:#f8fafc}.di-lc-progress-label{color:#94a3b8;font-size:11px}.di-lc-progress-copy{gap:4px;color:#334155;font-size:12px}.di-lc-progress-value{color:#2563eb;font-size:14px}.di-lc-progress{width:48px;height:8px;margin:0;background:#e2e8f0}.di-lc-progress>i{background:#2563eb}.di-lc-groups{display:grid;gap:24px;padding:0}.di-lc-group{display:block;padding:0;border:0}.di-lc-group-head{padding:0 4px;margin-bottom:10px}.di-lc-group-head h3{color:#1e293b;font-size:12px}.di-lc-group-head span{font-size:12px}.di-lc-problems{border:1px solid #f1f5f9;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);overflow:hidden}.di-lc-row{min-height:46px;padding:8px 12px;border-radius:0}.di-lc-row+.di-lc-row{border-top:1px solid #f1f5f9}.di-lc-row:hover{background:rgba(248,250,252,.5)}.di-lc-check{width:16px;height:16px;border-color:#cbd5e1;border-radius:4px;line-height:13px}.di-lc-problem-link{font-size:12px}.di-lc-problem-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#94a3b8}.di-lc-difficulty{min-width:auto;padding:3px 8px;border-radius:6px;font-size:10px}.di-workspace-launcher{right:20px;bottom:20px;padding:8px 14px 8px 8px}.di-local-toast{right:24px;bottom:24px}
 .di-custom-select{position:relative;min-width:0}.di-custom-select-trigger{appearance:none;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;height:34px;padding:0 10px 0 13px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#334155;font:var(--di-weight-text) 12px/1 Inter,"Segoe UI","Microsoft YaHei",sans-serif;text-align:left;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}.di-custom-select-trigger:hover:not(:disabled){border-color:#cbd5e1}.di-custom-select-trigger .is-placeholder{color:#94a3b8}.di-custom-select-trigger .di-icon{color:#94a3b8;transition:transform .15s ease}.di-custom-select.is-open .di-custom-select-trigger{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12)}.di-custom-select.is-open .di-custom-select-trigger .di-icon{transform:rotate(180deg)}.di-custom-select.is-disabled{opacity:.55}.di-custom-select-menu{position:absolute;z-index:40;top:calc(100% + 6px);right:0;left:0;max-height:220px;padding:5px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;box-shadow:0 12px 30px rgba(15,23,42,.12);overflow:auto}.di-custom-select-option{appearance:none;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:32px;padding:7px 9px;border:0;border-radius:8px;background:transparent;color:#475569;font:var(--di-weight-text) 12px/1.3 Inter,"Segoe UI","Microsoft YaHei",sans-serif;text-align:left;cursor:pointer}.di-custom-select-option:hover,.di-custom-select-option:focus-visible{outline:0;background:#f8fafc;color:#0f172a}.di-custom-select-option.is-selected{background:#eff6ff;color:#2563eb}.di-custom-select-option:disabled{opacity:.45;cursor:not-allowed}.di-history-mode-select{width:144px;flex:0 0 144px}

@@ -4,17 +4,30 @@ import { interviewApi } from './api.js'
 export function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache = options.cache !== false
   const [state, setState] = React.useState({ loading: true, data: null, error: '' })
+  const requestSequenceRef = React.useRef(0)
   const load = React.useCallback((force = false) => {
+    const requestSequence = ++requestSequenceRef.current
     setState((current) => ({ ...current, loading: current.data === null, error: '' }))
     const request = force || !cache ? Promise.resolve().then(loader) : interviewApi.cached(key, loader)
     return request
-      .then((data) => setState({ loading: false, data, error: '' }))
-      .catch((error) => setState((current) => ({ ...current, loading: false, error: error.message || '加载失败' })))
+      .then((data) => {
+        if (requestSequence === requestSequenceRef.current) setState({ loading: false, data, error: '' })
+        return data
+      })
+      .catch((error) => {
+        if (requestSequence === requestSequenceRef.current) {
+          setState((current) => ({ ...current, loading: false, error: error.message || '加载失败' }))
+        }
+      })
   }, [key, cache, ...dependencies])
 
   React.useEffect(() => {
     load()
-    return interviewApi.subscribe(() => load(true))
+    const unsubscribe = interviewApi.subscribe(() => load(true))
+    return () => {
+      requestSequenceRef.current += 1
+      unsubscribe()
+    }
   }, [load])
 
   return { ...state, reload: () => load(true) }

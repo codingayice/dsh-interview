@@ -94,7 +94,7 @@ export function QuestionResultCard({ sessionId, question }) {
     h(ErrorNotice, null, command.error))
 }
 
-export function ReviewResultCard({ sessionId, question, attempt }) {
+export function ReviewResultCard({ sessionId, question, attempt, actionsDisabled = false }) {
   if (!question || !question.explanation || (attempt && !attempt.evaluation)) return null
   const command = useCommand(sessionId)
   const run = (name, payload) => command.run(name, payload).catch(() => {})
@@ -141,10 +141,10 @@ export function ReviewResultCard({ sessionId, question, attempt }) {
       h(ErrorNotice, null, command.error),
       h('div', { className: 'di-review-actions' },
         isLeetcode
-          ? h(Button, { tone: 'primary', disabled: nextRequested, onClick: next }, nextRequested ? '已出下一题' : '随机下一题')
-          : h(Button, { tone: 'primary', busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
-        !isLeetcode ? h(Button, { busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答') : null,
-        !isLeetcode ? h(Button, { busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习') : null)))
+          ? h(Button, { tone: 'primary', disabled: actionsDisabled || nextRequested, onClick: next }, nextRequested ? '已出下一题' : '随机下一题')
+          : h(Button, { tone: 'primary', disabled: actionsDisabled, busy: command.busy === 'question.next', onClick: () => run('question.next') }, '下一题'),
+        !isLeetcode ? h(Button, { disabled: actionsDisabled, busy: command.busy === 'question.retry', onClick: retry }, h(Icon, { name: 'swap' }), '重新作答') : null,
+        !isLeetcode ? h(Button, { disabled: actionsDisabled, busy: command.busy === 'session.finish', onClick: () => run('session.finish') }, '结束练习') : null)))
 }
 
 export function ToolErrorCard({ message }) {
@@ -160,6 +160,14 @@ function usePresentedPractice(presentation, revision) {
     () => practiceId ? interviewApi.practice(practiceId) : Promise.resolve(null),
     [practiceId, revision],
     { cache: false },
+  )
+}
+
+function usePresentedSession(sessionId, revision) {
+  return useInterviewQuery(
+    `presented-session:${sessionId}:${revision || 0}`,
+    () => interviewApi.session(sessionId),
+    [sessionId, revision],
   )
 }
 
@@ -182,11 +190,19 @@ export function QuestionResourceCard({ presentation, revision, sessionId }) {
 
 export function ReviewResourceCard({ presentation, revision, sessionId }) {
   const query = usePresentedPractice(presentation, revision)
+  const sessionQuery = usePresentedSession(sessionId, revision)
   const practice = query.data?.resource?.data
+  const session = sessionQuery.data?.resource?.data
   const question = practice?.questions?.find((item) => item.id === presentation.questionId)
   const attempt = presentation.attemptId ? question?.attempts?.find((item) => item.id === presentation.attemptId) : null
   const complete = question?.explanation && (!presentation.attemptId || attempt?.evaluation)
-  return h(PresentedState, { query, missing: '找不到讲解数据' }, complete ? h(ReviewResultCard, { sessionId, question, attempt }) : null)
+  const actionsEnabled = session?.selected
+    && session.practice?.id === presentation.practiceId
+    && session.questionId === presentation.questionId
+    && session.phase === 'awaiting_next'
+  return h(PresentedState, { query, missing: '找不到讲解数据' }, complete
+    ? h(ReviewResultCard, { sessionId, question, attempt, actionsDisabled: !actionsEnabled })
+    : null)
 }
 
 export function PracticeSummaryCard({ presentation, revision }) {

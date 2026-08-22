@@ -186,8 +186,10 @@ export function PracticeLibrary({
   const [creating, setCreating] = React.useState(false)
   const command = useCommand(sessionId)
   const effectiveStatus = statusScope === 'active' ? 'active' : 'completed'
-  const filters = { query: queryText, mode, status: effectiveStatus }
-  const list = useInterviewQuery(`practices:${queryText}:${mode}:${effectiveStatus}`, () => interviewApi.practices(filters), [queryText, mode, effectiveStatus])
+  const normalizedQuery = queryText.trim()
+  const modeFilter = MODE_OPTIONS.some((option) => option.value === mode) ? mode : undefined
+  const filters = { query: normalizedQuery || undefined, mode: modeFilter, status: effectiveStatus }
+  const list = useInterviewQuery(`practices:${normalizedQuery}:${modeFilter || 'all'}:${effectiveStatus}`, () => interviewApi.practices(filters), [normalizedQuery, modeFilter, effectiveStatus])
   const practices = list.data?.resource?.data || []
   const visibleSelectedId = practices.some((practice) => practice.id === selectedId) ? selectedId : null
   const detail = useInterviewQuery(`practice:${visibleSelectedId || 'none'}`, () => visibleSelectedId ? interviewApi.practice(visibleSelectedId) : Promise.resolve(null), [visibleSelectedId])

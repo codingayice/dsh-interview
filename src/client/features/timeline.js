@@ -55,40 +55,43 @@ export function TimelinePanel({ sessionId, revisionSignal }) {
   const practice = detailQuery.data?.resource?.data
   if (!session?.selected || !practice?.questions?.length) return null
 
+  const selectedQuestion = practice.questions.find((question) => question.id === selection?.questionId)
+  const selectedViews = selectedQuestion?.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS
+  const selectedView = selectedViews.some((item) => item.id === selection?.view) ? selection.view : null
+  const selectedLabel = selectedViews.find((item) => item.id === selectedView)?.label
+
   return h('nav', {
     className: 'di-timeline',
     'aria-label': '题目时间轴',
     onKeyDown: (event) => {
       if (event.key === 'Escape') setSelection(null)
     },
-  }, practice.questions.map((question) => {
-    const views = question.leetcode ? TIMELINE_VIEWS.slice(0, 1) : TIMELINE_VIEWS
-    const activeView = selection?.questionId === question.id ? selection.view : null
-    const activeLabel = views.find((item) => item.id === activeView)?.label
+  },
+  h('div', { className: 'di-time-list' }, practice.questions.map((question) => {
+    const active = selection?.questionId === question.id
     return h('div', {
-      className: `di-time-item${session.questionId === question.id ? ' is-current' : ''}${activeView ? ' has-view' : ''}`,
+      className: `di-time-item${session.questionId === question.id ? ' is-current' : ''}${active ? ' has-view' : ''}`,
       key: question.id,
-    },
-    h('button', {
+    }, h('button', {
       className: 'di-time-node',
       type: 'button',
       'aria-label': `第 ${question.sequence} 题：${question.prompt}`,
       onClick: () => setSelection({ questionId: question.id, view: 'question' }),
     },
     h('span', { className: 'di-time-dot', 'aria-hidden': 'true' }),
-    h('span', null, `Q${String(question.sequence).padStart(2, '0')}`)),
-    activeView ? h('section', { className: 'di-time-flyout', 'aria-label': `${activeLabel}内容` },
+    h('span', null, `Q${String(question.sequence).padStart(2, '0')}`)))
+  })),
+  selectedQuestion && selectedView ? h('section', { className: 'di-time-flyout', 'aria-label': `${selectedLabel}内容` },
       h('header', { className: 'di-time-flyout-head' },
-        h('div', { className: 'di-time-tabs', role: 'tablist', 'aria-label': `第 ${question.sequence} 题详情` },
-          views.map((item) => h('button', {
-            className: `di-time-tab${activeView === item.id ? ' is-active' : ''}`,
+        h('div', { className: 'di-time-tabs', role: 'tablist', 'aria-label': `第 ${selectedQuestion.sequence} 题详情` },
+          selectedViews.map((item) => h('button', {
+            className: `di-time-tab${selectedView === item.id ? ' is-active' : ''}`,
             type: 'button',
             role: 'tab',
             key: item.id,
-            'aria-selected': activeView === item.id,
-            onClick: () => setSelection({ questionId: question.id, view: item.id }),
+            'aria-selected': selectedView === item.id,
+            onClick: () => setSelection({ questionId: selectedQuestion.id, view: item.id }),
           }, item.label))),
         h('button', { type: 'button', onClick: () => setSelection(null), 'aria-label': '关闭' }, '×')),
-      h('div', { className: 'di-time-flyout-body', role: 'tabpanel' }, h(TimelineContent, { question, view: activeView }))) : null)
-  }))
+      h('div', { className: 'di-time-flyout-body', role: 'tabpanel' }, h(TimelineContent, { question: selectedQuestion, view: selectedView }))) : null)
 }
