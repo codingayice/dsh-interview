@@ -1,5 +1,6 @@
 import React from 'react'
 import { interviewApi } from './api.js'
+import { createSingleFlight } from './single-flight.js'
 
 export function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache = options.cache !== false
@@ -36,20 +37,22 @@ export function useInterviewQuery(key, loader, dependencies = [], options = {}) 
 
 export function useCommand(sessionId) {
   const [state, setState] = React.useState({ busy: '', error: '' })
-  const inFlightRef = React.useRef(false)
-  const run = React.useCallback(async (command, payload = {}) => {
-    if (inFlightRef.current) return null
-    inFlightRef.current = true
-    setState({ busy: command, error: '' })
-    try {
-      return await interviewApi.command(sessionId, command, payload)
-    } catch (error) {
-      setState({ busy: '', error: error.message || '操作失败' })
-      throw error
-    } finally {
-      inFlightRef.current = false
-      setState((current) => ({ ...current, busy: '' }))
-    }
-  }, [sessionId])
+  const sessionIdRef = React.useRef(sessionId)
+  const runnerRef = React.useRef(null)
+  sessionIdRef.current = sessionId
+  if (!runnerRef.current) {
+    runnerRef.current = createSingleFlight(async (command, payload = {}) => {
+      setState({ busy: command, error: '' })
+      try {
+        return await interviewApi.command(sessionIdRef.current, command, payload)
+      } catch (error) {
+        setState({ busy: '', error: error.message || '操作失败' })
+        throw error
+      } finally {
+        setState((current) => ({ ...current, busy: '' }))
+      }
+    })
+  }
+  const run = React.useCallback((command, payload = {}) => runnerRef.current(command, payload), [])
   return { ...state, run, clearError: () => setState((current) => ({ ...current, error: '' })) }
 }

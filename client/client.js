@@ -138,6 +138,22 @@ var interviewApi = {
 
 // src/client/shared/hooks.js
 var import_react = __toESM(require("react"), 1);
+
+// src/client/shared/single-flight.js
+function createSingleFlight(handler) {
+  let running = false;
+  return async (...args) => {
+    if (running) return null;
+    running = true;
+    try {
+      return await handler(...args);
+    } finally {
+      running = false;
+    }
+  };
+}
+
+// src/client/shared/hooks.js
 function useInterviewQuery(key, loader, dependencies = [], options = {}) {
   const cache2 = options.cache !== false;
   const version = options.version || 0;
@@ -168,21 +184,23 @@ function useInterviewQuery(key, loader, dependencies = [], options = {}) {
 }
 function useCommand(sessionId) {
   const [state, setState] = import_react.default.useState({ busy: "", error: "" });
-  const inFlightRef = import_react.default.useRef(false);
-  const run = import_react.default.useCallback(async (command, payload = {}) => {
-    if (inFlightRef.current) return null;
-    inFlightRef.current = true;
-    setState({ busy: command, error: "" });
-    try {
-      return await interviewApi.command(sessionId, command, payload);
-    } catch (error) {
-      setState({ busy: "", error: error.message || "\u64CD\u4F5C\u5931\u8D25" });
-      throw error;
-    } finally {
-      inFlightRef.current = false;
-      setState((current) => ({ ...current, busy: "" }));
-    }
-  }, [sessionId]);
+  const sessionIdRef = import_react.default.useRef(sessionId);
+  const runnerRef = import_react.default.useRef(null);
+  sessionIdRef.current = sessionId;
+  if (!runnerRef.current) {
+    runnerRef.current = createSingleFlight(async (command, payload = {}) => {
+      setState({ busy: command, error: "" });
+      try {
+        return await interviewApi.command(sessionIdRef.current, command, payload);
+      } catch (error) {
+        setState({ busy: "", error: error.message || "\u64CD\u4F5C\u5931\u8D25" });
+        throw error;
+      } finally {
+        setState((current) => ({ ...current, busy: "" }));
+      }
+    });
+  }
+  const run = import_react.default.useCallback((command, payload = {}) => runnerRef.current(command, payload), []);
   return { ...state, run, clearError: () => setState((current) => ({ ...current, error: "" })) };
 }
 

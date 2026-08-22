@@ -36,3 +36,21 @@ test('低版本读取复用已有高版本资源', async () => {
   assert.deepEqual(older, latest)
   assert.equal(loads, 1)
 })
+
+test('全部模式请求不会发送空的模式筛选条件', async () => {
+  const originalFetch = globalThis.fetch
+  let requestedUrl = ''
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url)
+    return { ok: true, json: async () => ({ resource: { data: [] } }) }
+  }
+  try {
+    await interviewApi.practices({ query: '', mode: '', status: 'active' })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+
+  assert.match(requestedUrl, /status=active/)
+  assert.doesNotMatch(requestedUrl, /(?:\?|&)mode=/)
+  assert.doesNotMatch(requestedUrl, /(?:\?|&)query=/)
+})
